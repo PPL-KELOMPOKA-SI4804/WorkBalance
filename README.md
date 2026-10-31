@@ -2,8 +2,6 @@
 
 > Sistem pendukung keputusan berbasis web untuk memantau beban kerja dan kondisi kerja pegawai (SDG 8).
 
-![Status](https://img.shields.io/badge/status-purwarupa%20akademik-orange)
-![Mata kuliah](https://img.shields.io/badge/mata%20kuliah-PPL%20SI4804-blue)
 ![Laravel](https://img.shields.io/badge/backend-Laravel-FF2D20?logo=laravel&logoColor=white)
 ![React](https://img.shields.io/badge/frontend-React-61DAFB?logo=react&logoColor=black)
 ![Tailwind CSS](https://img.shields.io/badge/UI-Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)
