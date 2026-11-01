@@ -1,3 +1,5 @@
+<div align="center">
+
 # WorkBalance
 
 > Sistem pendukung keputusan berbasis web untuk memantau beban kerja dan kondisi kerja pegawai (SDG 8).
@@ -6,6 +8,8 @@
 ![React](https://img.shields.io/badge/frontend-React-61DAFB?logo=react&logoColor=black)
 ![Tailwind CSS](https://img.shields.io/badge/UI-Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![MySQL](https://img.shields.io/badge/database-MySQL-4479A1?logo=mysql&logoColor=white)
+
+</div>
 
 WorkBalance mengumpulkan data kondisi kerja yang dalam skenario proyek ini tersebar di spreadsheet, formulir, dokumen, dan komunikasi internal: tugas, jam kerja, survei pegawai, laporan masalah, insiden keselamatan, dan data pelatihan. Semuanya disimpan dalam satu basis data dengan akses berdasarkan peran.
 
