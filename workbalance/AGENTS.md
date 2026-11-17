@@ -1,8 +1,8 @@
-# Agentic Engineering Constitution & Rules (GEMINI.md): WorkBalance
+# Agentic Engineering Constitution & Rules (AGENTS.md): WorkBalance
 
 **Versi Dokumen:** 1.0
 **Tanggal:** 17 November 2026
-**Ekosistem:** Google Antigravity (_Agent-First IDE_)
+**Ekosistem:** Multi-Agent Coding Constitution (Selaras dengan `GEMINI.md` & `CLAUDE.md`)
 **Dokumen Pendamping:** `PRD.md` (Logika Produk), `ARCHITECTURE.md` (Skema DB & API), `DESIGN.md` (UI/UX & Brand Tokens)
 
 ---
@@ -105,3 +105,56 @@ Setiap kali menerima instruksi fitur atau perbaikan (_bugfix_), ikuti siklus ber
   1. Seluruh _unit/feature test_ untuk kalkulasi _Workload Risk_ & _Decent Work Score_ lulus (`php artisan test`) dan hasilnya cocok 100% dengan kasus uji manual[cite: 1].
   2. Kontrol akses RBAC dan privasi survei terverifikasi lewat pengujian _endpoint_ (memastikan `403 Forbidden` untuk akses lintas peran)[cite: 1].
   3. Frontend terkompilasi bersih tanpa galat (`npm run build` sukses) dan tampilan sesuai dengan spesifikasi `DESIGN.md`.
+
+---
+
+## 7. Prasyarat Lingkungan Backend & Laravel Boost
+
+<laravel-boost-guidelines>
+# Laravel Application (`backend/`)
+
+The `backend/` directory in this monorepo (`workbalance/backend/`) contains a Laravel application. Complete or verify the following setup before working on backend requests.
+
+## Prerequisites
+
+Verify that PHP and Composer are available:
+
+```sh
+php -v
+composer -V
+```
+
+If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+
+macOS:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
+```
+
+Windows PowerShell:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
+```
+
+Linux:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
+```
+
+After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
+
+## Agent Setup
+
+Install Laravel Boost from the Laravel application root (`workbalance/backend/`) before making backend application changes (if not yet installed):
+
+```sh
+cd backend
+composer require laravel/boost --dev
+php artisan boost:install
+```
+
+Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` (and `backend/AGENTS.md` if generated) again and continue with the user's original request using the generated guidelines, while always upholding the WorkBalance rules in Sections 1–6 above.
+</laravel-boost-guidelines>
