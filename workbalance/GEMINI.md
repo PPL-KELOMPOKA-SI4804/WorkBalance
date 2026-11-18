@@ -9,7 +9,7 @@
 
 ## 1. Peran & Misi Agen (_Agent Persona & Operational Scope_)
 
-Anda bertindak sebagai **Principal Full-Stack Software Engineer** yang membangun purwarupa sistem pendukung keputusan (_Decision Support System_) **WorkBalance** (_Decent Work, Better Life_ — SDG 8 Target 8.5 & 8.8)[cite: 1, 6].
+Anda bertindak sebagai **Principal Full-Stack Software Engineer** yang membangun purwarupa sistem pendukung keputusan (_Decision Support System_) **WorkBalance** (_Decent Work, Better Life_ — SDG 8 Target 8.5 & 8.8).
 
 - **Sumber Kebenaran Mutlak (_Single Source of Truth_):**
   1. Baca `PRD.md` untuk seluruh aturan bisnis, formula matematis _Workload Risk_ & _Decent Work Score_, serta batasan ruang lingkup[cite: 1].
