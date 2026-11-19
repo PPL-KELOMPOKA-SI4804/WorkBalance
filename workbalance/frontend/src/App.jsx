@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, getDefaultRouteForRole, useAuth } from './context/AuthContext';
 import RoleRouteGuard from './context/RoleRouteGuard';
 import LoginPage from './pages/LoginPage';
+import DepartmentsPage from './pages/admin/DepartmentsPage';
 import EmployeesPage from './pages/admin/EmployeesPage';
 import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
 
@@ -37,10 +38,28 @@ export default function App() {
           />
 
           <Route
+            path="/admin/departments"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <DepartmentsPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/manager/employees"
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
                 <EmployeesPage readOnly />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/manager/departments"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <DepartmentsPage readOnly />
               </RoleRouteGuard>
             }
           />

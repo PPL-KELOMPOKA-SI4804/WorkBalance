@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Briefcase,
+  Building2,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -49,9 +50,11 @@ export default function AppShell({
   const navItemsByRole = {
     admin: [
       { label: 'Pegawai & Kepegawaian', to: '/admin/employees', icon: Users },
+      { label: 'Data Departemen', to: '/admin/departments', icon: Building2 },
     ],
     manager: [
       { label: 'Direktori Tim', to: '/manager/employees', icon: Users },
+      { label: 'Struktur Departemen', to: '/manager/departments', icon: Building2 },
     ],
     employee: [
       { label: 'Beranda Pegawai', to: '/employee/dashboard', icon: LayoutDashboard },
@@ -115,7 +118,7 @@ export default function AppShell({
           </p>
           <div className="px-3 py-2 flex items-center gap-2.5 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0" />
-            <span>Sprint 0 & PBI-01 Aktif</span>
+            <span>Sprint 0, PBI-01 & PBI-02 Aktif</span>
           </div>
           <div className="px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-400">
             <Briefcase className="w-4 h-4 shrink-0" />
