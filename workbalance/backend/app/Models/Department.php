@@ -36,4 +36,19 @@ class Department extends Model
     {
         return $this->hasMany(DecentWorkScore::class, 'department_id');
     }
+
+    public function workplaceIssues(): HasMany
+    {
+        return $this->hasMany(WorkplaceIssue::class, 'department_id');
+    }
+
+    public function safetyIncidents(): HasMany
+    {
+        return $this->hasMany(SafetyIncident::class, 'department_id');
+    }
+
+    public function improvementActions(): HasMany
+    {
+        return $this->hasMany(ImprovementAction::class, 'department_id');
+    }
 }
