@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Award,
   Briefcase,
   Building2,
   ClipboardCheck,
@@ -57,6 +58,7 @@ export default function AppShell({
       { label: 'Manajemen Tugas', to: '/admin/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/admin/task-assignments', icon: ClipboardCheck },
       { label: 'Katalog Pelatihan', to: '/admin/trainings', icon: GraduationCap },
+      { label: 'Keikutsertaan Pelatihan', to: '/admin/training-participations', icon: Award },
     ],
     manager: [
       { label: 'Direktori Tim', to: '/manager/employees', icon: Users },
@@ -64,11 +66,13 @@ export default function AppShell({
       { label: 'Manajemen Tugas', to: '/manager/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/manager/task-assignments', icon: ClipboardCheck },
       { label: 'Katalog Pelatihan', to: '/manager/trainings', icon: GraduationCap },
+      { label: 'Keikutsertaan Pelatihan', to: '/manager/training-participations', icon: Award },
     ],
     employee: [
       { label: 'Beranda Pegawai', to: '/employee/dashboard', icon: LayoutDashboard },
       { label: 'Daftar Tugas', to: '/employee/tasks', icon: ClipboardList },
       { label: 'Penugasan Saya', to: '/employee/task-assignments', icon: ClipboardCheck },
+      { label: 'Pelatihan Saya', to: '/employee/training-participations', icon: Award },
     ],
   };
 
@@ -129,7 +133,7 @@ export default function AppShell({
           </p>
           <div className="px-3 py-2 flex items-center gap-2.5 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0" />
-            <span>Sprint 0, PBI-01 s.d. PBI-05 Aktif</span>
+            <span>Sprint 0, PBI-01 s.d. PBI-06 Aktif</span>
           </div>
           <div className="px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-400">
             <Briefcase className="w-4 h-4 shrink-0" />

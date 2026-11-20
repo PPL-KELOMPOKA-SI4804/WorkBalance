@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\MasterLookupController;
 use App\Http\Controllers\Api\V1\TaskAssignmentController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrainingController;
+use App\Http\Controllers\Api\V1\TrainingParticipationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -46,16 +47,19 @@ Route::prefix('v1')->group(function () {
             Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
         });
 
-        // Read access for Admin, Manager, & Employee (PBI-03: FR-06, PBI-04: FR-07)
+        // Read access for Admin, Manager, & Employee (PBI-03: FR-06, PBI-04: FR-07, PBI-06: FR-15)
         Route::middleware('role:admin,manager,employee')->group(function () {
             Route::get('/tasks', [TaskController::class, 'index']);
             Route::get('/tasks/{task}', [TaskController::class, 'show']);
 
             Route::get('/task-assignments', [TaskAssignmentController::class, 'index']);
             Route::get('/task-assignments/{taskAssignment}', [TaskAssignmentController::class, 'show']);
+
+            Route::get('/training-participations', [TrainingParticipationController::class, 'index']);
+            Route::get('/training-participations/{trainingParticipation}', [TrainingParticipationController::class, 'show']);
         });
 
-        // Write access for Admin & Manager (PBI-03: FR-06, PBI-04: FR-07, PBI-05: FR-15)
+        // Write access for Admin & Manager (PBI-03: FR-06, PBI-04: FR-07, PBI-05 & PBI-06: FR-15)
         Route::middleware('role:admin,manager')->group(function () {
             Route::post('/tasks', [TaskController::class, 'store']);
             Route::put('/tasks/{task}', [TaskController::class, 'update']);
@@ -70,6 +74,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/trainings', [TrainingController::class, 'store']);
             Route::put('/trainings/{training}', [TrainingController::class, 'update']);
             Route::delete('/trainings/{training}', [TrainingController::class, 'destroy']);
+
+            Route::post('/training-participations', [TrainingParticipationController::class, 'store']);
+            Route::put('/training-participations/{trainingParticipation}', [TrainingParticipationController::class, 'update']);
+            Route::delete('/training-participations/{trainingParticipation}', [TrainingParticipationController::class, 'destroy']);
         });
     });
 });
