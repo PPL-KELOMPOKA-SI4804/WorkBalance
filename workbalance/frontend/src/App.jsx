@@ -4,6 +4,7 @@ import RoleRouteGuard from './context/RoleRouteGuard';
 import LoginPage from './pages/LoginPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import EmployeesPage from './pages/admin/EmployeesPage';
+import TrainingParticipationsPage from './pages/admin/TrainingParticipationsPage';
 import TrainingsPage from './pages/admin/TrainingsPage';
 import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
 import TaskAssignmentsPage from './pages/manager/TaskAssignmentsPage';
@@ -77,6 +78,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/training-participations"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <TrainingParticipationsPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/manager/employees"
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
@@ -122,6 +132,15 @@ export default function App() {
           />
 
           <Route
+            path="/manager/training-participations"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <TrainingParticipationsPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/employee/dashboard"
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
@@ -144,6 +163,15 @@ export default function App() {
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
                 <TaskAssignmentsPage readOnly />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/employee/training-participations"
+            element={
+              <RoleRouteGuard allowedRoles={['employee']}>
+                <TrainingParticipationsPage readOnly />
               </RoleRouteGuard>
             }
           />
