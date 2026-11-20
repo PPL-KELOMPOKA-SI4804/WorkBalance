@@ -8,6 +8,7 @@ import TrainingParticipationsPage from './pages/admin/TrainingParticipationsPage
 import TrainingsPage from './pages/admin/TrainingsPage';
 import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
 import SurveysPage from './pages/employee/SurveysPage';
+import WorkLogsPage from './pages/employee/WorkLogsPage';
 import WorkplaceIssuesPage from './pages/employee/WorkplaceIssuesPage';
 import TaskAssignmentsPage from './pages/manager/TaskAssignmentsPage';
 import TasksPage from './pages/manager/TasksPage';
@@ -107,6 +108,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/work-logs"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <WorkLogsPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/manager/employees"
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
@@ -179,6 +189,15 @@ export default function App() {
           />
 
           <Route
+            path="/manager/work-logs"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <WorkLogsPage readOnly />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/employee/dashboard"
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
@@ -228,6 +247,15 @@ export default function App() {
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
                 <WorkplaceIssuesPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/employee/work-logs"
+            element={
+              <RoleRouteGuard allowedRoles={['employee']}>
+                <WorkLogsPage />
               </RoleRouteGuard>
             }
           />

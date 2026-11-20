@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   GraduationCap,
   HeartHandshake,
   LayoutDashboard,
@@ -59,6 +60,7 @@ export default function AppShell({
       { label: 'Data Departemen', to: '/admin/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/admin/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/admin/task-assignments', icon: ClipboardCheck },
+      { label: 'Catatan Waktu Kerja', to: '/admin/work-logs', icon: Clock },
       { label: 'Katalog Pelatihan', to: '/admin/trainings', icon: GraduationCap },
       { label: 'Keikutsertaan Pelatihan', to: '/admin/training-participations', icon: Award },
       { label: 'Survei Kondisi Kerja', to: '/admin/surveys', icon: HeartHandshake },
@@ -69,6 +71,7 @@ export default function AppShell({
       { label: 'Struktur Departemen', to: '/manager/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/manager/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/manager/task-assignments', icon: ClipboardCheck },
+      { label: 'Catatan Waktu Kerja', to: '/manager/work-logs', icon: Clock },
       { label: 'Katalog Pelatihan', to: '/manager/trainings', icon: GraduationCap },
       { label: 'Keikutsertaan Pelatihan', to: '/manager/training-participations', icon: Award },
       { label: 'Survei Kondisi Kerja', to: '/manager/surveys', icon: HeartHandshake },
@@ -78,6 +81,7 @@ export default function AppShell({
       { label: 'Beranda Pegawai', to: '/employee/dashboard', icon: LayoutDashboard },
       { label: 'Daftar Tugas', to: '/employee/tasks', icon: ClipboardList },
       { label: 'Penugasan Saya', to: '/employee/task-assignments', icon: ClipboardCheck },
+      { label: 'Catatan Waktu Kerja', to: '/employee/work-logs', icon: Clock },
       { label: 'Pelatihan Saya', to: '/employee/training-participations', icon: Award },
       { label: 'Survei Kondisi Kerja', to: '/employee/surveys', icon: HeartHandshake },
       { label: 'Permasalahan Kerja', to: '/employee/workplace-issues', icon: MessageSquareWarning },
@@ -141,7 +145,7 @@ export default function AppShell({
           </p>
           <div className="px-3 py-2 flex items-center gap-2.5 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0" />
-            <span>Sprint 0, PBI-01 s.d. PBI-08 Aktif</span>
+            <span>Sprint 0, PBI-01 s.d. PBI-09 Aktif</span>
           </div>
           <div className="px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-400">
             <Briefcase className="w-4 h-4 shrink-0" />

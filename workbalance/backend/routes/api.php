@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\TaskAssignmentController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrainingController;
 use App\Http\Controllers\Api\V1\TrainingParticipationController;
+use App\Http\Controllers\Api\V1\WorkLogController;
 use App\Http\Controllers\Api\V1\WorkplaceIssueController;
 use Illuminate\Support\Facades\Route;
 
@@ -105,6 +106,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'show']);
             Route::put('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'update']);
             Route::delete('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'destroy']);
+        });
+
+        // Daily Work Logs & Estimation vs Realization (PBI-09: FR-08)
+        Route::middleware('role:admin,manager,employee')->group(function () {
+            Route::get('/work-logs', [WorkLogController::class, 'index']);
+            Route::get('/work-logs/{workLog}', [WorkLogController::class, 'show']);
+        });
+
+        Route::middleware('role:admin,employee')->group(function () {
+            Route::post('/work-logs', [WorkLogController::class, 'store']);
+            Route::put('/work-logs/{workLog}', [WorkLogController::class, 'update']);
+            Route::delete('/work-logs/{workLog}', [WorkLogController::class, 'destroy']);
         });
     });
 });
