@@ -6,6 +6,8 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmploymentType;
 use App\Models\Position;
+use App\Models\Task;
+use App\Models\TaskAssignment;
 use App\Models\UserAccount;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -150,6 +152,119 @@ class DatabaseSeeder extends Seeder
 
                 if (isset($entry['manages_department'])) {
                     $entry['manages_department']->update(['manager_id' => $employee->id]);
+                }
+            }
+
+            $managerEmployee = Employee::where('employee_code', 'EMP-002')->first();
+
+            if ($managerEmployee) {
+                $seedTasks = [
+                    [
+                        'title' => 'Integrasi Modul Autentikasi Sanctum & RBAC',
+                        'department_id' => $engDept->id,
+                        'description' => 'Memastikan proteksi rute lintas peran dan token sesi berjalan sesuai standar keamanan.',
+                        'estimated_hours' => 16.00,
+                        'priority' => 'critical',
+                        'due_date' => now()->addDays(3)->toDateString(),
+                        'status' => 'in_progress',
+                    ],
+                    [
+                        'title' => 'Optimasi Kueri Agregasi Laporan Mingguan',
+                        'department_id' => $engDept->id,
+                        'description' => 'Mengurangi waktu eksekusi kueri ringkasan jam kerja tim pada dasbor.',
+                        'estimated_hours' => 12.00,
+                        'priority' => 'high',
+                        'due_date' => now()->subDays(2)->toDateString(),
+                        'status' => 'open',
+                    ],
+                    [
+                        'title' => 'Audit Prosedur Eskalasi Insiden Layanan',
+                        'department_id' => $opsDept->id,
+                        'description' => 'Meninjau ulang SOP penanganan tiket darurat dan jam operasional shift.',
+                        'estimated_hours' => 8.50,
+                        'priority' => 'medium',
+                        'due_date' => now()->addDays(14)->toDateString(),
+                        'status' => 'open',
+                    ],
+                    [
+                        'title' => 'Penyusunan Template Onboarding Pegawai Baru',
+                        'department_id' => $opsDept->id,
+                        'description' => 'Menyusun panduan pengisian work log harian dan pengenalan aturan PP 35/2021.',
+                        'estimated_hours' => 6.00,
+                        'priority' => 'low',
+                        'due_date' => now()->subDays(5)->toDateString(),
+                        'status' => 'completed',
+                    ],
+                ];
+
+                foreach ($seedTasks as $taskData) {
+                    Task::firstOrCreate(
+                        [
+                            'title' => $taskData['title'],
+                            'department_id' => $taskData['department_id'],
+                        ],
+                        [
+                            'created_by' => $managerEmployee->id,
+                            'description' => $taskData['description'],
+                            'estimated_hours' => $taskData['estimated_hours'],
+                            'priority' => $taskData['priority'],
+                            'due_date' => $taskData['due_date'],
+                            'status' => $taskData['status'],
+                        ]
+                    );
+                }
+
+                $emp3 = Employee::where('employee_code', 'EMP-003')->first();
+                $emp4 = Employee::where('employee_code', 'EMP-004')->first();
+                $emp5 = Employee::where('employee_code', 'EMP-005')->first();
+
+                $task1 = Task::where('title', 'Integrasi Modul Autentikasi Sanctum & RBAC')->first();
+                $task2 = Task::where('title', 'Optimasi Kueri Agregasi Laporan Mingguan')->first();
+                $task3 = Task::where('title', 'Audit Prosedur Eskalasi Insiden Layanan')->first();
+                $task4 = Task::where('title', 'Penyusunan Template Onboarding Pegawai Baru')->first();
+
+                $seedAssignments = [
+                    [
+                        'task' => $task1,
+                        'employee' => $emp3,
+                        'deadline' => now()->addDays(3)->toDateString(),
+                        'status' => 'in_progress',
+                    ],
+                    [
+                        'task' => $task2,
+                        'employee' => $emp3,
+                        'deadline' => now()->subDays(2)->toDateString(),
+                        'status' => 'assigned',
+                    ],
+                    [
+                        'task' => $task3,
+                        'employee' => $emp4,
+                        'deadline' => now()->addDays(14)->toDateString(),
+                        'status' => 'assigned',
+                    ],
+                    [
+                        'task' => $task4,
+                        'employee' => $emp5,
+                        'deadline' => now()->subDays(5)->toDateString(),
+                        'status' => 'completed',
+                    ],
+                ];
+
+                foreach ($seedAssignments as $assignData) {
+                    if ($assignData['task'] && $assignData['employee']) {
+                        TaskAssignment::firstOrCreate(
+                            [
+                                'task_id' => $assignData['task']->id,
+                                'employee_id' => $assignData['employee']->id,
+                            ],
+                            [
+                                'assigned_by' => $managerEmployee->id,
+                                'assigned_at' => now()->subDays(3),
+                                'deadline' => $assignData['deadline'],
+                                'status' => $assignData['status'],
+                            ]
+                        );
+                    }
                 }
             }
         });
