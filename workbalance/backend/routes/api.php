@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\TaskAssignmentController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrainingController;
 use App\Http\Controllers\Api\V1\TrainingParticipationController;
+use App\Http\Controllers\Api\V1\WorkplaceIssueController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -95,6 +96,15 @@ Route::prefix('v1')->group(function () {
                 Route::put('/surveys/{survey}', [SurveyController::class, 'update']);
                 Route::delete('/surveys/{survey}', [SurveyController::class, 'destroy']);
             });
+        });
+
+        // Workplace Issues Reporting & Resolution (PBI-08: FR-13)
+        Route::middleware('role:admin,manager,employee')->group(function () {
+            Route::get('/workplace-issues', [WorkplaceIssueController::class, 'index']);
+            Route::post('/workplace-issues', [WorkplaceIssueController::class, 'store']);
+            Route::get('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'show']);
+            Route::put('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'update']);
+            Route::delete('/workplace-issues/{workplaceIssue}', [WorkplaceIssueController::class, 'destroy']);
         });
     });
 });
