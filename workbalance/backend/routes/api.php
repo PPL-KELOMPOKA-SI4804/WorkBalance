@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmploymentTypeController;
 use App\Http\Controllers\Api\V1\MasterLookupController;
+use App\Http\Controllers\Api\V1\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -41,6 +42,19 @@ Route::prefix('v1')->group(function () {
             Route::post('/departments', [DepartmentController::class, 'store']);
             Route::put('/departments/{department}', [DepartmentController::class, 'update']);
             Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
+        });
+
+        // Read access for Admin, Manager, & Employee (PBI-03: FR-06)
+        Route::middleware('role:admin,manager,employee')->group(function () {
+            Route::get('/tasks', [TaskController::class, 'index']);
+            Route::get('/tasks/{task}', [TaskController::class, 'show']);
+        });
+
+        // Write access for Admin & Manager (PBI-03: FR-06)
+        Route::middleware('role:admin,manager')->group(function () {
+            Route::post('/tasks', [TaskController::class, 'store']);
+            Route::put('/tasks/{task}', [TaskController::class, 'update']);
+            Route::delete('/tasks/{task}', [TaskController::class, 'destroy']);
         });
     });
 });

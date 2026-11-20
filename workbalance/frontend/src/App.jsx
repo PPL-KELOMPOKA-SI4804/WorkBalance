@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import EmployeesPage from './pages/admin/EmployeesPage';
 import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
+import TasksPage from './pages/manager/TasksPage';
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -47,6 +48,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/tasks"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <TasksPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/manager/employees"
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
@@ -65,10 +75,28 @@ export default function App() {
           />
 
           <Route
+            path="/manager/tasks"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <TasksPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/employee/dashboard"
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
                 <EmployeeDashboardPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/employee/tasks"
+            element={
+              <RoleRouteGuard allowedRoles={['employee']}>
+                <TasksPage readOnly />
               </RoleRouteGuard>
             }
           />
