@@ -8,6 +8,7 @@ use App\Models\EmploymentType;
 use App\Models\Position;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use App\Models\Training;
 use App\Models\UserAccount;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -266,6 +267,54 @@ class DatabaseSeeder extends Seeder
                         );
                     }
                 }
+            }
+
+            $seedTrainings = [
+                [
+                    'title' => 'Arsitektur Sistem Terdistribusi & Optimasi Database',
+                    'category' => 'Teknis & Rekayasa',
+                    'provider' => 'WorkBalance Tech Academy',
+                    'duration_hours' => 16.00,
+                    'start_date' => now()->subDays(2)->toDateString(),
+                    'end_date' => now()->addDays(3)->toDateString(),
+                ],
+                [
+                    'title' => 'Keselamatan & Kesehatan Kerja (K3) Lingkungan Operasional',
+                    'category' => 'Keselamatan & K3',
+                    'provider' => 'Balai K3 Nasional',
+                    'duration_hours' => 12.00,
+                    'start_date' => now()->addDays(7)->toDateString(),
+                    'end_date' => now()->addDays(9)->toDateString(),
+                ],
+                [
+                    'title' => 'Manajemen Beban Kerja & Kepatuhan PP No. 35/2021',
+                    'category' => 'Kepemimpinan & Manajemen',
+                    'provider' => 'Institut SDM Indonesia',
+                    'duration_hours' => 8.00,
+                    'start_date' => now()->subDays(14)->toDateString(),
+                    'end_date' => now()->subDays(13)->toDateString(),
+                ],
+                [
+                    'title' => 'Manajemen Stres & Keseimbangan Kerja-Hidup (Work-Life Balance)',
+                    'category' => 'Kesejahteraan & Produktivitas',
+                    'provider' => 'Pusat Psikologi Terapan',
+                    'duration_hours' => 6.00,
+                    'start_date' => now()->addDays(15)->toDateString(),
+                    'end_date' => now()->addDays(15)->toDateString(),
+                ],
+            ];
+
+            foreach ($seedTrainings as $trainingData) {
+                Training::firstOrCreate(
+                    ['title' => $trainingData['title']],
+                    [
+                        'category' => $trainingData['category'],
+                        'provider' => $trainingData['provider'],
+                        'duration_hours' => $trainingData['duration_hours'],
+                        'start_date' => $trainingData['start_date'],
+                        'end_date' => $trainingData['end_date'],
+                    ]
+                );
             }
         });
     }

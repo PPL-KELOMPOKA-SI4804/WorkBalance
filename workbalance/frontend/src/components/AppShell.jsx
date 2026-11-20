@@ -5,6 +5,7 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -55,12 +56,14 @@ export default function AppShell({
       { label: 'Data Departemen', to: '/admin/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/admin/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/admin/task-assignments', icon: ClipboardCheck },
+      { label: 'Katalog Pelatihan', to: '/admin/trainings', icon: GraduationCap },
     ],
     manager: [
       { label: 'Direktori Tim', to: '/manager/employees', icon: Users },
       { label: 'Struktur Departemen', to: '/manager/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/manager/tasks', icon: ClipboardList },
       { label: 'Penugasan Kerja', to: '/manager/task-assignments', icon: ClipboardCheck },
+      { label: 'Katalog Pelatihan', to: '/manager/trainings', icon: GraduationCap },
     ],
     employee: [
       { label: 'Beranda Pegawai', to: '/employee/dashboard', icon: LayoutDashboard },
@@ -126,7 +129,7 @@ export default function AppShell({
           </p>
           <div className="px-3 py-2 flex items-center gap-2.5 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0" />
-            <span>Sprint 0, PBI-01 s.d. PBI-04 Aktif</span>
+            <span>Sprint 0, PBI-01 s.d. PBI-05 Aktif</span>
           </div>
           <div className="px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-400">
             <Briefcase className="w-4 h-4 shrink-0" />
