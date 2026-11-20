@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmploymentTypeController;
 use App\Http\Controllers\Api\V1\MasterLookupController;
+use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\TaskAssignmentController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrainingController;
@@ -78,6 +79,22 @@ Route::prefix('v1')->group(function () {
             Route::post('/training-participations', [TrainingParticipationController::class, 'store']);
             Route::put('/training-participations/{trainingParticipation}', [TrainingParticipationController::class, 'update']);
             Route::delete('/training-participations/{trainingParticipation}', [TrainingParticipationController::class, 'destroy']);
+        });
+
+        // Work Surveys & NFR-02 Department Aggregation Privacy (PBI-07: FR-12)
+        Route::middleware('survey.privacy')->group(function () {
+            Route::middleware('role:admin,manager,employee')->group(function () {
+                Route::get('/surveys', [SurveyController::class, 'index']);
+                Route::get('/surveys/{survey}', [SurveyController::class, 'show']);
+                Route::post('/surveys/{survey}/responses', [SurveyController::class, 'submitResponse']);
+                Route::put('/surveys/{survey}/responses', [SurveyController::class, 'updateResponse']);
+            });
+
+            Route::middleware('role:admin,manager')->group(function () {
+                Route::post('/surveys', [SurveyController::class, 'store']);
+                Route::put('/surveys/{survey}', [SurveyController::class, 'update']);
+                Route::delete('/surveys/{survey}', [SurveyController::class, 'destroy']);
+            });
         });
     });
 });
