@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\EmploymentTypeController;
 use App\Http\Controllers\Api\V1\MasterLookupController;
 use App\Http\Controllers\Api\V1\TaskAssignmentController;
 use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\TrainingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -54,7 +55,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/task-assignments/{taskAssignment}', [TaskAssignmentController::class, 'show']);
         });
 
-        // Write access for Admin & Manager (PBI-03: FR-06, PBI-04: FR-07)
+        // Write access for Admin & Manager (PBI-03: FR-06, PBI-04: FR-07, PBI-05: FR-15)
         Route::middleware('role:admin,manager')->group(function () {
             Route::post('/tasks', [TaskController::class, 'store']);
             Route::put('/tasks/{task}', [TaskController::class, 'update']);
@@ -63,6 +64,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/task-assignments', [TaskAssignmentController::class, 'store']);
             Route::put('/task-assignments/{taskAssignment}', [TaskAssignmentController::class, 'update']);
             Route::delete('/task-assignments/{taskAssignment}', [TaskAssignmentController::class, 'destroy']);
+
+            Route::get('/trainings', [TrainingController::class, 'index']);
+            Route::get('/trainings/{training}', [TrainingController::class, 'show']);
+            Route::post('/trainings', [TrainingController::class, 'store']);
+            Route::put('/trainings/{training}', [TrainingController::class, 'update']);
+            Route::delete('/trainings/{training}', [TrainingController::class, 'destroy']);
         });
     });
 });
