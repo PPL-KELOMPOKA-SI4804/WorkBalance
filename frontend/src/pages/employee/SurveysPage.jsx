@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
   BarChart3,
-  CheckCircle2,
-  ClipboardCheck,
   Edit3,
-  HeartHandshake,
-  Lock,
-  MessageSquareHeart,
+  Info,
   Plus,
   RefreshCw,
   RotateCcw,
-  ShieldCheck,
   Trash2,
-  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
@@ -33,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,12 +39,15 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  AnimatedNumber,
   ConfirmDialog,
   DataTable,
   FormSheet,
   KpiStatCard,
   StatusBadge,
 } from '@/components/workbalance';
+
+const ALL_VALUE = '__all__';
 
 const WLB_LIKERT_LABELS = {
   1: '1 — Sangat Buruk',
@@ -107,8 +106,30 @@ function emptyResponseForm() {
   };
 }
 
+function Nfr02PrivacyCue({ isEmployee }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-lg text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          <Info className="size-3.5 shrink-0 text-primary" />
+          <span>Privasi NFR-02: Agregat per departemen</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+        {isEmployee
+          ? 'Jawaban dan komentar Anda bersifat rahasia. Manajemen hanya melihat statistik agregat (AVG & COUNT) per departemen.'
+          : 'Hanya menampilkan statistik agregat (AVG & COUNT) per departemen tanpa identitas, skor per individu, maupun komentar responden.'}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function SurveysPage() {
   const { user } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const isEmployee = user?.role === 'employee';
   const canManage = user?.role === 'admin' || user?.role === 'manager';
 
@@ -120,7 +141,7 @@ export default function SurveysPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('');
 
   // Aggregate Detail Sheet (Manager / Admin — STRICTLY DEPARTMENT AGGREGATES ONLY)
   const [aggregateSheetOpen, setAggregateSheetOpen] = useState(false);
@@ -151,7 +172,7 @@ export default function SurveysPage() {
     try {
       const data = await surveyService.getSurveys({
         search: search.trim(),
-        is_active: activeFilter === 'all' ? '' : activeFilter,
+        is_active: activeFilter,
       });
 
       setSurveys(data?.surveys || []);
@@ -170,13 +191,13 @@ export default function SurveysPage() {
   }, [loadAllData]);
 
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || activeFilter !== 'all'),
+    () => Boolean(search.trim() || activeFilter),
     [search, activeFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setActiveFilter('all');
+    setActiveFilter('');
   };
 
   // --- Questionnaire CRUD (Admin & Manager) ---
@@ -310,7 +331,7 @@ export default function SurveysPage() {
         header: 'Departemen',
         cell: ({ row }) => (
           <div className="flex items-center gap-2 whitespace-nowrap">
-            <Badge variant="outline" className="font-mono text-[11px]">
+            <Badge variant="outline" className="font-mono text-xs">
               {row.original.department_code}
             </Badge>
             <span className="text-xs font-medium text-foreground">
@@ -327,7 +348,7 @@ export default function SurveysPage() {
           const rate = Number(row.original.participation_rate || 0);
           return (
             <div className="flex flex-col gap-1 whitespace-nowrap">
-              <div className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums">
+              <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
                 <span className="font-medium text-foreground">
                   {row.original.respondents_count} / {row.original.active_employees_count}
                 </span>
@@ -349,7 +370,7 @@ export default function SurveysPage() {
           const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
           return (
             <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+              <span className="text-xs font-medium text-foreground tabular-nums">
                 {row.original.avg_wlb_score !== null && row.original.avg_wlb_score !== undefined
                   ? `${Number(row.original.avg_wlb_score).toFixed(2)} / 5`
                   : '-'}
@@ -368,7 +389,7 @@ export default function SurveysPage() {
         id: 'workload_perception',
         header: 'Persepsi Beban',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
             {row.original.avg_workload_perception_score !== null &&
             row.original.avg_workload_perception_score !== undefined
               ? `${Number(row.original.avg_workload_perception_score).toFixed(2)} / 5`
@@ -391,7 +412,7 @@ export default function SurveysPage() {
             <span className="line-clamp-1 text-xs font-medium text-foreground">
               {row.original.title}
             </span>
-            <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+            <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
               {row.original.description || 'Survei berkala keseimbangan kehidupan kerja'}
             </span>
           </div>
@@ -401,7 +422,7 @@ export default function SurveysPage() {
         accessorKey: 'period_month',
         header: 'Periode',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
             {row.original.period_month}
           </span>
         ),
@@ -440,7 +461,7 @@ export default function SurveysPage() {
             return (
               <div className="flex flex-col items-start gap-1 whitespace-nowrap">
                 <StatusBadge status="completed" label="Sudah Diisi" />
-                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   WLB: {resp.work_life_balance_score}/5 · Beban:{' '}
                   {resp.workload_perception_score}/5
                 </span>
@@ -455,17 +476,18 @@ export default function SurveysPage() {
           cell: ({ row }) => {
             const survey = row.original;
             return (
-              <div className="flex justify-end whitespace-nowrap">
+              <div className="-mr-1.5 flex justify-end whitespace-nowrap">
                 {survey.is_active ? (
                   <Button
                     size="xs"
                     variant={survey.my_response ? 'outline' : 'default'}
+                    className="rounded-lg"
                     onClick={(event) => {
                       event.stopPropagation();
                       openResponseSheet(survey);
                     }}
                   >
-                    <Edit3 data-icon="inline-start" />
+                    <Edit3 className="size-4" data-icon="inline-start" />
                     {survey.my_response ? 'Ubah Jawaban' : 'Isi Survei'}
                   </Button>
                 ) : survey.my_response ? (
@@ -493,11 +515,11 @@ export default function SurveysPage() {
           const rate = Number(row.original.participation_rate || 0);
           return (
             <div className="flex flex-col gap-1 whitespace-nowrap">
-              <div className="flex items-center gap-1.5 font-mono text-xs tabular-nums">
+              <div className="flex items-center gap-1.5 text-xs tabular-nums">
                 <span className="font-medium text-foreground">
                   {row.original.responses_count ?? 0}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   ({rate.toFixed(1)}%)
                 </span>
               </div>
@@ -519,7 +541,7 @@ export default function SurveysPage() {
           const dimMeta = getDimensionBadgeMeta(survey.converted_wlb_dimension_score);
           return (
             <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+              <span className="text-xs font-medium text-foreground tabular-nums">
                 {survey.avg_wlb_score !== null && survey.avg_wlb_score !== undefined
                   ? `${Number(survey.avg_wlb_score).toFixed(2)} / 5`
                   : '-'}
@@ -544,12 +566,12 @@ export default function SurveysPage() {
         cell: ({ row }) => {
           const score = row.original.avg_workload_perception_score;
           if (score === null || score === undefined) {
-            return <span className="font-mono text-xs text-muted-foreground">-</span>;
+            return <span className="text-xs text-muted-foreground">-</span>;
           }
           const num = Number(score);
           return (
             <div className="flex flex-col gap-1 whitespace-nowrap">
-              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+              <span className="text-xs font-medium text-foreground tabular-nums">
                 {num.toFixed(2)} / 5
               </span>
               <Progress value={Math.min(100, Math.max(0, (num / 5) * 100))} className="h-1.5 w-20" />
@@ -565,16 +587,17 @@ export default function SurveysPage() {
           const survey = row.original;
           const hasResponses = Number(survey.responses_count || 0) > 0;
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
               <Button
                 variant="outline"
                 size="xs"
+                className="rounded-lg"
                 onClick={(event) => {
                   event.stopPropagation();
                   openAggregateSheet(survey);
                 }}
               >
-                <BarChart3 data-icon="inline-start" />
+                <BarChart3 className="size-4" data-icon="inline-start" />
                 Agregat
               </Button>
 
@@ -609,7 +632,7 @@ export default function SurveysPage() {
                     <Trash2
                       className={
                         hasResponses
-                          ? 'size-4 text-muted-foreground/60'
+                          ? 'size-4 text-muted-foreground'
                           : 'size-4 text-destructive'
                       }
                     />
@@ -634,44 +657,40 @@ export default function SurveysPage() {
   return (
     <AppShell
       title="Survei Kondisi Kerja"
-      breadcrumb={
-        isEmployee
-          ? 'Kesejahteraan & Pelatihan / Pengisian Survei Kondisi Kerja'
-          : 'Kesejahteraan & Kompetensi / Survei & Agregasi Departemen'
-      }
+      breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
       actions={
-        canManage ? (
-          <Button size="sm" onClick={openCreateSurveySheet}>
-            <Plus data-icon="inline-start" />
-            Buat Survei Baru
-          </Button>
-        ) : undefined
+        <div className="flex flex-wrap items-center gap-3">
+          <Nfr02PrivacyCue isEmployee={isEmployee} />
+          {canManage && (
+            <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
+              <Plus className="size-4" data-icon="inline-start" />
+              Buat Survei
+            </Button>
+          )}
+        </div>
       }
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : isEmployee ? (
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard
-              label="Survei Periode Dibuka"
+              label="Survei Dibuka"
               value={summary.active_surveys_count ?? 0}
               unit="periode"
-              icon={HeartHandshake}
-              statusTone="info"
-              statusLabel={`Dari ${summary.total_surveys ?? 0} total periode`}
+              hint={`Dari ${summary.total_surveys ?? 0} periode`}
             />
 
             <KpiStatCard
-              label="Survei Sudah Diisi"
+              label="Sudah Diisi"
               value={summary.my_submitted_count ?? 0}
               unit="survei"
-              icon={CheckCircle2}
               status="completed"
               statusLabel="Partisipasi tercatat"
             />
@@ -680,17 +699,16 @@ export default function SurveysPage() {
               label="Menunggu Pengisian"
               value={summary.my_pending_count ?? 0}
               unit="survei"
-              icon={ClipboardCheck}
               statusTone={Number(summary.my_pending_count || 0) > 0 ? 'warning' : 'success'}
               statusLabel={
                 Number(summary.my_pending_count || 0) > 0
-                  ? 'Mohon lengkapi survei aktif'
-                  : 'Semua survei aktif terisi'
+                  ? 'Perlu dilengkapi'
+                  : 'Semua terisi'
               }
             />
 
             <KpiStatCard
-              label="Rata-rata Skor WLB Saya"
+              label="Rata-rata WLB Saya"
               value={
                 summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
                   ? Number(summary.my_avg_wlb).toFixed(1)
@@ -701,28 +719,20 @@ export default function SurveysPage() {
                   ? '/ 5'
                   : undefined
               }
-              icon={MessageSquareHeart}
-              progress={
-                summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
-                  ? (Number(summary.my_avg_wlb) / 5) * 100
-                  : undefined
-              }
               hint="Skala Likert 1–5 pribadi"
             />
           </section>
         ) : (
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard
-              label="Total Periode Survei"
+              label="Total Periode"
               value={summary.total_surveys ?? 0}
               unit="periode"
-              icon={HeartHandshake}
-              statusTone="info"
-              statusLabel={`${summary.active_surveys_count ?? 0} periode dibuka`}
+              hint={`${summary.active_surveys_count ?? 0} periode dibuka`}
             />
 
             <KpiStatCard
-              label="Rata-rata Skor WLB (Agregat)"
+              label="Rata-rata WLB"
               value={
                 summary.overall_avg_wlb !== null && summary.overall_avg_wlb !== undefined
                   ? Number(summary.overall_avg_wlb).toFixed(2)
@@ -733,20 +743,13 @@ export default function SurveysPage() {
                   ? '/ 5'
                   : undefined
               }
-              icon={BarChart3}
-              progress={
-                summary.overall_wlb_dimension_score !== null &&
-                summary.overall_wlb_dimension_score !== undefined
-                  ? Number(summary.overall_wlb_dimension_score)
-                  : undefined
-              }
               status={overallWlbMeta.status}
               statusTone={overallWlbMeta.tone}
-              statusLabel={`Dimensi WLB: ${summary.overall_wlb_dimension_score ?? 0} / 100`}
+              statusLabel={`Dimensi WLB ${summary.overall_wlb_dimension_score ?? 0}/100`}
             />
 
             <KpiStatCard
-              label="Persepsi Beban Kerja"
+              label="Persepsi Beban"
               value={
                 summary.overall_avg_workload_perception !== null &&
                 summary.overall_avg_workload_perception !== undefined
@@ -759,43 +762,21 @@ export default function SurveysPage() {
                   ? '/ 5'
                   : undefined
               }
-              icon={MessageSquareHeart}
-              progress={
-                summary.overall_avg_workload_perception !== null &&
-                summary.overall_avg_workload_perception !== undefined
-                  ? (Number(summary.overall_avg_workload_perception) / 5) * 100
-                  : undefined
-              }
-              hint="Rata-rata agregat persepsi tim"
+              hint="Agregat seluruh tim"
             />
 
             <KpiStatCard
               label="Tingkat Partisipasi"
               value={`${overallParticipation.toFixed(1)}%`}
-              icon={Users}
-              progress={overallParticipation}
               statusTone={overallParticipation >= 75 ? 'success' : 'warning'}
               statusLabel={`${summary.total_responses ?? 0} respons agregat`}
             />
           </section>
         )}
 
-        {/* NFR-02 Privacy Callout */}
-        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
-          <p>
-            <span className="font-medium text-foreground">
-              Jaminan Privasi Survei (NFR-02):
-            </span>{' '}
-            {isEmployee
-              ? 'Jawaban dan komentar Anda bersifat rahasia. Manajer hanya melihat skor rata-rata dan tingkat partisipasi secara agregat per departemen.'
-              : 'Identitas responden maupun komentar individu tidak pernah ditampilkan pada antarmuka manajemen. Seluruh hasil survei disajikan eksklusif dalam bentuk metrik agregat departemen.'}
-          </p>
-        </div>
-
         {/* Row 2: Surveys DataTable */}
         <DataTable
-          title="Daftar Periode Survei Kondisi Kerja"
+          title="Periode Survei"
           countLabel="periode"
           columns={columns}
           data={surveys}
@@ -816,8 +797,8 @@ export default function SurveysPage() {
           }}
           emptyTitle={
             hasActiveFilters
-              ? 'Tidak ada survei yang sesuai filter'
-              : 'Belum ada periode survei kondisi kerja'
+              ? 'Tidak ada survei sesuai filter'
+              : 'Belum ada periode survei'
           }
           emptyDescription={
             hasActiveFilters
@@ -829,55 +810,75 @@ export default function SurveysPage() {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
+                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetFilters}>
+                  <RotateCcw className="size-4" data-icon="inline-start" />
                   Reset Filter
                 </Button>
               )}
               {canManage && (
-                <Button size="sm" onClick={openCreateSurveySheet}>
-                  <Plus data-icon="inline-start" />
-                  Buat Survei Baru
+                <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
+                  <Plus className="size-4" data-icon="inline-start" />
+                  Buat Survei
                 </Button>
               )}
             </div>
           }
           filterSlot={
             <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={activeFilter}
-                onValueChange={(val) => val && setActiveFilter(val)}
-                variant="outline"
-                size="sm"
+              <Select
+                name="filter_is_active"
+                value={activeFilter || ALL_VALUE}
+                onValueChange={(val) => setActiveFilter(val === ALL_VALUE ? '' : val)}
               >
-                <ToggleGroupItem value="all" className="text-xs">
-                  Semua
-                </ToggleGroupItem>
-                <ToggleGroupItem value="1" className="text-xs">
-                  Dibuka
-                </ToggleGroupItem>
-                <ToggleGroupItem value="0" className="text-xs">
-                  Ditutup
-                </ToggleGroupItem>
-              </ToggleGroup>
+                <SelectTrigger
+                  id="survey-filter-status"
+                  size="sm"
+                  aria-label="Filter Status Periode"
+                  className="w-40 rounded-lg bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Status</SelectItem>
+                    <SelectItem value="1">Dibuka</SelectItem>
+                    <SelectItem value="0">Ditutup</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
 
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
-                  Reset
-                </Button>
-              )}
+              <AnimatePresence initial={false}>
+                {hasActiveFilters && (
+                  <motion.div
+                    key="survey-reset-filters"
+                    initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={resetFilters}
+                    >
+                      <RotateCcw className="size-4" data-icon="inline-start" />
+                      Reset
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           }
           actionsSlot={
             <Button
               variant="outline"
               size="icon-sm"
+              className="rounded-lg"
               onClick={loadAllData}
               aria-label="Muat ulang data"
             >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
+              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
             </Button>
           }
         />
@@ -890,37 +891,38 @@ export default function SurveysPage() {
           onOpenChange={setAggregateSheetOpen}
           title={
             selectedSurvey
-              ? `Hasil Agregat Departemen · ${selectedSurvey.period_month}`
-              : 'Hasil Agregat Departemen'
+              ? `Agregat Departemen · ${selectedSurvey.period_month}`
+              : 'Agregat Departemen'
           }
           description={selectedSurvey?.title || undefined}
           size="xl"
+          loading={!selectedSurvey}
           footer={
-            <Button variant="outline" onClick={() => setAggregateSheetOpen(false)}>
+            <Button
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setAggregateSheetOpen(false)}
+            >
               Tutup
             </Button>
           }
         >
           {selectedSurvey && (
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-                <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
-                <span>
-                  <span className="font-medium text-foreground">Privasi NFR-02:</span> Hanya
-                  menampilkan statistik agregat (AVG &amp; COUNT) per departemen tanpa
-                  identitas, skor per individu, maupun komentar responden.
-                </span>
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center">
+                <Nfr02PrivacyCue isEmployee={false} />
               </div>
 
-              {/* Overall Period Aggregate Summary */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+              {/* Overall Period Aggregate Summary — open divided strip, no nested boxes */}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-border">
+                <div className="flex flex-col gap-2 sm:pr-5">
                   <span className="text-xs text-muted-foreground">Partisipasi Periode</span>
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
-                      {Number(selectedSurvey.participation_rate || 0).toFixed(1)}%
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                    <AnimatedNumber
+                      value={`${Number(selectedSurvey.participation_rate || 0).toFixed(1)}%`}
+                      className="text-2xl font-semibold tracking-[-0.02em] text-foreground"
+                    />
+                    <span className="text-xs text-muted-foreground tabular-nums">
                       {selectedSurvey.responses_count ?? 0} respons
                     </span>
                   </div>
@@ -930,33 +932,49 @@ export default function SurveysPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex flex-col gap-2 sm:px-5">
                   <span className="text-xs text-muted-foreground">Rata-rata WLB</span>
-                  <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
-                    {selectedSurvey.avg_wlb_score !== null &&
-                    selectedSurvey.avg_wlb_score !== undefined
-                      ? `${Number(selectedSurvey.avg_wlb_score).toFixed(2)}`
-                      : '-'}
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ 5</span>
-                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <AnimatedNumber
+                      value={
+                        selectedSurvey.avg_wlb_score !== null &&
+                        selectedSurvey.avg_wlb_score !== undefined
+                          ? Number(selectedSurvey.avg_wlb_score).toFixed(2)
+                          : '-'
+                      }
+                      className="text-2xl font-semibold tracking-[-0.02em] text-foreground"
+                    />
+                    <span className="text-xs text-muted-foreground tabular-nums">/ 5</span>
+                  </div>
                   <div className="flex">
                     <StatusBadge
-                      status={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).status}
-                      tone={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).tone}
-                      label={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).label}
+                      status={
+                        getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).status
+                      }
+                      tone={
+                        getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).tone
+                      }
+                      label={
+                        getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).label
+                      }
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex flex-col gap-2 sm:pl-5">
                   <span className="text-xs text-muted-foreground">Persepsi Beban Kerja</span>
-                  <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
-                    {selectedSurvey.avg_workload_perception_score !== null &&
-                    selectedSurvey.avg_workload_perception_score !== undefined
-                      ? `${Number(selectedSurvey.avg_workload_perception_score).toFixed(2)}`
-                      : '-'}
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ 5</span>
-                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <AnimatedNumber
+                      value={
+                        selectedSurvey.avg_workload_perception_score !== null &&
+                        selectedSurvey.avg_workload_perception_score !== undefined
+                          ? Number(selectedSurvey.avg_workload_perception_score).toFixed(2)
+                          : '-'
+                      }
+                      className="text-2xl font-semibold tracking-[-0.02em] text-foreground"
+                    />
+                    <span className="text-xs text-muted-foreground tabular-nums">/ 5</span>
+                  </div>
                   {selectedSurvey.avg_workload_perception_score !== null &&
                     selectedSurvey.avg_workload_perception_score !== undefined && (
                       <Progress
@@ -973,9 +991,11 @@ export default function SurveysPage() {
                 </div>
               </div>
 
+              <Separator />
+
               {/* Department Aggregates DataTable (strictly department-level aggregates) */}
               <DataTable
-                title="Rincian Agregat per Departemen"
+                title="Agregat per Departemen"
                 countLabel="departemen"
                 columns={departmentAggregateColumns}
                 data={selectedSurvey.department_aggregates || []}
@@ -994,7 +1014,7 @@ export default function SurveysPage() {
         <FormSheet
           open={surveySheetOpen}
           onOpenChange={setSurveySheetOpen}
-          title={editingSurvey ? 'Ubah Periode Survei' : 'Buat Survei Kondisi Kerja Baru'}
+          title={editingSurvey ? 'Ubah Periode Survei' : 'Buat Periode Survei'}
           description="Atur judul, periode bulan, status pembukaan, dan deskripsi survei."
           size="md"
           footer={
@@ -1002,12 +1022,18 @@ export default function SurveysPage() {
               <Button
                 type="button"
                 variant="outline"
+                className="rounded-lg"
                 onClick={() => setSurveySheetOpen(false)}
                 disabled={surveySubmitting}
               >
                 Batal
               </Button>
-              <Button type="submit" form="survey-form" disabled={surveySubmitting}>
+              <Button
+                type="submit"
+                form="survey-form"
+                className="rounded-lg"
+                disabled={surveySubmitting}
+              >
                 {surveySubmitting && <Spinner data-icon="inline-start" />}
                 {surveySubmitting
                   ? 'Menyimpan...'
@@ -1021,14 +1047,24 @@ export default function SurveysPage() {
           <form
             id="survey-form"
             onSubmit={handleSurveySubmit}
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-5"
           >
-            {surveyFormError && (
-              <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{surveyFormError}</span>
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {surveyFormError && (
+                <motion.div
+                  key="survey-form-error"
+                  role="alert"
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+                  className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{surveyFormError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="survey-title">Judul Survei</Label>
@@ -1043,7 +1079,7 @@ export default function SurveysPage() {
                   setSurveyForm((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Contoh: Survei Kondisi Kerja Desember 2026"
-                className="bg-background"
+                className="rounded-lg bg-background"
               />
             </div>
 
@@ -1059,7 +1095,7 @@ export default function SurveysPage() {
                   onChange={(e) =>
                     setSurveyForm((prev) => ({ ...prev, period_month: e.target.value }))
                   }
-                  className="bg-background font-mono tabular-nums"
+                  className="rounded-lg bg-background tabular-nums"
                 />
               </div>
 
@@ -1072,7 +1108,7 @@ export default function SurveysPage() {
                     setSurveyForm((prev) => ({ ...prev, is_active: val === '1' }))
                   }
                 >
-                  <SelectTrigger id="survey-is-active" className="w-full bg-background">
+                  <SelectTrigger id="survey-is-active" className="w-full rounded-lg bg-background">
                     <SelectValue placeholder="Pilih Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1099,7 +1135,7 @@ export default function SurveysPage() {
                   setSurveyForm((prev) => ({ ...prev, description: e.target.value }))
                 }
                 placeholder="Penjelasan singkat mengenai tujuan pengisian survei periode ini..."
-                className="bg-background"
+                className="rounded-lg bg-background"
               />
             </div>
           </form>
@@ -1121,10 +1157,10 @@ export default function SurveysPage() {
                 <span className="font-semibold text-foreground">
                   {deletingSurvey.title}
                 </span>{' '}
-                (<span className="font-mono">{deletingSurvey.period_month}</span>) akan
+                (<span className="tabular-nums">{deletingSurvey.period_month}</span>) akan
                 dihapus.
                 {Number(deletingSurvey.responses_count || 0) > 0 && (
-                  <span className="mt-2 block rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground">
+                  <span className="mt-2 block text-xs text-destructive">
                     Perhatian: Survei ini sudah memiliki {deletingSurvey.responses_count}{' '}
                     respons pegawai. Penghapusan akan ditolak oleh sistem.
                   </span>
@@ -1159,6 +1195,7 @@ export default function SurveysPage() {
               <Button
                 type="button"
                 variant="outline"
+                className="rounded-lg"
                 onClick={() => setResponseSheetOpen(false)}
                 disabled={responseSubmitting}
               >
@@ -1167,6 +1204,7 @@ export default function SurveysPage() {
               <Button
                 type="submit"
                 form="survey-response-form"
+                className="rounded-lg"
                 disabled={responseSubmitting}
               >
                 {responseSubmitting && <Spinner data-icon="inline-start" />}
@@ -1183,25 +1221,31 @@ export default function SurveysPage() {
             <form
               id="survey-response-form"
               onSubmit={handleResponseSubmit}
-              className="flex flex-col gap-5"
+              className="flex flex-col gap-6"
             >
-              <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                <Lock className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <span>
-                  Respons Anda bersifat rahasia dan hanya diproses sebagai rata-rata agregat
-                  departemen.
-                </span>
+              <div className="flex items-center">
+                <Nfr02PrivacyCue isEmployee />
               </div>
 
-              {responseFormError && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{responseFormError}</span>
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {responseFormError && (
+                  <motion.div
+                    key="response-form-error"
+                    role="alert"
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+                    className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                  >
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                    <span>{responseFormError}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Question 1: Work-Life Balance */}
-              <div className="flex flex-col gap-2.5 rounded-xl border border-border p-4">
+              {/* Question 1: Work-Life Balance (Approved Likert 1–5 ToggleGroup) */}
+              <div className="flex flex-col gap-3">
                 <Label id="survey-wlb-label" className="leading-snug">
                   1. Keseimbangan Kehidupan &amp; Pekerjaan (Work-Life Balance)
                 </Label>
@@ -1225,7 +1269,7 @@ export default function SurveysPage() {
                     <ToggleGroupItem
                       key={score}
                       value={String(score)}
-                      className="h-10 font-mono text-sm font-semibold tabular-nums data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      className="h-10 rounded-lg text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                       {score}
                     </ToggleGroupItem>
@@ -1240,8 +1284,10 @@ export default function SurveysPage() {
                 </p>
               </div>
 
-              {/* Question 2: Workload Perception */}
-              <div className="flex flex-col gap-2.5 rounded-xl border border-border p-4">
+              <Separator />
+
+              {/* Question 2: Workload Perception (Approved Likert 1–5 ToggleGroup) */}
+              <div className="flex flex-col gap-3">
                 <Label id="survey-workload-label" className="leading-snug">
                   2. Persepsi Beban Kerja Saat Ini (Workload Perception)
                 </Label>
@@ -1265,7 +1311,7 @@ export default function SurveysPage() {
                     <ToggleGroupItem
                       key={score}
                       value={String(score)}
-                      className="h-10 font-mono text-sm font-semibold tabular-nums data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      className="h-10 rounded-lg text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                       {score}
                     </ToggleGroupItem>
@@ -1279,6 +1325,8 @@ export default function SurveysPage() {
                   {WORKLOAD_LIKERT_LABELS[responseForm.workload_perception_score]}
                 </p>
               </div>
+
+              <Separator />
 
               {/* Optional Comments */}
               <div className="flex flex-col gap-1.5">
@@ -1295,7 +1343,7 @@ export default function SurveysPage() {
                     setResponseForm((prev) => ({ ...prev, comments: e.target.value }))
                   }
                   placeholder="Bagikan pengalaman kerja, masukan distribusi tugas, atau kendala waktu istirahat..."
-                  className="bg-background"
+                  className="rounded-lg bg-background"
                 />
               </div>
             </form>

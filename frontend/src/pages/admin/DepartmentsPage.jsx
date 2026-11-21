@@ -11,6 +11,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { getInitials } from '@/lib/navigation';
@@ -30,10 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   ConfirmDialog,
   DataTable,
@@ -42,6 +43,7 @@ import {
   StatusBadge,
 } from '@/components/workbalance';
 
+const ALL_VALUE = '__all__';
 const NO_MANAGER_VALUE = '__none__';
 
 function emptyDepartmentForm() {
@@ -54,6 +56,8 @@ function emptyDepartmentForm() {
 }
 
 export default function DepartmentsPage({ readOnly = false }) {
+  const shouldReduceMotion = useReducedMotion();
+
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -64,7 +68,7 @@ export default function DepartmentsPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [managerFilter, setManagerFilter] = useState('all');
+  const [managerFilter, setManagerFilter] = useState('');
 
   // Create/Edit Slide-Over Sheet State
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -81,14 +85,13 @@ export default function DepartmentsPage({ readOnly = false }) {
     setLoading(true);
     setErrorMsg('');
 
-    const apiManagerFilter = managerFilter === 'all' ? '' : managerFilter;
-    const hasFilters = Boolean(search.trim() || apiManagerFilter);
+    const hasFilters = Boolean(search.trim() || managerFilter);
 
     try {
       const [filteredDepts, unfilteredDepts, empRes] = await Promise.all([
         departmentService.getDepartments({
           search: search.trim(),
-          has_manager: apiManagerFilter,
+          has_manager: managerFilter,
         }),
         hasFilters ? departmentService.getDepartments() : Promise.resolve(null),
         !readOnly
@@ -113,13 +116,13 @@ export default function DepartmentsPage({ readOnly = false }) {
   }, [loadAllData]);
 
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || managerFilter !== 'all'),
+    () => Boolean(search.trim() || managerFilter),
     [search, managerFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setManagerFilter('all');
+    setManagerFilter('');
   };
 
   const stats = useMemo(() => {
@@ -226,7 +229,7 @@ export default function DepartmentsPage({ readOnly = false }) {
         accessorKey: 'code',
         header: 'Kode',
         cell: ({ row }) => (
-          <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
+          <span className="inline-flex items-center rounded-lg border border-border bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground whitespace-nowrap">
             {row.original.code}
           </span>
         ),
@@ -258,7 +261,7 @@ export default function DepartmentsPage({ readOnly = false }) {
           return (
             <div className="flex items-center gap-2.5 whitespace-nowrap">
               <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(manager.full_name)}
                 </AvatarFallback>
               </Avatar>
@@ -266,8 +269,8 @@ export default function DepartmentsPage({ readOnly = false }) {
                 <span className="truncate text-xs font-medium text-foreground">
                   {manager.full_name}
                 </span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  <span className="font-mono">{manager.employee_code}</span>
+                <span className="truncate text-xs text-muted-foreground tabular-nums">
+                  {manager.employee_code}
                   {manager.position?.title ? ` · ${manager.position.title}` : ''}
                 </span>
               </div>
@@ -286,18 +289,18 @@ export default function DepartmentsPage({ readOnly = false }) {
             <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
               <Badge
                 variant={employeesCount > 0 ? 'secondary' : 'outline'}
-                className="gap-1 font-mono text-xs font-medium tabular-nums"
+                className="gap-1 text-xs font-medium tabular-nums"
                 title={
                   employeesCount > 0
                     ? 'Tidak dapat dihapus karena masih memiliki pegawai terdaftar'
                     : 'Belum memiliki pegawai terdaftar'
                 }
               >
-                {employeesCount > 0 && <Lock className="size-3 text-muted-foreground" />}
+                {employeesCount > 0 && <Lock className="size-3.5 text-muted-foreground" />}
                 {employeesCount} pegawai
               </Badge>
               {employeesCount > 0 && (
-                <span className="pl-1 text-[11px] text-muted-foreground tabular-nums">
+                <span className="pl-1 text-xs text-muted-foreground tabular-nums">
                   {activeCount} aktif
                 </span>
               )}
@@ -312,7 +315,7 @@ export default function DepartmentsPage({ readOnly = false }) {
         cell: ({ row }) => {
           const tasksCount = Number(row.original.tasks_count || 0);
           return (
-            <span className="font-mono text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums">
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums">
               {tasksCount} tugas
             </span>
           );
@@ -330,7 +333,7 @@ export default function DepartmentsPage({ readOnly = false }) {
           const inUse =
             Number(dept.employees_count || 0) > 0 || Number(dept.tasks_count || 0) > 0;
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -340,9 +343,9 @@ export default function DepartmentsPage({ readOnly = false }) {
                 }}
                 aria-label={`Ubah ${dept.name}`}
                 title="Ubah Departemen"
-                className="text-muted-foreground hover:text-primary"
+                className="rounded-lg text-muted-foreground hover:text-primary"
               >
-                <Edit3 />
+                <Edit3 className="size-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -359,11 +362,11 @@ export default function DepartmentsPage({ readOnly = false }) {
                 }
                 className={
                   inUse
-                    ? 'text-muted-foreground/60 hover:text-amber-700'
-                    : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+                    ? 'rounded-lg text-muted-foreground hover:text-amber-700'
+                    : 'rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
                 }
               >
-                <Trash2 />
+                <Trash2 className="size-4" />
               </Button>
             </div>
           );
@@ -376,32 +379,28 @@ export default function DepartmentsPage({ readOnly = false }) {
 
   return (
     <AppShell
-      title={readOnly ? 'Struktur Departemen Organisasi' : 'Manajemen Data Departemen'}
-      breadcrumb={
-        readOnly
-          ? 'Organisasi & Tim / Struktur Departemen'
-          : 'Master Organisasi / Data Departemen'
-      }
+      title={readOnly ? 'Struktur Departemen' : 'Departemen'}
+      breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
       actions={
         readOnly ? (
           <Badge variant="outline" className="gap-1.5 text-xs font-normal text-muted-foreground">
-            <Lock className="size-3" />
+            <Lock className="size-3.5" />
             Mode Baca Saja
           </Badge>
         ) : (
-          <Button size="sm" onClick={openCreateSheet}>
-            <Plus data-icon="inline-start" />
+          <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+            <Plus data-icon="inline-start" className="size-4" />
             Tambah Departemen
           </Button>
         )
       }
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
@@ -411,11 +410,11 @@ export default function DepartmentsPage({ readOnly = false }) {
               value={stats.totalDepartments}
               unit="unit"
               icon={Building2}
-              hint="Unit struktur organisasi"
+              hint="Unit organisasi"
             />
 
             <KpiStatCard
-              label="Departemen Dengan Manajer"
+              label="Dengan Manajer"
               value={stats.withManager}
               unit={`/ ${stats.totalDepartments}`}
               icon={UserCheck}
@@ -430,27 +429,26 @@ export default function DepartmentsPage({ readOnly = false }) {
             />
 
             <KpiStatCard
-              label="Total Pegawai Terkelompok"
+              label="Pegawai Terkelompok"
               value={stats.totalEmployees}
               unit="pegawai"
               icon={Users}
-              hint="Tersebar di seluruh unit"
+              hint="Seluruh departemen"
             />
 
             <KpiStatCard
-              label="Rata-rata Pegawai / Unit"
+              label="Rata-rata / Unit"
               value={stats.avgEmployees}
               unit="pegawai"
               icon={Building2}
-              mono
-              hint="Kepadatan anggota departemen"
+              hint="Rasio per departemen"
             />
           </section>
         )}
 
         {/* Row 2: Department DataTable */}
         <DataTable
-          title="Daftar Departemen"
+          title="Departemen"
           countLabel="departemen"
           columns={columns}
           data={departments}
@@ -465,7 +463,7 @@ export default function DepartmentsPage({ readOnly = false }) {
           emptyTitle={
             hasActiveFilters
               ? 'Tidak ada departemen yang sesuai filter'
-              : 'Belum ada data departemen'
+              : 'Belum ada departemen'
           }
           emptyDescription={
             hasActiveFilters
@@ -475,14 +473,14 @@ export default function DepartmentsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
+                <Button variant="outline" size="sm" onClick={resetFilters} className="rounded-lg">
+                  <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" onClick={openCreateSheet}>
-                  <Plus data-icon="inline-start" />
+                <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+                  <Plus data-icon="inline-start" className="size-4" />
                   Tambah Departemen
                 </Button>
               )}
@@ -490,30 +488,44 @@ export default function DepartmentsPage({ readOnly = false }) {
           }
           filterSlot={
             <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={managerFilter}
-                onValueChange={(val) => val && setManagerFilter(val)}
-                variant="outline"
-                size="sm"
+              <Select
+                name="filter_manager"
+                value={managerFilter || ALL_VALUE}
+                onValueChange={(val) => setManagerFilter(val === ALL_VALUE ? '' : val)}
               >
-                <ToggleGroupItem value="all" className="text-xs">
-                  Semua
-                </ToggleGroupItem>
-                <ToggleGroupItem value="with_manager" className="text-xs">
-                  Memiliki Manajer
-                </ToggleGroupItem>
-                <ToggleGroupItem value="without_manager" className="text-xs">
-                  Belum Ada Manajer
-                </ToggleGroupItem>
-              </ToggleGroup>
+                <SelectTrigger
+                  id="dept-filter-manager"
+                  size="sm"
+                  className="w-44 rounded-lg bg-background text-xs"
+                  aria-label="Filter Status Manajer"
+                >
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Status</SelectItem>
+                    <SelectItem value="with_manager">Memiliki Manajer</SelectItem>
+                    <SelectItem value="without_manager">Belum Ada Manajer</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
 
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
-                  Reset
-                </Button>
-              )}
+              <AnimatePresence initial={false}>
+                {hasActiveFilters && (
+                  <motion.div
+                    key="dept-reset-filter"
+                    initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <Button variant="ghost" size="sm" onClick={resetFilters} className="rounded-lg">
+                      <RotateCcw data-icon="inline-start" className="size-4" />
+                      Reset
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           }
           actionsSlot={
@@ -522,8 +534,9 @@ export default function DepartmentsPage({ readOnly = false }) {
               size="icon-sm"
               onClick={loadAllData}
               aria-label="Muat ulang data"
+              className="rounded-lg"
             >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
+              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
             </Button>
           }
         />
@@ -535,7 +548,7 @@ export default function DepartmentsPage({ readOnly = false }) {
         onOpenChange={(open) => {
           if (!submitting) setSheetOpen(open);
         }}
-        title={editingDepartment ? 'Ubah Data Departemen' : 'Tambah Departemen Baru'}
+        title={editingDepartment ? 'Ubah Departemen' : 'Tambah Departemen'}
         description={
           editingDepartment
             ? `Perbarui informasi kode, manajer, atau deskripsi untuk ${editingDepartment.name}.`
@@ -549,10 +562,16 @@ export default function DepartmentsPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setSheetOpen(false)}
               disabled={submitting}
+              className="rounded-lg"
             >
               Batal
             </Button>
-            <Button type="submit" form="department-form" disabled={submitting}>
+            <Button
+              type="submit"
+              form="department-form"
+              disabled={submitting}
+              className="rounded-lg"
+            >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
                 ? 'Menyimpan...'
@@ -563,13 +582,23 @@ export default function DepartmentsPage({ readOnly = false }) {
           </>
         }
       >
-        <form id="department-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {formError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+        <form id="department-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <AnimatePresence initial={false}>
+            {formError && (
+              <motion.div
+                key="department-form-error"
+                role="alert"
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={{ duration: 0.16 }}
+                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{formError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
@@ -585,7 +614,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="FIN"
-                className="font-mono tabular-nums"
+                className="rounded-lg tabular-nums"
               />
             </div>
 
@@ -602,51 +631,57 @@ export default function DepartmentsPage({ readOnly = false }) {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Keuangan & Akuntansi"
+                className="rounded-lg"
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="dept-manager" className="text-xs font-medium">
-              Manajer Departemen (Opsional)
-            </Label>
-            <Select
-              name="manager_id"
-              value={form.manager_id || NO_MANAGER_VALUE}
-              onValueChange={(val) =>
-                setForm({ ...form, manager_id: val === NO_MANAGER_VALUE ? '' : val })
-              }
-            >
-              <SelectTrigger id="dept-manager" className="w-full">
-                <SelectValue placeholder="Belum Ditentukan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={NO_MANAGER_VALUE}>Belum Ditentukan</SelectItem>
-                  {managerOptions.map((emp) => (
-                    <SelectItem key={emp.id} value={String(emp.id)}>
-                      {emp.full_name} ({emp.employee_code})
-                      {emp.position?.title ? ` — ${emp.position.title}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          <Separator />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="dept-description" className="text-xs font-medium">
-              Deskripsi Unit / Fungsi (Opsional)
-            </Label>
-            <Textarea
-              id="dept-description"
-              name="description"
-              rows={3}
-              maxLength={1000}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Ringkasan ruang lingkup tanggung jawab departemen..."
-            />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dept-manager" className="text-xs font-medium">
+                Manajer Departemen (Opsional)
+              </Label>
+              <Select
+                name="manager_id"
+                value={form.manager_id || NO_MANAGER_VALUE}
+                onValueChange={(val) =>
+                  setForm({ ...form, manager_id: val === NO_MANAGER_VALUE ? '' : val })
+                }
+              >
+                <SelectTrigger id="dept-manager" className="w-full rounded-lg">
+                  <SelectValue placeholder="Belum Ditentukan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_MANAGER_VALUE}>Belum Ditentukan</SelectItem>
+                    {managerOptions.map((emp) => (
+                      <SelectItem key={emp.id} value={String(emp.id)}>
+                        {emp.full_name} ({emp.employee_code})
+                        {emp.position?.title ? ` — ${emp.position.title}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dept-description" className="text-xs font-medium">
+                Deskripsi Unit / Fungsi (Opsional)
+              </Label>
+              <Textarea
+                id="dept-description"
+                name="description"
+                rows={3}
+                maxLength={1000}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Ringkasan ruang lingkup tanggung jawab departemen..."
+                className="rounded-lg"
+              />
+            </div>
           </div>
         </form>
       </FormSheet>
@@ -657,16 +692,16 @@ export default function DepartmentsPage({ readOnly = false }) {
         onOpenChange={(open) => {
           if (!open && !deleteLoading) setDeletingDepartment(null);
         }}
-        title="Hapus Data Departemen?"
+        title="Hapus Departemen?"
         description={
           deletingDepartment ? (
             <>
               Anda akan menghapus departemen{' '}
               <span className="font-semibold text-foreground">{deletingDepartment.name}</span> (
-              <span className="font-mono tabular-nums">{deletingDepartment.code}</span>).
+              <span className="font-medium tabular-nums">{deletingDepartment.code}</span>).
               {(Number(deletingDepartment.employees_count || 0) > 0 ||
                 Number(deletingDepartment.tasks_count || 0) > 0) && (
-                <span className="mt-2.5 block rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                <span className="mt-2.5 block rounded-xl border border-amber-200/80 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800 tabular-nums">
                   Perhatian: Departemen ini masih memiliki{' '}
                   {deletingDepartment.employees_count || 0} pegawai dan{' '}
                   {deletingDepartment.tasks_count || 0} tugas terkait. Sistem akan menolak

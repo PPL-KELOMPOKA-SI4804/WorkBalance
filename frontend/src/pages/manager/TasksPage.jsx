@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -8,7 +9,6 @@ import {
   Clock,
   Edit3,
   Eye,
-  Lock,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -36,7 +36,6 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   ConfirmDialog,
   DataTable,
@@ -46,14 +45,6 @@ import {
 } from '@/components/workbalance';
 
 const ALL_VALUE = '__all__';
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'Semua' },
-  { value: 'open', label: 'Open' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
 
 const PRIORITY_META = {
   critical: { label: 'Kritis', tone: 'danger' },
@@ -127,6 +118,8 @@ function emptyTaskForm(departments = []) {
 }
 
 export default function TasksPage({ readOnly = false }) {
+  const prefersReducedMotion = useReducedMotion();
+
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -143,7 +136,7 @@ export default function TasksPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [dueFilter, setDueFilter] = useState('');
@@ -172,7 +165,7 @@ export default function TasksPage({ readOnly = false }) {
       const [tasksRes, deptsRes] = await Promise.all([
         taskService.getTasks({
           search: search.trim(),
-          status: statusFilter === 'all' ? '' : statusFilter,
+          status: statusFilter,
           priority: priorityFilter,
           department_id: departmentFilter,
           due_filter: dueFilter,
@@ -220,18 +213,14 @@ export default function TasksPage({ readOnly = false }) {
   const hasActiveFilters = useMemo(
     () =>
       Boolean(
-        search.trim() ||
-          (statusFilter && statusFilter !== 'all') ||
-          priorityFilter ||
-          departmentFilter ||
-          dueFilter
+        search.trim() || statusFilter || priorityFilter || departmentFilter || dueFilter
       ),
     [search, statusFilter, priorityFilter, departmentFilter, dueFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('all');
+    setStatusFilter('');
     setPriorityFilter('');
     setDepartmentFilter('');
     setDueFilter('');
@@ -359,7 +348,7 @@ export default function TasksPage({ readOnly = false }) {
               <span className="line-clamp-1 text-xs font-medium text-foreground">
                 {task.title}
               </span>
-              <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+              <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
                 {task.description || 'Tidak ada deskripsi tambahan'}
               </span>
             </div>
@@ -374,7 +363,7 @@ export default function TasksPage({ readOnly = false }) {
           const dept = row.original.department;
           return (
             <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground">
+              <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground">
                 {dept?.code || '-'}
               </span>
               <span className="max-w-[130px] truncate text-xs text-muted-foreground">
@@ -389,7 +378,7 @@ export default function TasksPage({ readOnly = false }) {
         id: 'estimated_hours',
         header: 'Estimasi',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+          <span className="text-xs font-medium whitespace-nowrap text-foreground tabular-nums">
             {Number(row.original.estimated_hours || 0).toFixed(1)} jam
           </span>
         ),
@@ -414,7 +403,7 @@ export default function TasksPage({ readOnly = false }) {
           const deadlineHint = getDeadlineIndicator(task.due_date, task.status);
           return (
             <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+              <span className="text-xs font-medium text-foreground tabular-nums">
                 {task.due_date ? String(task.due_date).slice(0, 10) : '-'}
               </span>
               {deadlineHint && (
@@ -422,7 +411,6 @@ export default function TasksPage({ readOnly = false }) {
                   tone={deadlineHint.tone}
                   label={deadlineHint.text}
                   showDot={false}
-                  className="px-2 py-0 text-[11px]"
                 />
               )}
             </div>
@@ -458,7 +446,7 @@ export default function TasksPage({ readOnly = false }) {
         cell: ({ row }) => {
           const task = row.original;
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
               <Button
                 type="button"
                 variant="ghost"
@@ -470,7 +458,7 @@ export default function TasksPage({ readOnly = false }) {
                 title="Lihat Detail Tugas"
                 aria-label="Lihat Detail Tugas"
               >
-                <Eye />
+                <Eye className="size-4" />
               </Button>
               {!readOnly && (
                 <>
@@ -485,7 +473,7 @@ export default function TasksPage({ readOnly = false }) {
                     title="Ubah Tugas"
                     aria-label="Ubah Tugas"
                   >
-                    <Edit3 />
+                    <Edit3 className="size-4" />
                   </Button>
                   <Button
                     type="button"
@@ -499,7 +487,7 @@ export default function TasksPage({ readOnly = false }) {
                     title="Hapus Tugas"
                     aria-label="Hapus Tugas"
                   >
-                    <Trash2 />
+                    <Trash2 className="size-4" />
                   </Button>
                 </>
               )}
@@ -520,30 +508,27 @@ export default function TasksPage({ readOnly = false }) {
   const selectedDeadlineHint = selectedTask
     ? getDeadlineIndicator(selectedTask.due_date, selectedTask.status)
     : null;
+  const deadlinePressureCount = Number(summary.deadline_pressure_count || 0);
 
   return (
     <AppShell
-      title={readOnly ? 'Daftar Tugas Tim' : 'Manajemen Tugas'}
-      breadcrumb={
-        readOnly
-          ? 'Aktivitas & Tugas / Daftar Tugas & Tenggat'
-          : 'Operasional Kerja / Perencanaan Tugas'
-      }
+      title={readOnly ? 'Tugas Tim' : 'Katalog Tugas'}
+      breadcrumb={readOnly ? 'Ruang Kerja' : 'Operasional'}
       actions={
         !readOnly ? (
           <Button size="sm" onClick={openCreateSheet}>
-            <Plus data-icon="inline-start" />
+            <Plus data-icon="inline-start" className="size-4" />
             Tambah Tugas
           </Button>
         ) : undefined
       }
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* 4 KPI Summary Cards */}
         {loading && !hasLoadedOnce ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
@@ -553,8 +538,7 @@ export default function TasksPage({ readOnly = false }) {
               value={summary.active ?? 0}
               unit="tugas"
               icon={ClipboardList}
-              statusTone="info"
-              statusLabel={`Dari ${summary.total ?? 0} total tugas`}
+              hint={`Dari ${summary.total ?? 0} total tugas`}
             />
 
             <KpiStatCard
@@ -562,20 +546,16 @@ export default function TasksPage({ readOnly = false }) {
               value={Number(summary.total_active_estimated_hours || 0).toFixed(1)}
               unit="jam"
               icon={Clock}
-              statusTone="info"
-              statusLabel="Beban kerja terencana"
+              hint="Beban kerja terencana"
             />
 
             <KpiStatCard
               label="Tekanan Tenggat"
-              value={summary.deadline_pressure_count ?? 0}
+              value={deadlinePressureCount}
               unit="tugas"
               icon={AlertTriangle}
-              statusTone={Number(summary.deadline_pressure_count || 0) > 0 ? 'warning' : 'success'}
-              statusLabel={
-                Number(summary.deadline_pressure_count || 0) > 0 ? 'Perlu perhatian' : 'Terkendali'
-              }
-              hint="≤ 7 hari / lewat"
+              statusTone={deadlinePressureCount > 0 ? 'warning' : 'success'}
+              statusLabel={deadlinePressureCount > 0 ? '≤ 7 hari / lewat' : 'Tenggat terkendali'}
             />
 
             <KpiStatCard
@@ -584,25 +564,14 @@ export default function TasksPage({ readOnly = false }) {
               unit="tugas"
               icon={CheckCircle2}
               status="completed"
-              statusLabel="Status selesai"
+              statusLabel="Selesai"
             />
           </section>
         )}
 
-        {/* Read-only Notice for Employee */}
-        {readOnly && (
-          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-            <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
-            <p>
-              <span className="font-medium text-foreground">Mode Baca Saja:</span> Anda dapat
-              meninjau rencana tugas, estimasi jam, dan tenggat waktu tim.
-            </p>
-          </div>
-        )}
-
         {/* Tasks DataTable */}
         <DataTable
-          title="Daftar Tugas"
+          title={readOnly ? 'Katalog Tugas Tim' : 'Rencana Tugas'}
           countLabel="tugas"
           columns={columns}
           data={tasks}
@@ -618,20 +587,20 @@ export default function TasksPage({ readOnly = false }) {
           emptyTitle={hasActiveFilters ? 'Tidak ada tugas yang sesuai filter' : 'Belum ada data tugas'}
           emptyDescription={
             hasActiveFilters
-              ? 'Ubah kata kunci pencarian atau setel ulang filter untuk melihat daftar tugas.'
+              ? 'Ubah kata kunci pencarian atau setel ulang filter untuk melihat katalog tugas.'
               : 'Tambahkan tugas pertama lengkap dengan estimasi waktu, prioritas, dan tenggat.'
           }
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
                 <Button variant="outline" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
+                  <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
               {!readOnly && (
                 <Button size="sm" onClick={openCreateSheet}>
-                  <Plus data-icon="inline-start" />
+                  <Plus data-icon="inline-start" className="size-4" />
                   Tambah Tugas
                 </Button>
               )}
@@ -639,19 +608,29 @@ export default function TasksPage({ readOnly = false }) {
           }
           filterSlot={
             <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={statusFilter}
-                onValueChange={(val) => val && setStatusFilter(val)}
-                variant="outline"
-                size="sm"
+              <Select
+                name="status_filter"
+                value={statusFilter || ALL_VALUE}
+                onValueChange={(val) => setStatusFilter(val === ALL_VALUE ? '' : val)}
               >
-                {STATUS_OPTIONS.map((opt) => (
-                  <ToggleGroupItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+                <SelectTrigger
+                  id="tasks-filter-status"
+                  size="sm"
+                  aria-label="Filter Status"
+                  className="w-36 rounded-lg bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
 
               <Select
                 name="priority_filter"
@@ -662,7 +641,7 @@ export default function TasksPage({ readOnly = false }) {
                   id="tasks-filter-priority"
                   size="sm"
                   aria-label="Filter Prioritas"
-                  className="w-36 bg-background text-xs"
+                  className="w-36 rounded-lg bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Prioritas" />
                 </SelectTrigger>
@@ -686,7 +665,7 @@ export default function TasksPage({ readOnly = false }) {
                   id="tasks-filter-department"
                   size="sm"
                   aria-label="Filter Departemen"
-                  className="w-44 bg-background text-xs"
+                  className="w-44 rounded-lg bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Departemen" />
                 </SelectTrigger>
@@ -711,7 +690,7 @@ export default function TasksPage({ readOnly = false }) {
                   id="tasks-filter-due"
                   size="sm"
                   aria-label="Filter Tenggat"
-                  className="w-44 bg-background text-xs"
+                  className="w-44 rounded-lg bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Tenggat" />
                 </SelectTrigger>
@@ -724,12 +703,22 @@ export default function TasksPage({ readOnly = false }) {
                 </SelectContent>
               </Select>
 
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
-                  Reset
-                </Button>
-              )}
+              <AnimatePresence initial={false}>
+                {hasActiveFilters && (
+                  <motion.div
+                    key="tasks-reset-filters"
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <Button variant="ghost" size="sm" onClick={resetFilters}>
+                      <RotateCcw data-icon="inline-start" className="size-4" />
+                      Reset
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           }
           actionsSlot={
@@ -740,7 +729,7 @@ export default function TasksPage({ readOnly = false }) {
               onClick={loadAllData}
               aria-label="Muat ulang data"
             >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
+              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
             </Button>
           }
         />
@@ -759,6 +748,7 @@ export default function TasksPage({ readOnly = false }) {
             : undefined
         }
         size="md"
+        loading={detailLoading}
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setDetailSheetOpen(false)}>
@@ -773,7 +763,7 @@ export default function TasksPage({ readOnly = false }) {
                   openEditSheet(target);
                 }}
               >
-                <Edit3 data-icon="inline-start" />
+                <Edit3 data-icon="inline-start" className="size-4" />
                 Ubah Tugas
               </Button>
             )}
@@ -781,15 +771,8 @@ export default function TasksPage({ readOnly = false }) {
         }
       >
         {selectedTask && (
-          <div className="flex flex-col gap-5">
-            {detailLoading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Spinner />
-                <span>Memuat rincian tugas dan penugasan terkait...</span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2.5">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge
                   tone={selectedPriorityMeta.tone}
@@ -812,7 +795,9 @@ export default function TasksPage({ readOnly = false }) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
+            <Separator />
+
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-muted-foreground">Departemen</span>
                 <span className="text-sm font-medium text-foreground">
@@ -827,13 +812,13 @@ export default function TasksPage({ readOnly = false }) {
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-muted-foreground">Estimasi Waktu</span>
-                <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+                <span className="text-sm font-semibold text-foreground tabular-nums">
                   {Number(selectedTask.estimated_hours || 0).toFixed(1)} jam
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-muted-foreground">Tenggat Waktu</span>
-                <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground tabular-nums">
                   <Calendar className="size-3.5 text-muted-foreground" />
                   {selectedTask.due_date ? String(selectedTask.due_date).slice(0, 10) : '-'}
                 </span>
@@ -842,16 +827,16 @@ export default function TasksPage({ readOnly = false }) {
 
             <Separator />
 
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground">Penugasan Terkait</span>
-                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   {selectedTask.assignments_count ?? selectedTask.assignments?.length ?? 0} penugasan
                 </span>
               </div>
 
               {selectedTask.assignments && selectedTask.assignments.length > 0 ? (
-                <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                <div className="divide-y divide-border">
                   {selectedTask.assignments.map((assign) => {
                     const empName =
                       assign.employee?.full_name || `Pegawai #${assign.employee_id}`;
@@ -860,11 +845,11 @@ export default function TasksPage({ readOnly = false }) {
                     return (
                       <div
                         key={assign.id}
-                        className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                        className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
                           <Avatar className="size-7 border border-border">
-                            <AvatarFallback className="bg-muted text-[10px] font-semibold text-foreground">
+                            <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                               {getInitials(empName)}
                             </AvatarFallback>
                           </Avatar>
@@ -878,7 +863,7 @@ export default function TasksPage({ readOnly = false }) {
                   })}
                 </div>
               ) : (
-                <p className="rounded-lg border border-dashed border-border px-3.5 py-4 text-center text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Belum ada pegawai yang ditugaskan pada tugas ini.
                 </p>
               )}
@@ -917,16 +902,23 @@ export default function TasksPage({ readOnly = false }) {
           </>
         }
       >
-        <form id="task-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {formError && (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
-            >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+        <form id="task-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <AnimatePresence initial={false}>
+            {formError && (
+              <motion.div
+                key="task-form-error"
+                role="alert"
+                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{formError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="task-title" className="text-xs">
@@ -941,6 +933,7 @@ export default function TasksPage({ readOnly = false }) {
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
               placeholder="Contoh: Penyusunan Laporan Kepatuhan K3 Q4"
+              className="rounded-lg"
             />
           </div>
 
@@ -954,7 +947,7 @@ export default function TasksPage({ readOnly = false }) {
                 value={form.department_id || undefined}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, department_id: val }))}
               >
-                <SelectTrigger id="task-department" className="w-full">
+                <SelectTrigger id="task-department" className="w-full rounded-lg">
                   <SelectValue placeholder="Pilih Departemen" />
                 </SelectTrigger>
                 <SelectContent>
@@ -983,7 +976,7 @@ export default function TasksPage({ readOnly = false }) {
                 step="0.5"
                 value={form.estimated_hours}
                 onChange={(e) => setForm((prev) => ({ ...prev, estimated_hours: e.target.value }))}
-                className="font-mono tabular-nums"
+                className="rounded-lg tabular-nums"
               />
             </div>
 
@@ -996,7 +989,7 @@ export default function TasksPage({ readOnly = false }) {
                 value={form.priority}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, priority: val }))}
               >
-                <SelectTrigger id="task-priority" className="w-full">
+                <SelectTrigger id="task-priority" className="w-full rounded-lg">
                   <SelectValue placeholder="Pilih Prioritas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1021,7 +1014,7 @@ export default function TasksPage({ readOnly = false }) {
                 required
                 value={form.due_date}
                 onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
-                className="font-mono tabular-nums"
+                className="rounded-lg tabular-nums"
               />
             </div>
           </div>
@@ -1035,7 +1028,7 @@ export default function TasksPage({ readOnly = false }) {
               value={form.status}
               onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
             >
-              <SelectTrigger id="task-status" className="w-full">
+              <SelectTrigger id="task-status" className="w-full rounded-lg">
                 <SelectValue placeholder="Pilih Status" />
               </SelectTrigger>
               <SelectContent>
@@ -1061,6 +1054,7 @@ export default function TasksPage({ readOnly = false }) {
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="Rincian ruang lingkup pekerjaan atau target keluaran..."
+              className="rounded-lg"
             />
           </div>
         </form>
@@ -1079,7 +1073,7 @@ export default function TasksPage({ readOnly = false }) {
               Tugas <span className="font-medium text-foreground">{deletingTask.title}</span> akan
               dihapus dari perencanaan.
               {Number(deletingTask.assignments_count || 0) > 0 && (
-                <span className="mt-2 block rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                <span className="mt-2 block rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
                   Perhatian: Tugas ini memiliki {deletingTask.assignments_count} penugasan terkait.
                   Penghapusan akan ditolak jika terdapat penugasan aktif atau catatan work log.
                 </span>
