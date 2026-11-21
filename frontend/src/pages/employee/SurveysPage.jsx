@@ -106,16 +106,23 @@ function emptyResponseForm() {
   };
 }
 
-function Nfr02PrivacyCue({ isEmployee }) {
+function Nfr02PrivacyCue({ isEmployee, compact = false }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           <Info className="size-3.5 shrink-0 text-primary" />
-          <span>Privasi NFR-02: Agregat per departemen</span>
+          {compact ? (
+            <>
+              <span>NFR-02</span>
+              <span className="hidden lg:inline">· Agregat per departemen</span>
+            </>
+          ) : (
+            <span>Privasi NFR-02: Agregat per departemen</span>
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
@@ -354,7 +361,7 @@ export default function SurveysPage() {
                 </span>
                 <span className="text-muted-foreground">{rate.toFixed(1)}%</span>
               </div>
-              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-28" />
+              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-20" />
             </div>
           );
         },
@@ -365,7 +372,7 @@ export default function SurveysPage() {
             ? Number(row.avg_wlb_score)
             : -1,
         id: 'avg_wlb',
-        header: 'Skor & Dimensi WLB',
+        header: 'Skor WLB',
         cell: ({ row }) => {
           const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
           return (
@@ -660,7 +667,7 @@ export default function SurveysPage() {
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
       actions={
         <div className="flex flex-wrap items-center gap-3">
-          <Nfr02PrivacyCue isEmployee={isEmployee} />
+          <Nfr02PrivacyCue isEmployee={isEmployee} compact />
           {canManage && (
             <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
               <Plus className="size-4" data-icon="inline-start" />
@@ -1246,9 +1253,9 @@ export default function SurveysPage() {
 
               {/* Question 1: Work-Life Balance (Approved Likert 1–5 ToggleGroup) */}
               <div className="flex flex-col gap-3">
-                <Label id="survey-wlb-label" className="leading-snug">
+                <p id="survey-wlb-label" className="text-sm leading-snug font-medium text-foreground">
                   1. Keseimbangan Kehidupan &amp; Pekerjaan (Work-Life Balance)
-                </Label>
+                </p>
                 <ToggleGroup
                   type="single"
                   aria-labelledby="survey-wlb-label"
@@ -1288,9 +1295,12 @@ export default function SurveysPage() {
 
               {/* Question 2: Workload Perception (Approved Likert 1–5 ToggleGroup) */}
               <div className="flex flex-col gap-3">
-                <Label id="survey-workload-label" className="leading-snug">
+                <p
+                  id="survey-workload-label"
+                  className="text-sm leading-snug font-medium text-foreground"
+                >
                   2. Persepsi Beban Kerja Saat Ini (Workload Perception)
-                </Label>
+                </p>
                 <ToggleGroup
                   type="single"
                   aria-labelledby="survey-workload-label"

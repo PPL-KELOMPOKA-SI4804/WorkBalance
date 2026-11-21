@@ -80,7 +80,7 @@ export function DecentWorkDonutChart({
             cornerRadius={8}
             stroke="none"
             isAnimationActive={!prefersReducedMotion}
-            animationDuration={360}
+            animationDuration={240}
             animationEasing="ease-out"
           >
             {chartData.map((entry) => (
@@ -154,7 +154,7 @@ export function WorkHoursBarChart({
           radius={[0, 0, 0, 0]}
           maxBarSize={36}
           isAnimationActive={!prefersReducedMotion}
-          animationDuration={320}
+          animationDuration={220}
           animationEasing="ease-out"
         />
         <Bar
@@ -164,7 +164,7 @@ export function WorkHoursBarChart({
           radius={[6, 6, 0, 0]}
           maxBarSize={36}
           isAnimationActive={!prefersReducedMotion}
-          animationDuration={320}
+          animationDuration={220}
           animationEasing="ease-out"
         />
       </BarChart>
@@ -242,7 +242,7 @@ export function WorkloadTrendAreaChart({
             dot={{ r: 3, strokeWidth: 1.5, fill: 'var(--card)' }}
             activeDot={{ r: 5 }}
             isAnimationActive={!prefersReducedMotion}
-            animationDuration={320}
+            animationDuration={220}
             animationEasing="ease-out"
           />
         ))}

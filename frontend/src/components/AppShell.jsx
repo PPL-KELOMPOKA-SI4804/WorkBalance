@@ -152,7 +152,7 @@ function RegulatoryFooter({ collapsed }) {
     <div className="border-t border-sidebar-border px-4 py-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
         <Scale aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
-        <span className="truncate">PP 35/2021 · 40j / maks 18j lembur</span>
+        <span className="truncate">PP 35/2021 · 40j + maks 18j</span>
       </div>
     </div>
   );

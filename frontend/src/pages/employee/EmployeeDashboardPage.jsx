@@ -179,7 +179,11 @@ export default function EmployeeDashboardPage() {
 
       if (surveyRes.status === 'fulfilled' && surveyRes.value) {
         const surveys = surveyRes.value.surveys || [];
-        const pending = surveys.filter((s) => s.status === 'open' && !s.has_responded).length;
+        const summaryPending = surveyRes.value.summary?.my_pending_count;
+        const pending =
+          typeof summaryPending === 'number'
+            ? summaryPending
+            : surveys.filter((s) => s.is_active && !s.my_response).length;
         setPendingSurveysCount(pending);
       }
     } finally {

@@ -13,7 +13,7 @@ const SIZE_CLASSES = {
   sm: 'sm:max-w-md data-[side=right]:sm:max-w-md',
   md: 'sm:max-w-lg data-[side=right]:sm:max-w-lg',
   lg: 'sm:max-w-xl data-[side=right]:sm:max-w-xl',
-  xl: 'sm:max-w-2xl data-[side=right]:sm:max-w-2xl',
+  xl: 'sm:max-w-3xl data-[side=right]:sm:max-w-3xl',
 };
 
 export function FormSheet({
@@ -31,8 +31,13 @@ export function FormSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          event.currentTarget?.focus?.({ preventScroll: true });
+        }}
         className={cn(
-          'flex w-full flex-col gap-0 p-0',
+          'flex w-full flex-col gap-0 p-0 focus:outline-none',
           SIZE_CLASSES[size] || SIZE_CLASSES.md,
           className
         )}

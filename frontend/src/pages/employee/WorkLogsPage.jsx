@@ -787,7 +787,11 @@ export default function WorkLogsPage({ readOnly = false }) {
           searchable
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Cari aktivitas, nama tugas, atau pegawai..."
+          searchPlaceholder={
+            isEmployee
+              ? 'Cari aktivitas atau nama tugas...'
+              : 'Cari pegawai, tugas, atau aktivitas...'
+          }
           pageSize={10}
           onRowClick={(log) => openDetailSheet(log)}
           emptyTitle={
