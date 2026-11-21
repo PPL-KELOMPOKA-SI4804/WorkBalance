@@ -1,14 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40" fill="none" role="img" aria-label="WorkBalance Logo">
-  <g transform="translate(2, 4)">
-    <rect x="2" y="7" width="6" height="17" rx="3" fill="#0284C7" />
-    <rect x="11" y="2" width="6" height="23" rx="3" fill="#10B981" />
-    <rect x="20" y="8" width="6" height="16" rx="3" fill="#F59E0B" />
-    <path d="M2.5 17C7.5 12.5 20.5 12.5 25.5 17" stroke="#1E293B" stroke-width="2.2" stroke-linecap="round" />
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="800"
+     height="220"
+     viewBox="0 0 800 220">
+
+  <!-- BRAND SYMBOL -->
+  <g transform="translate(15, 0) scale(0.82)">
+
+    <rect x="48" y="58"
+          width="48" height="140"
+          rx="24" fill="#0284C7"/>
+
+    <rect x="104" y="20"
+          width="48" height="216"
+          rx="24" fill="#10B981"/>
+
+    <rect x="160" y="58"
+          width="48" height="140"
+          rx="24" fill="#F59E0B"/>
+
+    <path d="
+      M 18,154
+      C 66,78 190,78 238,154
+      C 183,105 73,105 18,154
+      Z"
+      fill="#1E293B"/>
+
   </g>
-  <text x="38" y="22" font-family="Plus Jakarta Sans, Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.02em">
+
+  <!-- WORDMARK -->
+  <text x="245" y="112"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="68"
+        font-weight="700"
+        letter-spacing="-3">
+
     <tspan fill="#1E293B">Work</tspan><tspan fill="#0284C7">Balance</tspan>
+
   </text>
-  <text x="38" y="34" font-family="Plus Jakarta Sans, Inter, sans-serif" font-size="7.5" font-weight="600" fill="#475569" letter-spacing="0.12em">
-    DECENT WORK, BETTER LIFE
+
+  <!-- TAGLINE -->
+  <text x="250" y="157"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="22"
+        font-weight="500"
+        letter-spacing="4"
+        fill="#334155">
+
+    Decent Work, Better Life
+
   </text>
+
 </svg>

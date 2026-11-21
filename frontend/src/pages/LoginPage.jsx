@@ -114,9 +114,9 @@ export default function LoginPage() {
       <aside className="hidden flex-col justify-between border-r border-border bg-sidebar p-10 lg:col-span-6 lg:flex xl:col-span-7 xl:p-14">
         <div>
           <img
-            src="/assets/workbalance_horizontal_logo_2.svg"
+            src="/assets/workbalance_horizontal_logo.svg"
             alt="WorkBalance"
-            className="h-9 w-auto"
+            className="-ml-1 h-9 w-auto object-contain"
           />
         </div>
 
@@ -175,9 +175,9 @@ export default function LoginPage() {
         <div className="flex w-full max-w-[390px] flex-col gap-7">
           <div className="flex flex-col gap-2">
             <img
-              src="/assets/workbalance_horizontal_logo_2.svg"
+              src="/assets/workbalance_horizontal_logo.svg"
               alt="WorkBalance"
-              className="mb-3 h-8 w-auto self-start lg:hidden"
+              className="-ml-1 mb-3 h-8 w-auto self-start object-contain lg:hidden"
             />
             <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground">
               Masuk ke ruang kerja

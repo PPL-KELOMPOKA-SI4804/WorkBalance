@@ -1,7 +1,7 @@
 # UI/UX & Brand Identity Design System (DESIGN.md): WorkBalance
 
-**Versi Dokumen:** 2.0 (Calm Enterprise Precision — Anti-AI-Slop Edition)  
-**Tanggal:** 21 November 2026  
+**Versi Dokumen:** 2.1 (Calm Enterprise Precision — Optical & Copy Craft Edition)  
+**Tanggal:** 22 November 2026  
 **Mode Permukaan:** `Operate` (Enterprise Workforce & SDG 8 Decision Support System)  
 **Referensi Produk & Teknis:** `PRD.md` & `ARCHITECTURE.md`  
 **Tagline Merek:** _"Decent Work, Better Life"_
@@ -47,8 +47,8 @@ Logo **WorkBalance** terdiri atas tiga pilar vertikal berujung membulat (*capsul
 
 | Nama File | Varian | Ukuran | Lokasi Penggunaan |
 | :--- | :--- | :--- | :--- |
-| `workbalance_horizontal_logo_2.svg` | Horizontal Lockup | `h-8` (`32px`, auto width) | Header Sidebar (expanded), Login Panel, Kop Laporan. |
-| `workbalance_logo_2.svg` | Standalone Icon | `size-8` (`32px × 32px`) | Favicon, Header Sidebar (collapsed rail), Loading Brand Mark. |
+| `workbalance_horizontal_logo.svg` | Horizontal Lockup | `h-8` (`32px`, auto width, `-ml-1` optis) | Header Sidebar (expanded), Login Panel, Kop Laporan. |
+| `workbalance_logo.svg` | Standalone Icon | `size-7`–`size-8` | Favicon, Header Sidebar (collapsed rail), Loading Brand Mark. |
 
 ---
 
@@ -66,7 +66,7 @@ Seluruh komponen baru **WAJIB** menggunakan token semantik CSS (`bg-background`,
 | `--muted` | `oklch(0.955 0.006 247)` | Hover baris, tab list, input search tenang |
 | `--border` | `oklch(0.905 0.008 247)` | Hairline `1px` pemisah kartu, sidebar, & tabel |
 | `--foreground` | `oklch(0.208 0.032 256)` | Teks utama (`#1E293B` equivalent, kontras > 11:1) |
-| `--muted-foreground` | `oklch(0.495 0.025 256)` | Teks sekunder, label kolom, metadata (kontras ≥ 4.6:1) |
+| `--muted-foreground` | `oklch(0.425 0.024 256)` | Teks sekunder, label kolom, metadata (kontras > 6.2:1, tanpa opacity dilution) |
 | `--primary` | `oklch(0.562 0.148 238)` | WorkBalance Primary Blue (`#0284C7` family) untuk CTA & aktif |
 | `--destructive` | `oklch(0.577 0.215 27)` | Aksi hapus & status Risiko Tinggi / Override PP 35/2021 |
 
@@ -87,16 +87,15 @@ Gunakan komponen terpusat **`<StatusBadge />`** (`src/components/workbalance/Sta
 | **Workflow & Approval** | `open` / `enrolled` / `planned` | `sky-500` | Terbuka / Terjadwal | `--chart-1` |
 | **Workflow & Approval** | `rejected` / `cancelled` / `severe` / `inactive` | `rose-500` / `slate-400` | Ditolak / Nonaktif | `--chart-5` |
 
-### 3.3 Tipografi & Skala Ketat (`Operate Mode`)
+### 3.3 Tipografi, Monospace Allowlist, Radius Konsentris & Ikon (`Operate Mode`)
 
-- **UI Sans:** `"Plus Jakarta Sans", "Inter", system-ui, sans-serif` — satu keluarga sans terkalibrasi untuk seluruh heading, label, dan isi tabel.
-- **Data Monospace:** `"JetBrains Mono", ui-monospace, monospace` — digunakan **hanya** untuk kode (`EMP-001`, `ENG`), periode ISO (`2026-W47`), dan durasi/rasio pengukuran (`42.5j / 40j`).
-- **Skala Tetap (`rem`, bukan `clamp` fluid):**
-  - **Page Title (`H1`):** `text-xl` (`20px`), `font-semibold`, `tracking-[-0.02em]`, `text-foreground`.
-  - **Section / Card Title (`H2`):** `text-sm`–`text-base` (`14px–16px`), `font-semibold`, `tracking-[-0.01em]`.
-  - **KPI Hero Number:** `text-2xl`–`text-[28px]`, `font-semibold`, `tracking-[-0.025em]`, `tabular-nums`.
-  - **Body & Table Cell:** `text-sm` (`14px`), `leading-5`.
-  - **Table Header & Meta:** `text-xs` (`12px`), `font-medium`, `text-muted-foreground`.
+- **UI Sans:** `"Plus Jakarta Sans", "Geist Variable", "Inter", system-ui, sans-serif` — dipakai untuk seluruh heading, label, isi tabel, dan **semua angka metrik** (wajib `tabular-nums`, bukan monospace).
+- **Monospace Allowlist Ketat (`JetBrains Mono`):** Digunakan **eksklusif** untuk kode pegawai (`EMP-001`), kode departemen (`ENG`, `OPS`, `HRD`), dan shortcut keycap (`Ctrl K`). **Dilarang** memakai `font-mono` pada skor, durasi jam, tanggal, input form, maupun pagination.
+- **Lantai Kontras & Ukuran:** Minimum `text-xs` (`12px`) untuk semua teks terbaca; **dilarang** `text-muted-foreground/60|70|80`, **dilarang** `italic` acak pada UI, dan wajib `text-wrap: balance` pada semua heading (`h1–h4`).
+- **Radius Konsentris (`inner = max(4px, outer - padding)`):** Kartu luar `rounded-2xl` (`16px`) dengan padding `8px` menghasilkan kontrol dalam `rounded-lg` (`8px`); `TabsList` `rounded-xl` (`12px`) dengan `p-1` (`4px`) menghasilkan trigger `rounded-lg` (`8px`).
+- **Konsistensi Ikon (Lucide):** Bobot stroke tunggal `1.75` secara global dan 3 ukuran tetap: `size-3.5` (inline meta/prefix), `size-4` (tombol, navigasi, aksi tabel), dan `size-5` (empty/error state).
+- **Filter & Copy Discipline:** Hapus bar filter pill `ToggleGroup` di toolbar tabel (gunakan `<Select>` ringkas 1 baris), hapus banner paragraf panjang yang berulang, dan gunakan *spacing* (`gap-8` antar seksi) alih-alih kotak bersarang.
+- **Animasi Fungsional (`motion/react`):** Hanya untuk umpan balik berguna (interpolasi angka metrik KPI, perpindahan indikator navigasi aktif, progress refetch non-destruktif) dengan kepatuhan penuh pada `prefers-reduced-motion`.
 
 ---
 

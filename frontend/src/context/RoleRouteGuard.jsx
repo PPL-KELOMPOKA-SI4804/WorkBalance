@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { getDefaultRouteForRole, useAuth } from '../context/AuthContext';
+import { getDefaultRouteForRole, useAuth } from '@/context/AuthContext';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function RoleRouteGuard({ allowedRoles = [], children }) {
   const { user, loading } = useAuth();
@@ -7,15 +8,16 @@ export default function RoleRouteGuard({ allowedRoles = [], children }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-6 py-5">
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-4">
           <img
-            src="/assets/workbalance_logo_2.svg"
+            src="/assets/workbalance_logo.svg"
             alt="WorkBalance"
-            className="size-7 animate-pulse"
+            className="size-7 shrink-0"
           />
-          <span className="text-sm font-medium text-muted-foreground">
-            Memverifikasi sesi pengguna...
-          </span>
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Spinner className="size-4 text-primary" />
+            <span>Memverifikasi sesi...</span>
+          </div>
         </div>
       </div>
     );
