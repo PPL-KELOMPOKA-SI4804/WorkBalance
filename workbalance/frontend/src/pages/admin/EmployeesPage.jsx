@@ -2,41 +2,47 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Briefcase,
-  CheckCircle2,
   Edit3,
   Lock,
   Plus,
   RefreshCw,
-  Search,
+  RotateCcw,
   Trash2,
   UserCheck,
   UserMinus,
   Users,
-  X,
 } from 'lucide-react';
-import AppShell from '../../components/AppShell';
-import { extractApiError } from '../../services/api';
-import { employeeService } from '../../services/employeeService';
+import { toast } from 'sonner';
+import AppShell from '@/components/AppShell';
+import { getInitials, ROLE_LABELS } from '@/lib/navigation';
+import { extractApiError } from '@/services/api';
+import { employeeService } from '@/services/employeeService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  ConfirmDialog,
+  DataTable,
+  FormSheet,
+  KpiStatCard,
+  StatusBadge,
+} from '@/components/workbalance';
 
-const STATUS_PILLS = [
-  { value: '', label: 'Semua' },
-  { value: 'active', label: 'Aktif' },
-  { value: 'inactive', label: 'Nonaktif' },
-];
-
-const ROLE_LABELS = {
-  admin: 'Admin',
-  manager: 'Manajer',
-  employee: 'Pegawai',
-};
-
-function getInitials(name = '') {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return (name || 'PG').slice(0, 2).toUpperCase();
-}
+const ALL_FILTER_VALUE = '__all__';
 
 function emptyEmployeeForm(departments, positions, employmentTypes) {
   return {
@@ -64,6 +70,7 @@ function emptyTypeForm() {
 export default function EmployeesPage({ readOnly = false }) {
   const [activeTab, setActiveTab] = useState('employees');
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [employees, setEmployees] = useState([]);
@@ -79,41 +86,31 @@ export default function EmployeesPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
 
-  // Toast feedback
-  const [toast, setToast] = useState(null);
-
-  // Employee Modal State
-  const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
+  // Employee FormSheet State
+  const [employeeSheetOpen, setEmployeeSheetOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm([], [], []));
   const [employeeFormError, setEmployeeFormError] = useState('');
   const [employeeSubmitting, setEmployeeSubmitting] = useState(false);
 
-  // Delete Employee Modal
+  // Delete Employee ConfirmDialog State
   const [deletingEmployee, setDeletingEmployee] = useState(null);
   const [deleteEmployeeLoading, setDeleteEmployeeLoading] = useState(false);
 
-  // Employment Type Modal State
-  const [typeModalOpen, setTypeModalOpen] = useState(false);
+  // Employment Type FormSheet State
+  const [typeSheetOpen, setTypeSheetOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [typeForm, setTypeForm] = useState(emptyTypeForm());
   const [typeFormError, setTypeFormError] = useState('');
   const [typeSubmitting, setTypeSubmitting] = useState(false);
 
-  // Delete Type Modal
+  // Delete Employment Type ConfirmDialog State
   const [deletingType, setDeletingType] = useState(null);
   const [deleteTypeLoading, setDeleteTypeLoading] = useState(false);
-
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message });
-    setTimeout(() => {
-      setToast((current) => (current?.message === message ? null : current));
-    }, 4500);
-  }, []);
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -123,7 +120,7 @@ export default function EmployeesPage({ readOnly = false }) {
       const [empRes, typesRes, deptRes, posRes] = await Promise.all([
         employeeService.getEmployees({
           search,
-          status: statusFilter,
+          status: statusFilter === 'all' ? '' : statusFilter,
           department_id: departmentFilter,
           employment_type_id: typeFilter,
         }),
@@ -144,6 +141,7 @@ export default function EmployeesPage({ readOnly = false }) {
       setEmploymentTypes(typesRes || []);
       setDepartments(deptRes || []);
       setPositions(posRes || []);
+      setHasLoaded(true);
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Gagal memuat data master pegawai.').message);
     } finally {
@@ -156,26 +154,26 @@ export default function EmployeesPage({ readOnly = false }) {
   }, [loadAllData]);
 
   const hasActiveFilters = useMemo(
-    () => Boolean(search || statusFilter || departmentFilter || typeFilter),
+    () => Boolean(search.trim() || statusFilter !== 'all' || departmentFilter || typeFilter),
     [search, statusFilter, departmentFilter, typeFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('');
+    setStatusFilter('all');
     setDepartmentFilter('');
     setTypeFilter('');
   };
 
   // --- Employee CRUD Handlers ---
-  const openCreateEmployeeModal = () => {
+  const openCreateEmployeeSheet = useCallback(() => {
     setEditingEmployee(null);
     setEmployeeForm(emptyEmployeeForm(departments, positions, employmentTypes));
     setEmployeeFormError('');
-    setEmployeeModalOpen(true);
-  };
+    setEmployeeSheetOpen(true);
+  }, [departments, positions, employmentTypes]);
 
-  const openEditEmployeeModal = (emp) => {
+  const openEditEmployeeSheet = useCallback((emp) => {
     setEditingEmployee(emp);
     setEmployeeForm({
       employee_code: emp.employee_code || '',
@@ -190,13 +188,23 @@ export default function EmployeesPage({ readOnly = false }) {
       status: emp.status || 'active',
     });
     setEmployeeFormError('');
-    setEmployeeModalOpen(true);
-  };
+    setEmployeeSheetOpen(true);
+  }, []);
 
   const handleEmployeeSubmit = async (e) => {
     e.preventDefault();
-    setEmployeeSubmitting(true);
     setEmployeeFormError('');
+
+    if (
+      !employeeForm.department_id ||
+      !employeeForm.position_id ||
+      !employeeForm.employment_type_id
+    ) {
+      setEmployeeFormError('Departemen, jabatan, dan jenis kepegawaian wajib dipilih.');
+      return;
+    }
+
+    setEmployeeSubmitting(true);
 
     const payload = {
       employee_code: employeeForm.employee_code.trim(),
@@ -220,12 +228,12 @@ export default function EmployeesPage({ readOnly = false }) {
     try {
       if (editingEmployee) {
         const res = await employeeService.updateEmployee(editingEmployee.id, payload);
-        showToast('success', res.message || 'Data pegawai berhasil diperbarui.');
+        toast.success(res.message || 'Data pegawai berhasil diperbarui.');
       } else {
         const res = await employeeService.createEmployee(payload);
-        showToast('success', res.message || 'Data pegawai berhasil ditambahkan.');
+        toast.success(res.message || 'Data pegawai berhasil ditambahkan.');
       }
-      setEmployeeModalOpen(false);
+      setEmployeeSheetOpen(false);
       await loadAllData();
     } catch (err) {
       setEmployeeFormError(extractApiError(err, 'Gagal menyimpan data pegawai.').message);
@@ -240,11 +248,11 @@ export default function EmployeesPage({ readOnly = false }) {
 
     try {
       const res = await employeeService.deleteEmployee(deletingEmployee.id);
-      showToast('success', res.message || 'Data pegawai berhasil dihapus.');
+      toast.success(res.message || 'Data pegawai berhasil dihapus.');
       setDeletingEmployee(null);
       await loadAllData();
     } catch (err) {
-      showToast('error', extractApiError(err, 'Gagal menghapus pegawai.').message);
+      toast.error(extractApiError(err, 'Gagal menghapus pegawai.').message);
       setDeletingEmployee(null);
     } finally {
       setDeleteEmployeeLoading(false);
@@ -252,14 +260,14 @@ export default function EmployeesPage({ readOnly = false }) {
   };
 
   // --- Employment Type CRUD Handlers ---
-  const openCreateTypeModal = () => {
+  const openCreateTypeSheet = useCallback(() => {
     setEditingType(null);
     setTypeForm(emptyTypeForm());
     setTypeFormError('');
-    setTypeModalOpen(true);
-  };
+    setTypeSheetOpen(true);
+  }, []);
 
-  const openEditTypeModal = (typeItem) => {
+  const openEditTypeSheet = useCallback((typeItem) => {
     setEditingType(typeItem);
     setTypeForm({
       name: typeItem.name || '',
@@ -267,8 +275,8 @@ export default function EmployeesPage({ readOnly = false }) {
       normal_weekly_hours: String(typeItem.normal_weekly_hours || 40),
     });
     setTypeFormError('');
-    setTypeModalOpen(true);
-  };
+    setTypeSheetOpen(true);
+  }, []);
 
   const handleTypeSubmit = async (e) => {
     e.preventDefault();
@@ -284,12 +292,12 @@ export default function EmployeesPage({ readOnly = false }) {
     try {
       if (editingType) {
         const res = await employeeService.updateEmploymentType(editingType.id, payload);
-        showToast('success', res.message || 'Jenis kepegawaian berhasil diperbarui.');
+        toast.success(res.message || 'Jenis kepegawaian berhasil diperbarui.');
       } else {
         const res = await employeeService.createEmploymentType(payload);
-        showToast('success', res.message || 'Jenis kepegawaian berhasil ditambahkan.');
+        toast.success(res.message || 'Jenis kepegawaian berhasil ditambahkan.');
       }
-      setTypeModalOpen(false);
+      setTypeSheetOpen(false);
       await loadAllData();
     } catch (err) {
       setTypeFormError(extractApiError(err, 'Gagal menyimpan jenis kepegawaian.').message);
@@ -304,920 +312,938 @@ export default function EmployeesPage({ readOnly = false }) {
 
     try {
       const res = await employeeService.deleteEmploymentType(deletingType.id);
-      showToast('success', res.message || 'Jenis kepegawaian berhasil dihapus.');
+      toast.success(res.message || 'Jenis kepegawaian berhasil dihapus.');
       setDeletingType(null);
       await loadAllData();
     } catch (err) {
-      showToast('error', extractApiError(err, 'Jenis kepegawaian tidak dapat dihapus.').message);
+      toast.error(extractApiError(err, 'Jenis kepegawaian tidak dapat dihapus.').message);
       setDeletingType(null);
     } finally {
       setDeleteTypeLoading(false);
     }
   };
 
-  const kpiCards = [
-    {
-      label: 'Total Pegawai',
-      value: summary.total,
-      badge: 'Seluruh unit organisasi',
-      badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-      icon: Users,
-      iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
-    },
-    {
-      label: 'Pegawai Aktif',
-      value: summary.active,
-      badge: 'Akun aktif beroperasi',
-      badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-      icon: UserCheck,
-      iconBg: 'bg-[#D1FAE5] text-[#10B981]',
-    },
-    {
-      label: 'Pegawai Nonaktif',
-      value: summary.inactive,
-      badge: 'Akses dinonaktifkan',
-      badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-      icon: UserMinus,
-      iconBg: 'bg-[#FEF3C7] text-[#F59E0B]',
-    },
-    {
-      label: 'Jenis Kepegawaian',
-      value: summary.employment_types_count,
-      badge: 'Acuan jam kerja normal',
-      badgeClass: 'bg-slate-100 text-slate-600',
-      icon: Briefcase,
-      iconBg: 'bg-slate-100 text-[#1E293B]',
-    },
-  ];
+  // --- DataTable Columns: Employees ---
+  const employeeColumns = useMemo(() => {
+    const baseColumns = [
+      {
+        accessorFn: (row) => row.full_name || '',
+        id: 'employee',
+        header: 'Pegawai',
+        cell: ({ row }) => {
+          const emp = row.original;
+          const role = emp.user_account?.role;
+          return (
+            <div className="flex items-center gap-2.5">
+              <Avatar className="size-8 border border-border">
+                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+                  {getInitials(emp.full_name, emp.user_account?.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 max-w-[230px] flex-col">
+                <span className="truncate text-xs font-medium text-foreground">
+                  {emp.full_name}
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {emp.user_account?.email || 'Tanpa akun login'}
+                  {role && (
+                    <span className="ml-1 font-medium text-primary">
+                      ({ROLE_LABELS[role] || role})
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'employee_code',
+        header: 'Kode',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.employee_code}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => `${row.position?.title || ''} ${row.department?.name || ''}`,
+        id: 'department_position',
+        header: 'Departemen & Jabatan',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex max-w-[210px] flex-col gap-0.5 whitespace-normal">
+              <span className="line-clamp-1 text-xs font-medium text-foreground">
+                {emp.position?.title || '-'}
+              </span>
+              <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                {emp.department?.name || '-'}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.employment_type?.name || '',
+        id: 'employment_type',
+        header: 'Jenis Kepegawaian',
+        cell: ({ row }) => {
+          const empType = row.original.employment_type;
+          return (
+            <div className="flex flex-col gap-0.5 whitespace-nowrap">
+              <span className="text-xs font-medium text-foreground">{empType?.name || '-'}</span>
+              {empType && (
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                  {empType.work_days_per_week} hr · {empType.normal_weekly_hours}j/mg
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'join_date',
+        header: 'Tgl Bergabung',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+            {row.original.join_date ? String(row.original.join_date).slice(0, 10) : '-'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.status === 'active' ? 'active' : 'inactive'} />
+        ),
+      },
+    ];
+
+    if (!readOnly) {
+      baseColumns.push({
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openEditEmployeeSheet(emp);
+                }}
+                aria-label={`Ubah ${emp.full_name}`}
+                title="Ubah Pegawai"
+                className="text-muted-foreground hover:text-primary"
+              >
+                <Edit3 />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDeletingEmployee(emp);
+                }}
+                aria-label={`Hapus ${emp.full_name}`}
+                title="Hapus Pegawai"
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          );
+        },
+      });
+    }
+
+    return baseColumns;
+  }, [readOnly, openEditEmployeeSheet]);
+
+  // --- DataTable Columns: Employment Types ---
+  const typeColumns = useMemo(() => {
+    const baseColumns = [
+      {
+        accessorKey: 'name',
+        header: 'Nama Jenis Kepegawaian',
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground">{row.original.name}</span>
+        ),
+      },
+      {
+        accessorKey: 'work_days_per_week',
+        header: 'Hari Kerja / Minggu',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-foreground whitespace-nowrap tabular-nums">
+            {row.original.work_days_per_week} hari/minggu
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => (Number(row.work_days_per_week) === 6 ? 7 : 8),
+        id: 'daily_overtime_limit',
+        header: 'Ambang Lembur Harian',
+        cell: ({ row }) => {
+          const dailyLimit = Number(row.original.work_days_per_week) === 6 ? 7 : 8;
+          return (
+            <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+              &gt; {dailyLimit} jam/hari (PP 35/2021)
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'normal_weekly_hours',
+        header: 'Jam Normal / Minggu',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.normal_weekly_hours} jam
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => Number(row.employees_count || 0),
+        id: 'employees_count',
+        header: 'Pegawai Terkait',
+        cell: ({ row }) => {
+          const count = Number(row.original.employees_count || 0);
+          const inUse = count > 0;
+          return (
+            <Badge
+              variant={inUse ? 'secondary' : 'outline'}
+              className="gap-1 font-mono text-xs font-medium whitespace-nowrap tabular-nums"
+              title={
+                inUse
+                  ? 'Tidak dapat dihapus karena masih direferensikan oleh data pegawai aktif'
+                  : 'Belum digunakan oleh pegawai'
+              }
+            >
+              {inUse && <Lock className="size-3 text-muted-foreground" />}
+              {count} pegawai
+            </Badge>
+          );
+        },
+      },
+    ];
+
+    if (!readOnly) {
+      baseColumns.push({
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const typeItem = row.original;
+          const inUse = Number(typeItem.employees_count || 0) > 0;
+          return (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openEditTypeSheet(typeItem);
+                }}
+                aria-label={`Ubah ${typeItem.name}`}
+                title="Ubah Jenis Kepegawaian"
+                className="text-muted-foreground hover:text-primary"
+              >
+                <Edit3 />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDeletingType(typeItem);
+                }}
+                aria-label={`Hapus ${typeItem.name}`}
+                title={
+                  inUse
+                    ? 'Masih digunakan oleh pegawai (penghapusan ditolak sistem)'
+                    : 'Hapus Jenis Kepegawaian'
+                }
+                className={
+                  inUse
+                    ? 'text-muted-foreground/60 hover:text-amber-700'
+                    : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+                }
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          );
+        },
+      });
+    }
+
+    return baseColumns;
+  }, [readOnly, openEditTypeSheet]);
+
+  const activePercent =
+    summary.total > 0 ? Math.round((Number(summary.active || 0) / summary.total) * 100) : 0;
 
   return (
     <AppShell
       title={readOnly ? 'Direktori Pegawai Tim' : 'Manajemen Pegawai & Kepegawaian'}
-      breadcrumb={readOnly ? 'Manajer / Direktori Master Pegawai (Read-Only)' : 'Admin / Data Master / PBI-01'}
-      searchValue={search}
-      onSearchChange={activeTab === 'employees' ? setSearch : undefined}
-      searchPlaceholder="Cari nama, kode pegawai, atau email..."
+      breadcrumb={
+        readOnly
+          ? 'Organisasi & Tim / Direktori Tim'
+          : 'Master Organisasi / Pegawai & Kepegawaian'
+      }
+      actions={
+        readOnly ? (
+          <Badge variant="outline" className="gap-1.5 text-xs font-normal text-muted-foreground">
+            <Lock className="size-3" />
+            Mode Baca Saja
+          </Badge>
+        ) : activeTab === 'employees' ? (
+          <Button size="sm" onClick={openCreateEmployeeSheet}>
+            <Plus data-icon="inline-start" />
+            Tambah Pegawai
+          </Button>
+        ) : (
+          <Button size="sm" onClick={openCreateTypeSheet}>
+            <Plus data-icon="inline-start" />
+            Tambah Jenis Kepegawaian
+          </Button>
+        )
+      }
     >
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          role="status"
-          className={`fixed top-5 right-5 z-50 max-w-md flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg border ${
-            toast.type === 'success'
-              ? 'bg-white border-emerald-200 text-[#047857]'
-              : 'bg-white border-red-200 text-[#B91C1C]'
-          }`}
-        >
-          {toast.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm font-medium text-[#1E293B] flex-1">{toast.message}</p>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600"
-            aria-label="Tutup notifikasi"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {/* 4 KPI Summary Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          {kpiCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.label}
-                className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs hover:border-slate-300 transition"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">{card.label}</span>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                    <Icon className="w-[18px] h-[18px]" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-bold text-[#1E293B] tabular-nums mt-2">
-                  {card.value}
-                </p>
-                <span
-                  className={`inline-block mt-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${card.badgeClass}`}
-                >
-                  {card.badge}
-                </span>
-              </div>
-            );
-          })}
-        </section>
-
-        {/* Tabs Navigation */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex bg-white p-1 rounded-xl border border-slate-200/80">
-            <button
-              type="button"
-              onClick={() => setActiveTab('employees')}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition cursor-pointer ${
-                activeTab === 'employees'
-                  ? 'bg-[#0284C7] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Data Master Pegawai (FR-02)
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('employment-types')}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition cursor-pointer ${
-                activeTab === 'employment-types'
-                  ? 'bg-[#0284C7] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Jenis Kepegawaian (FR-05)
-            </button>
+      <div className="flex flex-col gap-6">
+        {/* Row 1: 4 KPI Summary Cards */}
+        {loading && !hasLoaded ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <Skeleton key={n} className="h-32 rounded-xl" />
+            ))}
           </div>
+        ) : (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiStatCard
+              label="Total Pegawai"
+              value={summary.total}
+              unit="pegawai"
+              icon={Users}
+              hint="Seluruh unit organisasi"
+            />
 
-          {readOnly && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E0F2FE] text-[#0369A1] text-xs font-medium">
-              <Lock className="w-3.5 h-3.5" />
-              Mode Baca Saja (Akses Manajer)
-            </span>
-          )}
-        </div>
+            <KpiStatCard
+              label="Pegawai Aktif"
+              value={summary.active}
+              unit="pegawai"
+              icon={UserCheck}
+              status="active"
+              statusLabel="Beroperasi"
+              hint={`${activePercent}% dari total`}
+            />
 
-        {/* Error State Banner */}
-        {errorMsg && (
-          <div className="bg-white rounded-xl border border-red-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#1E293B]">Gagal Memuat Data</h2>
-                <p className="text-sm text-slate-600 mt-0.5">{errorMsg}</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={loadAllData}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-sm font-semibold transition cursor-pointer shrink-0"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Lagi</span>
-            </button>
-          </div>
+            <KpiStatCard
+              label="Pegawai Nonaktif"
+              value={summary.inactive}
+              unit="pegawai"
+              icon={UserMinus}
+              status={Number(summary.inactive || 0) > 0 ? 'inactive' : 'active'}
+              statusLabel={
+                Number(summary.inactive || 0) > 0 ? 'Akses dinonaktifkan' : 'Semua aktif'
+              }
+            />
+
+            <KpiStatCard
+              label="Jenis Kepegawaian"
+              value={summary.employment_types_count}
+              unit="kategori"
+              icon={Briefcase}
+              hint="Acuan jam kerja normal"
+            />
+          </section>
         )}
 
-        {/* Tab 1: Data Master Pegawai (FR-02) */}
-        {activeTab === 'employees' && !errorMsg && (
-          <section className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-            {/* Table Toolbar */}
-            <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-semibold text-[#1E293B]">Daftar Pegawai</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                  {employees.length}
-                </span>
-              </div>
+        {/* Row 2: Tabs (Data Master Pegawai / Jenis Kepegawaian) */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <TabsList>
+              <TabsTrigger value="employees" className="px-3">
+                Data Master Pegawai
+              </TabsTrigger>
+              <TabsTrigger value="employment-types" className="px-3">
+                Jenis Kepegawaian
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* Local Search (visible on smaller screens or always accessible) */}
-                <div className="relative w-full sm:w-56">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari nama / kode..."
-                    className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  />
-                </div>
-
-                {/* Status Filter Pills */}
-                <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
-                  {STATUS_PILLS.map((pill) => (
-                    <button
-                      key={pill.label}
-                      type="button"
-                      onClick={() => setStatusFilter(pill.value)}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
-                        statusFilter === pill.value
-                          ? 'bg-white text-[#1E293B] shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Department Filter */}
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:border-[#0284C7] focus:outline-none"
-                  aria-label="Filter Departemen"
-                >
-                  <option value="">Semua Departemen</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Employment Type Filter */}
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:border-[#0284C7] focus:outline-none"
-                  aria-label="Filter Jenis Kepegawaian"
-                >
-                  <option value="">Semua Kepegawaian</option>
-                  {employmentTypes.map((typeItem) => (
-                    <option key={typeItem.id} value={typeItem.id}>
-                      {typeItem.name}
-                    </option>
-                  ))}
-                </select>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={openCreateEmployeeModal}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Tambah Pegawai</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Loading State */}
-            {loading ? (
-              <div className="p-6 space-y-3" aria-busy="true">
-                {[1, 2, 3, 4].map((row) => (
-                  <div key={row} className="h-12 bg-slate-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : employees.length === 0 ? (
-              /* Empty State */
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#1E293B]">
-                  {hasActiveFilters ? 'Tidak ada pegawai yang sesuai filter' : 'Belum ada data pegawai'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  {hasActiveFilters
-                    ? 'Coba ubah kata kunci pencarian atau setel ulang filter yang aktif.'
-                    : 'Tambahkan data pegawai pertama untuk mulai memantau kondisi kerja tim.'}
-                </p>
-                <div className="mt-4 flex justify-center gap-2">
+          {/* Tab 1: Data Master Pegawai */}
+          <TabsContent value="employees">
+            <DataTable
+              title="Daftar Pegawai"
+              countLabel="pegawai"
+              columns={employeeColumns}
+              data={employees}
+              loading={loading}
+              error={errorMsg}
+              onRetry={loadAllData}
+              searchable
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari nama, kode, atau email..."
+              pageSize={10}
+              emptyTitle={
+                hasActiveFilters
+                  ? 'Tidak ada pegawai yang sesuai filter'
+                  : 'Belum ada data pegawai'
+              }
+              emptyDescription={
+                hasActiveFilters
+                  ? 'Coba ubah kata kunci pencarian atau setel ulang filter yang aktif.'
+                  : 'Tambahkan data pegawai pertama untuk mulai memantau kondisi kerja tim.'
+              }
+              emptyAction={
+                <div className="flex flex-wrap items-center justify-center gap-2">
                   {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
-                    >
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                      <RotateCcw data-icon="inline-start" />
                       Setel Ulang Filter
-                    </button>
+                    </Button>
                   )}
                   {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={openCreateEmployeeModal}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Tambah Pegawai</span>
-                    </button>
+                    <Button size="sm" onClick={openCreateEmployeeSheet}>
+                      <Plus data-icon="inline-start" />
+                      Tambah Pegawai
+                    </Button>
                   )}
                 </div>
-              </div>
-            ) : (
-              /* Success State Table */
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/80 text-[#64748B] text-xs uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4 font-semibold">Pegawai</th>
-                      <th className="py-3 px-4 font-semibold">Kode</th>
-                      <th className="py-3 px-4 font-semibold">Departemen & Jabatan</th>
-                      <th className="py-3 px-4 font-semibold">Jenis Kepegawaian</th>
-                      <th className="py-3 px-4 font-semibold">Tgl Bergabung</th>
-                      <th className="py-3 px-4 font-semibold">Status</th>
-                      {!readOnly && <th className="py-3 px-4 font-semibold text-right">Aksi</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-[#334155]">
-                    {employees.map((emp) => (
-                      <tr
-                        key={emp.id}
-                        className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors"
-                      >
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#E0F2FE] text-[#0369A1] text-xs font-bold flex items-center justify-center shrink-0">
-                              {getInitials(emp.full_name)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-[#1E293B] truncate">{emp.full_name}</p>
-                              <p className="text-xs text-slate-500 truncate">
-                                {emp.user_account?.email || 'Tanpa akun login'}
-                                {emp.user_account?.role && (
-                                  <span className="ml-1.5 text-[#0284C7] font-medium">
-                                    ({ROLE_LABELS[emp.user_account.role] || emp.user_account.role})
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-medium tabular-nums text-[#1E293B] whitespace-nowrap">
-                          {emp.employee_code}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <p className="font-medium text-[#1E293B]">{emp.position?.title || '-'}</p>
-                          <p className="text-xs text-slate-500">{emp.department?.name || '-'}</p>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <p className="font-medium text-[#1E293B]">
-                            {emp.employment_type?.name || '-'}
-                          </p>
-                          {emp.employment_type && (
-                            <p className="text-xs text-slate-500 tabular-nums">
-                              {emp.employment_type.work_days_per_week} hari/mgg •{' '}
-                              {emp.employment_type.normal_weekly_hours} jam/mgg
-                            </p>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 tabular-nums whitespace-nowrap text-slate-600">
-                          {emp.join_date ? String(emp.join_date).slice(0, 10) : '-'}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {emp.status === 'active' ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#D1FAE5] text-[#047857]">
-                              Aktif
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEE2E2] text-[#B91C1C]">
-                              Nonaktif
-                            </span>
-                          )}
-                        </td>
-                        {!readOnly && (
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openEditEmployeeModal(emp)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                title="Ubah Pegawai"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDeletingEmployee(emp)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#EF4444] hover:bg-[#FEE2E2]/70 transition cursor-pointer"
-                                title="Hapus Pegawai"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
+              }
+              filterSlot={
+                <div className="flex flex-wrap items-center gap-2">
+                  <ToggleGroup
+                    type="single"
+                    value={statusFilter}
+                    onValueChange={(val) => val && setStatusFilter(val)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <ToggleGroupItem value="all" className="text-xs">
+                      Semua
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="active" className="text-xs">
+                      Aktif
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="inactive" className="text-xs">
+                      Nonaktif
+                    </ToggleGroupItem>
+                  </ToggleGroup>
 
-        {/* Tab 2: Jenis Kepegawaian (FR-05) */}
-        {activeTab === 'employment-types' && !errorMsg && (
-          <section className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-semibold text-[#1E293B]">
-                  Daftar Jenis Kepegawaian (FR-05)
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                  {employmentTypes.length}
-                </span>
-              </div>
+                  <Select
+                    name="filter_department"
+                    value={departmentFilter || ALL_FILTER_VALUE}
+                    onValueChange={(val) =>
+                      setDepartmentFilter(val === ALL_FILTER_VALUE ? '' : val)
+                    }
+                  >
+                    <SelectTrigger
+                      id="emp-filter-department"
+                      size="sm"
+                      className="w-44 bg-background text-xs"
+                      aria-label="Filter Departemen"
+                    >
+                      <SelectValue placeholder="Semua Departemen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={ALL_FILTER_VALUE}>Semua Departemen</SelectItem>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.id} value={String(dept.id)}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
 
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={openCreateTypeModal}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Jenis Kepegawaian</span>
-                </button>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="p-6 space-y-3" aria-busy="true">
-                {[1, 2, 3].map((row) => (
-                  <div key={row} className="h-12 bg-slate-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : employmentTypes.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center mx-auto mb-3">
-                  <Briefcase className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#1E293B]">Belum ada jenis kepegawaian</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Tambahkan kategori hubungan kerja untuk menetapkan standar hari dan jam kerja normal.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/80 text-[#64748B] text-xs uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4 font-semibold">Nama Jenis Kepegawaian</th>
-                      <th className="py-3 px-4 font-semibold">Hari Kerja / Minggu</th>
-                      <th className="py-3 px-4 font-semibold">Ambang Lembur Harian</th>
-                      <th className="py-3 px-4 font-semibold">Jam Kerja Normal / Minggu</th>
-                      <th className="py-3 px-4 font-semibold">Pegawai Terkait</th>
-                      {!readOnly && <th className="py-3 px-4 font-semibold text-right">Aksi</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-[#334155]">
-                    {employmentTypes.map((typeItem) => {
-                      const inUse = Number(typeItem.employees_count || 0) > 0;
-                      const dailyLimit = Number(typeItem.work_days_per_week) === 6 ? 7 : 8;
-                      return (
-                        <tr
-                          key={typeItem.id}
-                          className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors"
-                        >
-                          <td className="py-3.5 px-4 font-semibold text-[#1E293B]">
+                  <Select
+                    name="filter_employment_type"
+                    value={typeFilter || ALL_FILTER_VALUE}
+                    onValueChange={(val) =>
+                      setTypeFilter(val === ALL_FILTER_VALUE ? '' : val)
+                    }
+                  >
+                    <SelectTrigger
+                      id="emp-filter-type"
+                      size="sm"
+                      className="w-44 bg-background text-xs"
+                      aria-label="Filter Jenis Kepegawaian"
+                    >
+                      <SelectValue placeholder="Semua Kepegawaian" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={ALL_FILTER_VALUE}>Semua Kepegawaian</SelectItem>
+                        {employmentTypes.map((typeItem) => (
+                          <SelectItem key={typeItem.id} value={String(typeItem.id)}>
                             {typeItem.name}
-                          </td>
-                          <td className="py-3.5 px-4 tabular-nums">
-                            {typeItem.work_days_per_week} hari/minggu
-                          </td>
-                          <td className="py-3.5 px-4 tabular-nums text-slate-600">
-                            &gt; {dailyLimit} jam/hari (PP 35/2021)
-                          </td>
-                          <td className="py-3.5 px-4 tabular-nums font-medium text-[#1E293B]">
-                            {typeItem.normal_weekly_hours} jam
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium tabular-nums ${
-                                inUse
-                                  ? 'bg-[#E0F2FE] text-[#0369A1]'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                              title={
-                                inUse
-                                  ? 'Tidak dapat dihapus karena masih direferensikan oleh data pegawai aktif'
-                                  : 'Belum digunakan oleh pegawai'
-                              }
-                            >
-                              {inUse && <Lock className="w-3 h-3" />}
-                              {typeItem.employees_count || 0} pegawai
-                            </span>
-                          </td>
-                          {!readOnly && (
-                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditTypeModal(typeItem)}
-                                  className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                  title="Ubah Jenis Kepegawaian"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeletingType(typeItem)}
-                                  className={`p-1.5 rounded-lg transition cursor-pointer ${
-                                    inUse
-                                      ? 'text-slate-400 hover:text-[#B45309] hover:bg-[#FEF3C7]/70'
-                                      : 'text-slate-500 hover:text-[#EF4444] hover:bg-[#FEE2E2]/70'
-                                  }`}
-                                  title={
-                                    inUse
-                                      ? 'Masih digunakan oleh pegawai (penghapusan ditolak sistem)'
-                                      : 'Hapus Jenis Kepegawaian'
-                                  }
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={resetFilters}>
+                      <RotateCcw data-icon="inline-start" />
+                      Reset
+                    </Button>
+                  )}
+                </div>
+              }
+              actionsSlot={
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={loadAllData}
+                  aria-label="Muat ulang data"
+                >
+                  <RefreshCw className={loading ? 'animate-spin' : ''} />
+                </Button>
+              }
+            />
+          </TabsContent>
+
+          {/* Tab 2: Jenis Kepegawaian */}
+          <TabsContent value="employment-types">
+            <DataTable
+              title="Daftar Jenis Kepegawaian"
+              countLabel="kategori"
+              columns={typeColumns}
+              data={employmentTypes}
+              loading={loading}
+              error={errorMsg}
+              onRetry={loadAllData}
+              searchable
+              searchPlaceholder="Cari jenis kepegawaian..."
+              pageSize={10}
+              emptyTitle="Belum ada jenis kepegawaian"
+              emptyDescription="Tambahkan kategori hubungan kerja untuk menetapkan standar hari dan jam kerja normal."
+              emptyAction={
+                !readOnly ? (
+                  <Button size="sm" onClick={openCreateTypeSheet}>
+                    <Plus data-icon="inline-start" />
+                    Tambah Jenis Kepegawaian
+                  </Button>
+                ) : undefined
+              }
+              actionsSlot={
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={loadAllData}
+                  aria-label="Muat ulang data"
+                >
+                  <RefreshCw className={loading ? 'animate-spin' : ''} />
+                </Button>
+              }
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Modal Tambah / Ubah Pegawai */}
-      {employeeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-xl max-h-[92vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#1E293B]">
-                {editingEmployee ? 'Ubah Data Pegawai' : 'Tambah Pegawai Baru'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEmployeeModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* FormSheet: Create / Edit Employee */}
+      <FormSheet
+        open={employeeSheetOpen}
+        onOpenChange={(open) => {
+          if (!employeeSubmitting) setEmployeeSheetOpen(open);
+        }}
+        title={editingEmployee ? 'Ubah Data Pegawai' : 'Tambah Pegawai Baru'}
+        description={
+          editingEmployee
+            ? `Perbarui profil kepegawaian dan akses akun untuk ${editingEmployee.full_name}.`
+            : 'Daftarkan profil pegawai baru beserta akun login dan peran aksesnya.'
+        }
+        size="lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEmployeeSheetOpen(false)}
+              disabled={employeeSubmitting}
+            >
+              Batal
+            </Button>
+            <Button type="submit" form="employee-form" disabled={employeeSubmitting}>
+              {employeeSubmitting && <Spinner data-icon="inline-start" />}
+              {employeeSubmitting
+                ? 'Menyimpan...'
+                : editingEmployee
+                  ? 'Simpan Perubahan'
+                  : 'Simpan Pegawai'}
+            </Button>
+          </>
+        }
+      >
+        <form id="employee-form" onSubmit={handleEmployeeSubmit} className="flex flex-col gap-4">
+          {employeeFormError && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{employeeFormError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-code" className="text-xs font-medium">
+                Kode Pegawai
+              </Label>
+              <Input
+                id="emp-code"
+                name="employee_code"
+                type="text"
+                required
+                value={employeeForm.employee_code}
+                onChange={(e) =>
+                  setEmployeeForm({ ...employeeForm, employee_code: e.target.value })
+                }
+                placeholder="EMP-006"
+                className="font-mono tabular-nums"
+              />
             </div>
 
-            <form onSubmit={handleEmployeeSubmit} className="p-6 space-y-4">
-              {employeeFormError && (
-                <div className="flex items-start gap-2 rounded-lg bg-[#FEE2E2] px-3.5 py-2.5 text-xs text-[#B91C1C]">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{employeeFormError}</span>
-                </div>
-              )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-full-name" className="text-xs font-medium">
+                Nama Lengkap
+              </Label>
+              <Input
+                id="emp-full-name"
+                name="full_name"
+                type="text"
+                required
+                value={employeeForm.full_name}
+                onChange={(e) =>
+                  setEmployeeForm({ ...employeeForm, full_name: e.target.value })
+                }
+                placeholder="Nama lengkap pegawai"
+              />
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Kode Pegawai
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={employeeForm.employee_code}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, employee_code: e.target.value })
-                    }
-                    placeholder="EMP-006"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7] tabular-nums"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Nama Lengkap
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={employeeForm.full_name}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, full_name: e.target.value })
-                    }
-                    placeholder="Nama lengkap pegawai"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Departemen
-                  </label>
-                  <select
-                    required
-                    value={employeeForm.department_id}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, department_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="">Pilih Departemen</option>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-department" className="text-xs font-medium">
+                Departemen
+              </Label>
+              <Select
+                name="department_id"
+                value={employeeForm.department_id || undefined}
+                onValueChange={(val) =>
+                  setEmployeeForm({ ...employeeForm, department_id: val })
+                }
+              >
+                <SelectTrigger id="emp-department" className="w-full">
+                  <SelectValue placeholder="Pilih Departemen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
                     {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
+                      <SelectItem key={d.id} value={String(d.id)}>
                         {d.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Jabatan / Posisi
-                  </label>
-                  <select
-                    required
-                    value={employeeForm.position_id}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, position_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="">Pilih Jabatan</option>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-position" className="text-xs font-medium">
+                Jabatan / Posisi
+              </Label>
+              <Select
+                name="position_id"
+                value={employeeForm.position_id || undefined}
+                onValueChange={(val) => setEmployeeForm({ ...employeeForm, position_id: val })}
+              >
+                <SelectTrigger id="emp-position" className="w-full">
+                  <SelectValue placeholder="Pilih Jabatan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
                     {positions.map((p) => (
-                      <option key={p.id} value={p.id}>
+                      <SelectItem key={p.id} value={String(p.id)}>
                         {p.title}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Jenis Kepegawaian
-                  </label>
-                  <select
-                    required
-                    value={employeeForm.employment_type_id}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, employment_type_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="">Pilih Jenis Kepegawaian</option>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-type" className="text-xs font-medium">
+                Jenis Kepegawaian
+              </Label>
+              <Select
+                name="employment_type_id"
+                value={employeeForm.employment_type_id || undefined}
+                onValueChange={(val) =>
+                  setEmployeeForm({ ...employeeForm, employment_type_id: val })
+                }
+              >
+                <SelectTrigger id="emp-type" className="w-full">
+                  <SelectValue placeholder="Pilih Jenis Kepegawaian" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
                     {employmentTypes.map((t) => (
-                      <option key={t.id} value={t.id}>
+                      <SelectItem key={t.id} value={String(t.id)}>
                         {t.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Tanggal Bergabung
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={employeeForm.join_date}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, join_date: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7] tabular-nums"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email Akun
-                  </label>
-                  <input
-                    type="email"
-                    value={employeeForm.email}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, email: e.target.value })
-                    }
-                    placeholder="pegawai@workbalance.id"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {editingEmployee ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Awal'}
-                  </label>
-                  <input
-                    type="password"
-                    minLength={8}
-                    value={employeeForm.password}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, password: e.target.value })
-                    }
-                    placeholder={editingEmployee ? 'Kosongkan jika tetap' : 'Min. 8 karakter (default password123)'}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Peran Akses (RBAC)
-                  </label>
-                  <select
-                    value={employeeForm.role}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, role: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="employee">Pegawai</option>
-                    <option value="manager">Manajer</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Status Keaktifan
-                  </label>
-                  <select
-                    value={employeeForm.status}
-                    onChange={(e) =>
-                      setEmployeeForm({ ...employeeForm, status: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Nonaktif</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setEmployeeModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={employeeSubmitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 rounded-lg transition cursor-pointer"
-                >
-                  {employeeSubmitting ? 'Menyimpan...' : editingEmployee ? 'Simpan Perubahan' : 'Simpan Pegawai'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Konfirmasi Hapus Pegawai */}
-      {deletingEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-md p-6">
-            <h3 className="text-base font-bold text-[#1E293B]">Hapus Data Pegawai?</h3>
-            <p className="text-sm text-slate-600 mt-2">
-              Data pegawai <span className="font-semibold text-[#1E293B]">{deletingEmployee.full_name}</span>{' '}
-              (<span className="tabular-nums">{deletingEmployee.employee_code}</span>) beserta akun login terkait akan dihapus secara permanen.
-            </p>
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeletingEmployee(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={deleteEmployeeLoading}
-                onClick={handleConfirmDeleteEmployee}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#EF4444] hover:bg-red-600 disabled:opacity-60 rounded-lg cursor-pointer"
-              >
-                {deleteEmployeeLoading ? 'Menghapus...' : 'Hapus Pegawai'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Tambah / Ubah Jenis Kepegawaian */}
-      {typeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#1E293B]">
-                {editingType ? 'Ubah Jenis Kepegawaian' : 'Tambah Jenis Kepegawaian'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setTypeModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
 
-            <form onSubmit={handleTypeSubmit} className="p-6 space-y-4">
-              {typeFormError && (
-                <div className="flex items-start gap-2 rounded-lg bg-[#FEE2E2] px-3.5 py-2.5 text-xs text-[#B91C1C]">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{typeFormError}</span>
-                </div>
-              )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-join-date" className="text-xs font-medium">
+                Tanggal Bergabung
+              </Label>
+              <Input
+                id="emp-join-date"
+                name="join_date"
+                type="date"
+                required
+                value={employeeForm.join_date}
+                onChange={(e) =>
+                  setEmployeeForm({ ...employeeForm, join_date: e.target.value })
+                }
+                className="font-mono tabular-nums"
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nama Jenis Kepegawaian
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={typeForm.name}
-                  onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
-                  placeholder="Misal: Tetap (PKWTT)"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-email" className="text-xs font-medium">
+                Email Akun
+              </Label>
+              <Input
+                id="emp-email"
+                name="email"
+                type="email"
+                autoComplete="off"
+                value={employeeForm.email}
+                onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+                placeholder="pegawai@workbalance.id"
+              />
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Hari Kerja / Minggu
-                  </label>
-                  <select
-                    value={typeForm.work_days_per_week}
-                    onChange={(e) =>
-                      setTypeForm({ ...typeForm, work_days_per_week: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="5">5 Hari (8 jam/hari)</option>
-                    <option value="6">6 Hari (7 jam/hari)</option>
-                  </select>
-                </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-password" className="text-xs font-medium">
+                {editingEmployee ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Awal'}
+              </Label>
+              <Input
+                id="emp-password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                value={employeeForm.password}
+                onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                placeholder={
+                  editingEmployee
+                    ? 'Kosongkan jika tetap'
+                    : 'Min. 8 karakter (default password123)'
+                }
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Jam Normal / Minggu
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={80}
-                    required
-                    value={typeForm.normal_weekly_hours}
-                    onChange={(e) =>
-                      setTypeForm({ ...typeForm, normal_weekly_hours: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7] tabular-nums"
-                  />
-                </div>
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-role" className="text-xs font-medium">
+                Peran Akses (RBAC)
+              </Label>
+              <Select
+                name="role"
+                value={employeeForm.role}
+                onValueChange={(val) => setEmployeeForm({ ...employeeForm, role: val })}
+              >
+                <SelectTrigger id="emp-role" className="w-full">
+                  <SelectValue placeholder="Pilih Peran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="employee">Pegawai</SelectItem>
+                    <SelectItem value="manager">Manajer</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setTypeModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={typeSubmitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 rounded-lg cursor-pointer"
-                >
-                  {typeSubmitting ? 'Menyimpan...' : 'Simpan'}
-                </button>
-              </div>
-            </form>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="emp-status" className="text-xs font-medium">
+                Status Keaktifan
+              </Label>
+              <Select
+                name="status"
+                value={employeeForm.status}
+                onValueChange={(val) => setEmployeeForm({ ...employeeForm, status: val })}
+              >
+                <SelectTrigger id="emp-status" className="w-full">
+                  <SelectValue placeholder="Pilih Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="inactive">Nonaktif</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
-      )}
+        </form>
+      </FormSheet>
 
-      {/* Modal Konfirmasi Hapus Jenis Kepegawaian */}
-      {deletingType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-md p-6">
-            <h3 className="text-base font-bold text-[#1E293B]">Hapus Jenis Kepegawaian?</h3>
-            <p className="text-sm text-slate-600 mt-2">
+      {/* ConfirmDialog: Delete Employee */}
+      <ConfirmDialog
+        open={Boolean(deletingEmployee)}
+        onOpenChange={(open) => {
+          if (!open && !deleteEmployeeLoading) setDeletingEmployee(null);
+        }}
+        title="Hapus Data Pegawai?"
+        description={
+          deletingEmployee ? (
+            <>
+              Data pegawai{' '}
+              <span className="font-semibold text-foreground">{deletingEmployee.full_name}</span> (
+              <span className="font-mono tabular-nums">{deletingEmployee.employee_code}</span>)
+              beserta akun login terkait akan dihapus secara permanen.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Hapus Pegawai"
+        variant="destructive"
+        loading={deleteEmployeeLoading}
+        onConfirm={handleConfirmDeleteEmployee}
+      />
+
+      {/* FormSheet: Create / Edit Employment Type */}
+      <FormSheet
+        open={typeSheetOpen}
+        onOpenChange={(open) => {
+          if (!typeSubmitting) setTypeSheetOpen(open);
+        }}
+        title={editingType ? 'Ubah Jenis Kepegawaian' : 'Tambah Jenis Kepegawaian'}
+        description="Tetapkan standar hari kerja dan jam kerja normal mingguan sesuai PP No. 35/2021."
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTypeSheetOpen(false)}
+              disabled={typeSubmitting}
+            >
+              Batal
+            </Button>
+            <Button type="submit" form="employment-type-form" disabled={typeSubmitting}>
+              {typeSubmitting && <Spinner data-icon="inline-start" />}
+              {typeSubmitting ? 'Menyimpan...' : 'Simpan'}
+            </Button>
+          </>
+        }
+      >
+        <form id="employment-type-form" onSubmit={handleTypeSubmit} className="flex flex-col gap-4">
+          {typeFormError && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{typeFormError}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="type-name" className="text-xs font-medium">
+              Nama Jenis Kepegawaian
+            </Label>
+            <Input
+              id="type-name"
+              name="name"
+              type="text"
+              required
+              value={typeForm.name}
+              onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
+              placeholder="Misal: Tetap (PKWTT)"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="type-work-days" className="text-xs font-medium">
+                Hari Kerja / Minggu
+              </Label>
+              <Select
+                name="work_days_per_week"
+                value={typeForm.work_days_per_week}
+                onValueChange={(val) => setTypeForm({ ...typeForm, work_days_per_week: val })}
+              >
+                <SelectTrigger id="type-work-days" className="w-full">
+                  <SelectValue placeholder="Pilih Hari Kerja" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="5">5 Hari (8 jam/hari)</SelectItem>
+                    <SelectItem value="6">6 Hari (7 jam/hari)</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="type-weekly-hours" className="text-xs font-medium">
+                Jam Normal / Minggu
+              </Label>
+              <Input
+                id="type-weekly-hours"
+                name="normal_weekly_hours"
+                type="number"
+                min={1}
+                max={80}
+                required
+                value={typeForm.normal_weekly_hours}
+                onChange={(e) =>
+                  setTypeForm({ ...typeForm, normal_weekly_hours: e.target.value })
+                }
+                className="font-mono tabular-nums"
+              />
+            </div>
+          </div>
+        </form>
+      </FormSheet>
+
+      {/* ConfirmDialog: Delete Employment Type */}
+      <ConfirmDialog
+        open={Boolean(deletingType)}
+        onOpenChange={(open) => {
+          if (!open && !deleteTypeLoading) setDeletingType(null);
+        }}
+        title="Hapus Jenis Kepegawaian?"
+        description={
+          deletingType ? (
+            <>
               Anda akan menghapus kategori{' '}
-              <span className="font-semibold text-[#1E293B]">{deletingType.name}</span>.
+              <span className="font-semibold text-foreground">{deletingType.name}</span>.
               {Number(deletingType.employees_count || 0) > 0 && (
-                <span className="block mt-2 text-xs text-[#B45309] bg-[#FEF3C7] p-2.5 rounded-lg">
-                  Perhatian: Jenis kepegawaian ini masih digunakan oleh {deletingType.employees_count}{' '}
-                  pegawai. Sistem akan menolak penghapusan untuk menjaga integritas data.
+                <span className="mt-2.5 block rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                  Perhatian: Jenis kepegawaian ini masih digunakan oleh{' '}
+                  {deletingType.employees_count} pegawai. Sistem akan menolak penghapusan untuk
+                  menjaga integritas data.
                 </span>
               )}
-            </p>
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeletingType(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={deleteTypeLoading}
-                onClick={handleConfirmDeleteType}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#EF4444] hover:bg-red-600 disabled:opacity-60 rounded-lg cursor-pointer"
-              >
-                {deleteTypeLoading ? 'Memproses...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          ) : undefined
+        }
+        confirmLabel="Hapus"
+        variant="destructive"
+        loading={deleteTypeLoading}
+        onConfirm={handleConfirmDeleteType}
+      />
     </AppShell>
   );
 }

@@ -6,14 +6,16 @@ export default function RoleRouteGuard({ allowedRoles = [], children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
-        <div className="bg-white rounded-xl border border-slate-200/80 px-6 py-5 flex items-center gap-3 shadow-xs">
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-6 py-5">
           <img
             src="/assets/workbalance_logo_2.svg"
             alt="WorkBalance"
-            className="w-7 h-7 animate-pulse"
+            className="size-7 animate-pulse"
           />
-          <span className="text-sm font-medium text-slate-600">Memverifikasi sesi pengguna...</span>
+          <span className="text-sm font-medium text-muted-foreground">
+            Memverifikasi sesi pengguna...
+          </span>
         </div>
       </div>
     );

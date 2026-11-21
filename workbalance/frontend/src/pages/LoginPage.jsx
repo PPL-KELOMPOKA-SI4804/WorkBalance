@@ -1,13 +1,73 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-react';
-import { getDefaultRouteForRole, useAuth } from '../context/AuthContext';
-import { extractApiError } from '../services/api';
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Scale,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { getDefaultRouteForRole, useAuth } from '@/context/AuthContext';
+import { extractApiError } from '@/services/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
+import { StatusBadge } from '@/components/workbalance';
 
 const DEMO_ACCOUNTS = [
-  { label: 'Admin', email: 'admin@workbalance.id', password: 'password123', badge: 'Full CRUD Master' },
-  { label: 'Manajer', email: 'manager@workbalance.id', password: 'password123', badge: 'Read-Only Tim' },
-  { label: 'Pegawai', email: 'pegawai1@workbalance.id', password: 'password123', badge: 'Portal Pribadi' },
+  {
+    label: 'Admin',
+    tone: 'info',
+    email: 'admin@workbalance.id',
+    password: 'password123',
+    scope: 'Master & Analitik',
+  },
+  {
+    label: 'Manajer',
+    tone: 'success',
+    email: 'manager@workbalance.id',
+    password: 'password123',
+    scope: 'Pemantauan Tim',
+  },
+  {
+    label: 'Pegawai',
+    tone: 'warning',
+    email: 'pegawai1@workbalance.id',
+    password: 'password123',
+    scope: 'Portal Pribadi',
+  },
+];
+
+const SYSTEM_PILLARS = [
+  {
+    icon: Scale,
+    label: 'Kepatuhan PP No. 35/2021',
+    metric: '40j normal · ≤18j lembur',
+    description:
+      'Deteksi dini otomatis jika jam kerja mingguan ≥ 55 jam atau lembur melewati ambang sehat.',
+  },
+  {
+    icon: TrendingUp,
+    label: 'Decent Work Score 6 Dimensi',
+    metric: 'Skala terukur 0–100',
+    description:
+      'Menggabungkan waktu kerja, lembur, keseimbangan tugas, pelatihan, survei, dan isu K3.',
+  },
+  {
+    icon: ShieldCheck,
+    label: 'Privasi Survei Terjaga (NFR-02)',
+    metric: 'Agregasi departemen',
+    description:
+      'Hasil survei kondisi kerja pada dasbor manajer selalu ditampilkan secara agregat non-punitif.',
+  },
 ];
 
 export default function LoginPage() {
@@ -16,6 +76,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -30,9 +91,12 @@ export default function LoginPage() {
 
     try {
       const loggedInUser = await login(email.trim(), password);
+      toast.success(`Selamat datang kembali, ${loggedInUser.employee?.full_name || loggedInUser.email}`);
       navigate(getDefaultRouteForRole(loggedInUser.role), { replace: true });
     } catch (err) {
-      setErrorMessage(extractApiError(err, 'Gagal masuk. Periksa email dan kata sandi Anda.').message);
+      setErrorMessage(
+        extractApiError(err, 'Gagal masuk. Periksa kembali email dan kata sandi organisasi Anda.').message
+      );
     } finally {
       setSubmitting(false);
     }
@@ -45,98 +109,105 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-white">
-      {/* Left Brand Panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-[#1E293B] to-[#0369A1] text-white relative overflow-hidden">
-        <div className="flex items-center gap-3">
-          <svg viewBox="0 0 32 32" fill="none" className="w-9 h-9" aria-hidden="true">
-            <rect x="4" y="9" width="6" height="16" rx="3" fill="#38BDF8" />
-            <rect x="13" y="4" width="6" height="22" rx="3" fill="#10B981" />
-            <rect x="22" y="10" width="6" height="15" rx="3" fill="#F59E0B" />
-            <path d="M4.5 18.5C9.5 14.2 22.5 14.2 27.5 18.5" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
-          </svg>
-          <div>
-            <span className="text-xl font-bold tracking-tight">
-              Work<span className="text-[#38BDF8]">Balance</span>
-            </span>
-            <p className="text-[10px] tracking-[0.14em] uppercase text-sky-200/90 font-semibold">
-              Decent Work, Better Life
+    <div className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-12">
+      {/* Left Architectural Context Panel */}
+      <aside className="hidden flex-col justify-between border-r border-border bg-sidebar p-10 lg:col-span-6 lg:flex xl:col-span-7 xl:p-14">
+        <div>
+          <img
+            src="/assets/workbalance_horizontal_logo_2.svg"
+            alt="WorkBalance"
+            className="h-9 w-auto"
+          />
+        </div>
+
+        <div className="my-auto flex max-w-xl flex-col gap-8 py-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="text-3xl leading-[1.18] font-semibold tracking-[-0.03em] text-foreground xl:text-[34px]">
+              Keseimbangan beban kerja, terukur setiap minggu.
+            </h2>
+            <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+              WorkBalance membantu organisasi memantau aktivitas kerja, kapasitas tugas, dan
+              indikator <span className="font-medium text-foreground">SDG 8 (Target 8.5 & 8.8)</span>{' '}
+              secara objektif, adil, dan non-punitif.
             </p>
           </div>
-        </div>
 
-        <div className="max-w-lg space-y-6 my-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-medium text-sky-100">
-            <ShieldCheck className="w-4 h-4 text-[#10B981]" />
-            <span>SDG 8 Decision Support System (Target 8.5 & 8.8)</span>
-          </div>
-
-          <h2 className="text-3xl font-bold leading-snug">
-            Pantau Beban Kerja dan Kondisi Kerja Secara Terukur & Adil.
-          </h2>
-          <p className="text-sm text-sky-100/85 leading-relaxed">
-            WorkBalance mengintegrasikan data kepegawaian, aktivitas kerja, kesejahteraan, dan
-            kepatuhan waktu kerja sesuai acuan <span className="font-semibold text-white">PP No. 35/2021</span>{' '}
-            untuk membantu organisasi menjaga keseimbangan beban kerja tim.
-          </p>
-
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="rounded-xl bg-white/10 border border-white/10 p-4">
-              <div className="w-2 h-8 rounded-full bg-[#38BDF8] mb-2.5" />
-              <p className="text-xs font-semibold">Struktur Kerja</p>
-              <p className="text-[11px] text-sky-100/75 mt-0.5">Kapasitas & jam kerja normal</p>
-            </div>
-            <div className="rounded-xl bg-white/10 border border-white/10 p-4">
-              <div className="w-2 h-10 rounded-full bg-[#10B981] mb-2.5" />
-              <p className="text-xs font-semibold">Kesejahteraan</p>
-              <p className="text-[11px] text-sky-100/75 mt-0.5">Decent Work Score 6 dimensi</p>
-            </div>
-            <div className="rounded-xl bg-white/10 border border-white/10 p-4">
-              <div className="w-2 h-7 rounded-full bg-[#F59E0B] mb-2.5" />
-              <p className="text-xs font-semibold">Deteksi Dini</p>
-              <p className="text-[11px] text-sky-100/75 mt-0.5">Peringatan risiko beban kerja</p>
-            </div>
+          {/* Single Architectural Specification Surface */}
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+            {SYSTEM_PILLARS.map((pillar) => {
+              const Icon = pillar.icon;
+              return (
+                <div
+                  key={pillar.label}
+                  className="flex items-start gap-3.5 px-5 py-4"
+                >
+                  <Icon
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-primary"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">
+                        {pillar.label}
+                      </span>
+                      <span className="font-mono text-[11px] font-medium text-muted-foreground tabular-nums">
+                        {pillar.metric}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {pillar.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <p className="text-xs text-sky-200/70">
-          Purwarupa Akademik PPL SI4804 — Kelompok A-A
-        </p>
-      </div>
+        <div className="flex w-full max-w-xl items-center justify-between text-xs text-muted-foreground">
+          <span>WorkBalance · Decent Work Decision Support System</span>
+          <span className="font-mono text-[11px]">PPL SI4804 · Kelompok A</span>
+        </div>
+      </aside>
 
-      {/* Right Form Panel */}
-      <div className="flex flex-col justify-center items-center p-6 sm:p-12 bg-[#F8FAFC]">
-        <div className="w-full max-w-md bg-white rounded-xl border border-slate-200/80 p-7 sm:p-8 shadow-xs">
-          <div className="mb-6">
+      {/* Right Authentication Column */}
+      <main className="flex flex-col items-center justify-center px-6 py-12 sm:px-10 lg:col-span-6 xl:col-span-5">
+        <div className="flex w-full max-w-[390px] flex-col gap-7">
+          <div className="flex flex-col gap-2">
             <img
               src="/assets/workbalance_horizontal_logo_2.svg"
               alt="WorkBalance"
-              className="h-9 w-auto mb-5"
+              className="mb-3 h-8 w-auto self-start lg:hidden"
             />
-            <h1 className="text-2xl font-bold text-[#1E293B]">Masuk ke WorkBalance</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Gunakan akun organisasi Anda untuk mengakses ruang kerja sesuai peran.
+            <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground">
+              Masuk ke ruang kerja
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Gunakan akun organisasi Anda untuk mengakses dasbor sesuai peran.
             </p>
           </div>
 
           {errorMessage && (
             <div
               role="alert"
-              className="mb-5 flex items-start gap-2.5 rounded-lg bg-[#FEE2E2] border border-red-200 px-3.5 py-3 text-xs text-[#B91C1C]"
+              className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs text-destructive"
             >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span className="leading-relaxed">{errorMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Email
-              </label>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-foreground">
+                Email Organisasi
+              </Label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
+                <Mail
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
                   id="email"
                   type="email"
                   required
@@ -144,60 +215,96 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@workbalance.id"
-                  className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 transition"
+                  className="h-10 bg-card pl-9 text-sm"
                 />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-slate-700 mb-1.5">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="text-xs font-medium text-foreground">
                 Kata Sandi
-              </label>
+              </Label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
+                <Lock
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Masukkan kata sandi"
-                  className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 transition"
+                  className="h-10 bg-card pr-10 pl-9 text-sm"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
+              size="lg"
               disabled={submitting}
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 text-white font-semibold text-sm py-2.5 px-4 rounded-lg transition cursor-pointer"
+              className="mt-1 h-10 w-full font-medium"
             >
-              <span>{submitting ? 'Memproses...' : 'Masuk'}</span>
-              {!submitting && <ArrowRight className="w-4 h-4" />}
-            </button>
+              {submitting ? (
+                <>
+                  <Spinner data-icon="inline-start" />
+                  Memproses...
+                </>
+              ) : (
+                <>
+                  Masuk
+                  <ArrowRight data-icon="inline-end" />
+                </>
+              )}
+            </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
-              Isi Cepat Akun Demo (Data Uji)
-            </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Akses Cepat Akun Uji
+              </span>
+              <Separator className="flex-1" />
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
-              {DEMO_ACCOUNTS.map((demo) => (
-                <button
-                  key={demo.email}
-                  type="button"
-                  onClick={() => applyDemoAccount(demo)}
-                  className="text-left p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:border-[#0284C7] hover:bg-[#E0F2FE]/40 transition cursor-pointer"
-                >
-                  <p className="text-xs font-semibold text-[#1E293B]">{demo.label}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">{demo.badge}</p>
-                </button>
-              ))}
+              {DEMO_ACCOUNTS.map((demo) => {
+                const selected = email === demo.email;
+                return (
+                  <button
+                    key={demo.email}
+                    type="button"
+                    onClick={() => applyDemoAccount(demo)}
+                    className={cn(
+                      'flex flex-col items-start gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors',
+                      selected
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border bg-card hover:border-foreground/25 hover:bg-muted/40'
+                    )}
+                  >
+                    <StatusBadge tone={demo.tone} label={demo.label} />
+                    <span className="w-full truncate text-[11px] text-muted-foreground">
+                      {demo.scope}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -6,9 +6,9 @@ const AuthContext = createContext(null);
 export function getDefaultRouteForRole(role) {
   switch (role) {
     case 'admin':
-      return '/admin/employees';
+      return '/admin/dashboard';
     case 'manager':
-      return '/manager/employees';
+      return '/manager/dashboard';
     case 'employee':
       return '/employee/dashboard';
     default:
