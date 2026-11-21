@@ -56,6 +56,7 @@ export default function AppShell({
 
   const navItemsByRole = {
     admin: [
+      { label: 'Dasbor Kondisi Kerja', to: '/admin/dashboard', icon: LayoutDashboard },
       { label: 'Pegawai & Kepegawaian', to: '/admin/employees', icon: Users },
       { label: 'Data Departemen', to: '/admin/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/admin/tasks', icon: ClipboardList },
@@ -67,6 +68,7 @@ export default function AppShell({
       { label: 'Permasalahan Kerja', to: '/admin/workplace-issues', icon: MessageSquareWarning },
     ],
     manager: [
+      { label: 'Dasbor Kondisi Kerja', to: '/manager/dashboard', icon: LayoutDashboard },
       { label: 'Direktori Tim', to: '/manager/employees', icon: Users },
       { label: 'Struktur Departemen', to: '/manager/departments', icon: Building2 },
       { label: 'Manajemen Tugas', to: '/manager/tasks', icon: ClipboardList },
@@ -145,7 +147,7 @@ export default function AppShell({
           </p>
           <div className="px-3 py-2 flex items-center gap-2.5 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-[#10B981] shrink-0" />
-            <span>Sprint 0, PBI-01 s.d. PBI-09 Aktif</span>
+            <span>Sprint 0, PBI-01 s.d. PBI-10 Aktif</span>
           </div>
           <div className="px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-400">
             <Briefcase className="w-4 h-4 shrink-0" />
