@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmploymentTypeController;
+use App\Http\Controllers\Api\V1\ManagerDashboardController;
 use App\Http\Controllers\Api\V1\MasterLookupController;
 use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\TaskAssignmentController;
@@ -118,6 +119,11 @@ Route::prefix('v1')->group(function () {
             Route::post('/work-logs', [WorkLogController::class, 'store']);
             Route::put('/work-logs/{workLog}', [WorkLogController::class, 'update']);
             Route::delete('/work-logs/{workLog}', [WorkLogController::class, 'destroy']);
+        });
+
+        // Manager Team Condition, Workload & Issues Dashboard Summary (PBI-10: FR-19)
+        Route::middleware(['survey.privacy', 'role:admin,manager'])->group(function () {
+            Route::get('/dashboard/manager', [ManagerDashboardController::class, 'index']);
         });
     });
 });

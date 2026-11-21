@@ -10,6 +10,7 @@ import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
 import SurveysPage from './pages/employee/SurveysPage';
 import WorkLogsPage from './pages/employee/WorkLogsPage';
 import WorkplaceIssuesPage from './pages/employee/WorkplaceIssuesPage';
+import ManagerDashboardPage from './pages/manager/ManagerDashboardPage';
 import TaskAssignmentsPage from './pages/manager/TaskAssignmentsPage';
 import TasksPage from './pages/manager/TasksPage';
 
@@ -40,6 +41,15 @@ export default function App() {
             element={
               <RoleRouteGuard allowedRoles={['admin']}>
                 <EmployeesPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/admin/dashboard"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <ManagerDashboardPage />
               </RoleRouteGuard>
             }
           />
@@ -121,6 +131,15 @@ export default function App() {
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
                 <EmployeesPage readOnly />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/manager/dashboard"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <ManagerDashboardPage />
               </RoleRouteGuard>
             }
           />
