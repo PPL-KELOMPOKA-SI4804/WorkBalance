@@ -7,10 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  Eye,
   Info,
   MessageSquareWarning,
-  RefreshCw,
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
@@ -18,6 +16,8 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, formatMonth } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { managerDashboardService } from '@/services/managerDashboardService';
@@ -51,6 +51,7 @@ import {
   DecentWorkDonutChart,
   FormSheet,
   KpiStatCard,
+  MonthPicker,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -117,6 +118,8 @@ export default function ManagerDashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
+  useRefetchOnFocus(loadDashboard);
+
   const departments = dashboard?.departments || [];
   const kpi = dashboard?.kpi_summary || {};
   const dimensions = dashboard?.decent_work_dimensions || [];
@@ -168,6 +171,7 @@ export default function ManagerDashboardPage() {
   const pendingIssuesTotal =
     (kpi.open_issues_count ?? 0) + (kpi.in_progress_issues_count ?? 0);
 
+  // Calm Rows: 4 single-line data columns; clicking any row opens full diagnostic sheet
   const employeeColumns = useMemo(
     () => [
       {
@@ -177,112 +181,56 @@ export default function ManagerDashboardPage() {
           const emp = row.original;
           return (
             <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
+              <Avatar className="size-7 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium text-foreground">
-                  {emp.full_name}
+              <span className="truncate font-medium text-foreground" title={emp.full_name}>
+                {emp.full_name}
+              </span>
+              {emp.department?.code && (
+                <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
+                  {emp.department.code}
                 </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {emp.position_title || '-'} ·{' '}
-                  <span className="font-mono">{emp.department?.code || '-'}</span>
-                </span>
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'weekly_hours_total',
-        header: 'Jam Kerja',
-        cell: ({ row }) => {
-          const emp = row.original;
-          return (
-            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {formatScore(emp.weekly_hours_total, 1)} /{' '}
-                {formatScore(emp.normal_weekly_hours, 0)}j
-              </span>
-              <span className="text-muted-foreground">
-                Lembur {formatScore(emp.overtime_hours_total, 1)}j
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'active_assignments_count',
-        header: 'Beban & Tenggat',
-        cell: ({ row }) => {
-          const emp = row.original;
-          return (
-            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {emp.active_assignments_count} tugas ({formatScore(emp.active_estimated_hours, 1)}j)
-              </span>
-              <span className="text-muted-foreground">
-                Lewat {emp.overdue_assignments_count} · ≤7h {emp.due_soon_assignments_count}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'final_score',
-        header: 'Workload Risk',
-        cell: ({ row }) => {
-          const emp = row.original;
-          return (
-            <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
-              <StatusBadge
-                status={emp.risk_category}
-                label={`${formatScore(emp.final_score, 1)} · ${
-                  emp.risk_category === 'high'
-                    ? 'Tinggi'
-                    : emp.risk_category === 'medium'
-                      ? 'Sedang'
-                      : 'Rendah'
-                }`}
-              />
-              {emp.is_overridden && (
-                <StatusBadge status="override" label="PP 35" showDot={false} />
               )}
             </div>
           );
         },
       },
       {
-        accessorKey: 'priority_reason',
-        header: 'Catatan',
-        enableSorting: false,
+        accessorKey: 'weekly_hours_total',
+        header: 'Jam',
+        meta: { className: 'hidden sm:table-cell' },
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+              {formatScore(emp.weekly_hours_total, 1)} / {formatScore(emp.normal_weekly_hours, 0)}j
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'final_score',
+        header: 'Skor',
         cell: ({ row }) => (
-          <p className="max-w-sm line-clamp-2 text-xs leading-relaxed text-muted-foreground whitespace-normal">
-            {row.original.priority_reason}
-          </p>
+          <span className="text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
+            {formatScore(row.original.final_score, 1)}
+          </span>
         ),
       },
       {
-        id: 'actions',
-        header: () => <span className="sr-only">Aksi</span>,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="-mr-1.5 flex justify-end">
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={(event) => {
-                event.stopPropagation();
-                setSelectedEmployee(row.original);
-              }}
-            >
-              <Eye data-icon="inline-start" />
-              Detail
-            </Button>
-          </div>
-        ),
+        accessorKey: 'risk_category',
+        header: 'Risiko',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <StatusBadge
+              status={emp.is_overridden ? 'override' : emp.risk_category}
+            />
+          );
+        },
       },
     ],
     []
@@ -297,7 +245,8 @@ export default function ManagerDashboardPage() {
             <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
               <Clock className="size-3.5 text-primary" />
               <span>
-                {activeFiltersMeta.week_start || '-'} s.d. {activeFiltersMeta.week_end || '-'}
+                {formatDate(activeFiltersMeta.week_start)} s.d.{' '}
+                {formatDate(activeFiltersMeta.week_end)}
               </span>
             </span>
             <span>
@@ -317,7 +266,7 @@ export default function ManagerDashboardPage() {
               value={departmentFilter || ALL_VALUE}
               onValueChange={(val) => setDepartmentFilter(val === ALL_VALUE ? '' : val)}
             >
-              <SelectTrigger id="mgr-dept-filter" size="sm" className="w-48 bg-background text-xs">
+              <SelectTrigger id="mgr-dept-filter" size="sm" className="w-48 rounded-lg bg-background text-xs">
                 <SelectValue placeholder="Semua Departemen" />
               </SelectTrigger>
               <SelectContent>
@@ -325,21 +274,27 @@ export default function ManagerDashboardPage() {
                   <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={String(dept.id)}>
-                      {dept.code} — {dept.name}
+                      <span className="inline-flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {dept.code}
+                        </span>
+                        <span>{dept.name}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>
               </SelectContent>
             </Select>
 
-            <input
+            <MonthPicker
               id="mgr-period-month"
-              name="period_month"
-              type="month"
+              size="sm"
               value={periodMonth || activeFiltersMeta.period_month || ''}
-              onChange={(e) => setPeriodMonth(e.target.value)}
-              aria-label="Filter periode bulan"
-              className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
+              onChange={setPeriodMonth}
+              clearable={Boolean(periodMonth)}
+              placeholder="MM-YYYY"
+              ariaLabel="Filter periode bulan"
+              className="w-36"
             />
 
             <AnimatePresence initial={false}>
@@ -357,16 +312,6 @@ export default function ManagerDashboardPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={loadDashboard}
-              disabled={loading}
-              aria-label="Muat ulang dasbor"
-            >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
-            </Button>
           </div>
         </section>
 
@@ -383,7 +328,6 @@ export default function ManagerDashboardPage() {
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={loadDashboard}>
-              <RefreshCw data-icon="inline-start" />
               Coba Lagi
             </Button>
           </div>
@@ -508,7 +452,7 @@ export default function ManagerDashboardPage() {
                                 radius={[6, 6, 0, 0]}
                                 maxBarSize={32}
                                 isAnimationActive={!prefersReducedMotion}
-                                animationDuration={320}
+                                animationDuration={220}
                               />
                               <Bar
                                 dataKey="avg_workload_risk_score"
@@ -516,7 +460,7 @@ export default function ManagerDashboardPage() {
                                 radius={[6, 6, 0, 0]}
                                 maxBarSize={32}
                                 isAnimationActive={!prefersReducedMotion}
-                                animationDuration={320}
+                                animationDuration={220}
                               />
                             </BarChart>
                           </ChartContainer>
@@ -533,53 +477,27 @@ export default function ManagerDashboardPage() {
                         departmentComparison.map((dept) => (
                           <div
                             key={dept.department_id}
-                            className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/30"
+                            className="flex flex-col gap-1.5 px-5 py-3.5 transition-colors hover:bg-muted/30"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                                   {dept.code}
                                 </span>
-                                <span className="text-sm font-medium text-foreground">
+                                <span className="truncate text-sm font-medium text-foreground">
                                   {dept.name}
-                                </span>
-                                <span className="text-xs text-muted-foreground tabular-nums">
-                                  · {dept.active_employees_count} pegawai
                                 </span>
                               </div>
                               <StatusBadge
                                 status={dept.status_category}
-                                label={`Decent Work ${formatScore(dept.decent_work_score, 1)}`}
+                                label={`Skor ${formatScore(dept.decent_work_score, 1)}`}
                               />
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">Workload Risk</span>
-                                <span className="font-semibold text-foreground tabular-nums">
-                                  {formatScore(dept.avg_workload_risk_score, 1)} / 100
-                                </span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">Jam Aktual / Tugas</span>
-                                <span className="font-medium text-foreground tabular-nums">
-                                  {formatScore(dept.weekly_hours_total, 1)}j /{' '}
-                                  {formatScore(dept.estimated_hours_total, 0)}j
-                                </span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">Masalah Aktif</span>
-                                <span className="font-medium text-foreground tabular-nums">
-                                  {dept.open_issues_count + dept.in_progress_issues_count} isu
-                                </span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">Survei WLB</span>
-                                <span className="font-medium text-foreground tabular-nums">
-                                  {dept.survey_avg_wlb !== null ? `${dept.survey_avg_wlb} / 5` : '-'}
-                                </span>
-                              </div>
-                            </div>
+                            <p className="text-xs text-muted-foreground tabular-nums">
+                              {dept.active_employees_count} pegawai · Risiko{' '}
+                              {formatScore(dept.avg_workload_risk_score, 1)} ·{' '}
+                              {dept.open_issues_count + dept.in_progress_issues_count} isu aktif
+                            </p>
                           </div>
                         ))
                       )}
@@ -600,24 +518,27 @@ export default function ManagerDashboardPage() {
                       {priorityHighlights.map((item) => {
                         const sev = SEVERITY_TONES[item.severity] || SEVERITY_TONES.info;
                         return (
-                          <div key={item.id} className="flex flex-col gap-2 px-5 py-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Link
+                            key={item.id}
+                            to={resolveContextualRoute(item.action_route)}
+                            className="group flex flex-col gap-1.5 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+                                {item.title}
+                              </span>
                               <StatusBadge tone={sev.tone} label={sev.label} />
-                              <Link
-                                to={resolveContextualRoute(item.action_route)}
-                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                              >
-                                <span>{item.action_label}</span>
-                                <ArrowRight className="size-3.5" />
-                              </Link>
                             </div>
-                            <h3 className="text-sm font-medium text-foreground">
-                              {item.title}
-                            </h3>
-                            <p className="text-xs leading-relaxed text-muted-foreground">
-                              {item.description}
-                            </p>
-                          </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <p
+                                className="truncate text-xs text-muted-foreground"
+                                title={item.description}
+                              >
+                                {item.description}
+                              </p>
+                              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                            </div>
+                          </Link>
                         );
                       })}
                     </div>
@@ -628,7 +549,7 @@ export default function ManagerDashboardPage() {
                       <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
                         Masalah Kerja
                       </h2>
-                      <span className="text-xs font-medium text-emerald-700 tabular-nums">
+                      <span className="text-xs font-medium text-success tabular-nums">
                         {formatScore(issuesSummary.counts.resolution_rate, 0)}% selesai
                       </span>
                     </div>
@@ -657,24 +578,21 @@ export default function ManagerDashboardPage() {
                     <div className="max-h-72 flex-1 divide-y divide-border overflow-y-auto">
                       {issuesSummary.active_issues.length === 0 ? (
                         <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-                          <CheckCircle2 className="size-5 text-emerald-600" />
+                          <CheckCircle2 className="size-5 text-success" />
                           <p className="text-xs font-medium text-foreground">
                             Tidak ada masalah aktif
                           </p>
                         </div>
                       ) : (
                         issuesSummary.active_issues.map((issue) => (
-                          <div key={issue.id} className="flex flex-col gap-1.5 px-5 py-3.5">
+                          <div key={issue.id} className="flex flex-col gap-1 px-5 py-3">
                             <div className="flex items-center justify-between gap-2">
                               <span className="truncate text-xs font-medium text-foreground">
                                 {issue.category}
                               </span>
                               <StatusBadge status={issue.status} />
                             </div>
-                            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                              {issue.description}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="truncate text-xs text-muted-foreground">
                               {issue.reporter?.full_name || '-'} ·{' '}
                               <span className="font-mono">{issue.department?.code || '-'}</span>
                             </p>
@@ -695,7 +613,7 @@ export default function ManagerDashboardPage() {
                 </div>
               </div>
 
-              {/* Right Column: Decent Work Donut + 6 Dimensions (tooltips!) + Survey Aggregate */}
+              {/* Right Column: Decent Work Donut + 6 Dimensions + Survey Aggregate */}
               <div className="flex flex-col gap-6 xl:col-span-4">
                 <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
                   <div className="flex items-center justify-between gap-2">
@@ -703,7 +621,7 @@ export default function ManagerDashboardPage() {
                       Decent Work Score
                     </h2>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {activeFiltersMeta.period_month}
+                      {formatMonth(activeFiltersMeta.period_month)}
                     </span>
                   </div>
 
@@ -752,7 +670,7 @@ export default function ManagerDashboardPage() {
                   </div>
                 </div>
 
-                {/* Aggregated Survey Card (Strict NFR-02 Privacy — open spacing, no inner box) */}
+                {/* Aggregated Survey Card (Strict NFR-02 Privacy: open spacing, no inner box) */}
                 <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
@@ -793,7 +711,7 @@ export default function ManagerDashboardPage() {
                     </div>
                     <div className="px-2">
                       <p className="text-xs text-muted-foreground">Partisipasi</p>
-                      <p className="mt-1 text-base font-semibold text-emerald-700 tabular-nums">
+                      <p className="mt-1 text-base font-semibold text-success tabular-nums">
                         {formatScore(surveySummary.participation_rate, 0)}%
                       </p>
                     </div>
@@ -802,7 +720,7 @@ export default function ManagerDashboardPage() {
               </div>
             </section>
 
-            {/* Band 3: Full-Width Employee Priority Table (Select filter — zero ToggleGroup badges) */}
+            {/* Band 3: Full-Width Employee Priority Table */}
             <section>
               <DataTable
                 title="Prioritas Redistribusi"
@@ -819,7 +737,7 @@ export default function ManagerDashboardPage() {
                 emptyDescription="Ubah pilihan risiko atau kata kunci pencarian."
                 filterSlot={
                   <Select value={riskFilter} onValueChange={setRiskFilter}>
-                    <SelectTrigger id="mgr-risk-filter" size="sm" className="w-40 bg-background text-xs">
+                    <SelectTrigger id="mgr-risk-filter" size="sm" className="w-40 rounded-lg bg-background text-xs">
                       <SelectValue placeholder="Semua Risiko" />
                     </SelectTrigger>
                     <SelectContent>
@@ -838,7 +756,7 @@ export default function ManagerDashboardPage() {
         )}
       </div>
 
-      {/* Employee 360° Workload Sub-Indicators Slide-Over Sheet */}
+      {/* Employee 360 Workload Sub-Indicators Slide-Over Sheet */}
       <FormSheet
         open={Boolean(selectedEmployee)}
         onOpenChange={(open) => !open && setSelectedEmployee(null)}
@@ -886,6 +804,22 @@ export default function ManagerDashboardPage() {
                 )}
               </div>
             </div>
+
+            <dl className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <dt className="text-muted-foreground">Jabatan</dt>
+                <dd className="mt-0.5 font-medium text-foreground">
+                  {selectedEmployee.position_title || '-'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Tugas Aktif</dt>
+                <dd className="mt-0.5 font-medium text-foreground tabular-nums">
+                  {selectedEmployee.active_assignments_count} tugas (lewat{' '}
+                  {selectedEmployee.overdue_assignments_count})
+                </dd>
+              </div>
+            </dl>
 
             <Separator />
 

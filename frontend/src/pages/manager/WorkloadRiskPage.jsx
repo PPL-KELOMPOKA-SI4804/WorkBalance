@@ -6,10 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Calculator,
-  Clock,
-  Eye,
   Info,
-  RefreshCw,
   RotateCcw,
   ShieldAlert,
   Users,
@@ -18,6 +15,8 @@ import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, XAxis, YAxis } from 
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, formatWeek, formatWeekStart } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { workloadRiskService } from '@/services/workloadRiskService';
@@ -51,6 +50,7 @@ import {
   FormSheet,
   KpiStatCard,
   StatusBadge,
+  WeekPicker,
 } from '@/components/workbalance';
 
 const ALL_VALUE = '__all__';
@@ -88,7 +88,7 @@ export default function WorkloadRiskPage() {
   const [departments, setDepartments] = useState([]);
   const [filtersMeta, setFiltersMeta] = useState({});
 
-  // Interactive Filters (Unified Select Controls — zero filter badges)
+  // Interactive Filters (Unified Select Controls, zero filter badges)
   const [periodWeek, setPeriodWeek] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [riskCategory, setRiskCategory] = useState(ALL_VALUE);
@@ -129,6 +129,8 @@ export default function WorkloadRiskPage() {
     loadData();
   }, [loadData]);
 
+  useRefetchOnFocus(loadData);
+
   const handleRecalculate = async () => {
     if (!canRecalculate) return;
     setRecalculating(true);
@@ -157,7 +159,7 @@ export default function WorkloadRiskPage() {
       const fresh = await workloadRiskService.getWorkloadRisk(row.id);
       setSelectedRisk(fresh);
     } catch {
-      // Keep snapshot if detail refresh fails
+      // Keep snapshot if detail fetch fails
     } finally {
       setDetailLoading(false);
     }
@@ -231,167 +233,87 @@ export default function WorkloadRiskPage() {
     [summary, thresholds]
   );
 
+  // Calm Rows: 4 single-line columns; clicking any row opens full diagnostic sheet
   const columns = useMemo(
     () => [
-      {
-        accessorFn: (row) => row.employee?.full_name || '-',
-        id: 'employee',
-        header: 'Pegawai',
-        cell: ({ row }) => {
-          const emp = row.original.employee || {};
-          return (
-            <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                  {getInitials(emp.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium text-foreground">
-                  {emp.full_name || '-'}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  <span className="font-mono">{emp.employee_code || '-'}</span>
-                  {emp.department?.code ? (
-                    <>
-                      {' · '}
-                      <span className="font-mono">{emp.department.code}</span>
-                    </>
-                  ) : null}
-                </span>
-              </div>
-            </div>
-          );
-        },
-      },
+      isEmployee
+        ? {
+            accessorKey: 'period_week',
+            header: 'Periode',
+            cell: ({ row }) => (
+              <span className="font-medium text-foreground whitespace-nowrap tabular-nums">
+                {formatWeek(row.original.period_week)}
+              </span>
+            ),
+          }
+        : {
+            accessorFn: (row) => row.employee?.full_name || '-',
+            id: 'employee',
+            header: 'Pegawai',
+            cell: ({ row }) => {
+              const emp = row.original.employee || {};
+              return (
+                <div className="flex items-center gap-2.5">
+                  <Avatar className="size-7 border border-border">
+                    <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                      {getInitials(emp.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate font-medium text-foreground" title={emp.full_name}>
+                    {emp.full_name || '-'}
+                  </span>
+                  {emp.employee_code && (
+                    <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
+                      {emp.employee_code}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          },
       {
         accessorFn: (row) => Number(row.metrics?.weekly_hours_total || 0),
         id: 'weekly_hours',
-        header: 'Jam & Lembur',
+        header: 'Jam',
+        meta: { className: 'hidden sm:table-cell' },
         cell: ({ row }) => {
           const m = row.original.metrics || {};
           return (
-            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {formatNumber(m.weekly_hours_total, 1)} / {formatNumber(m.normal_weekly_hours, 0)}j
-              </span>
-              <span className="text-muted-foreground">
-                Lembur {formatNumber(m.overtime_hours_total, 1)}j ({m.overtime_days_count ?? 0}h)
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) => Number(row.metrics?.active_estimated_hours || 0),
-        id: 'task_load',
-        header: 'Beban & Kapasitas',
-        cell: ({ row }) => {
-          const m = row.original.metrics || {};
-          return (
-            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {formatNumber(m.active_estimated_hours, 1)}j /{' '}
-                {formatNumber(m.available_capacity_hours, 0)}j
-              </span>
-              <span className="text-muted-foreground">
-                {m.active_assignments_count ?? 0} tugas · ≤7h {m.urgent_assignments_count ?? 0}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        id: 'sub_scores',
-        header: 'Sub-Skor',
-        enableSorting: false,
-        cell: ({ row }) => {
-          const r = row.original;
-          return (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-              <span title="Waktu Kerja">{formatNumber(r.weekly_hours_score, 0)}</span>
-              <span className="text-border">·</span>
-              <span title="Lembur">{formatNumber(r.overtime_score, 0)}</span>
-              <span className="text-border">·</span>
-              <span title="Beban Tugas">{formatNumber(r.task_load_score, 0)}</span>
-              <span className="text-border">·</span>
-              <span title="Tekanan Tenggat">{formatNumber(r.deadline_pressure_score, 0)}</span>
-            </div>
+            <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+              {formatNumber(m.weekly_hours_total, 1)} / {formatNumber(m.normal_weekly_hours, 0)}j
+            </span>
           );
         },
       },
       {
         accessorKey: 'final_score',
-        header: 'Skor & Risiko',
+        header: 'Skor',
+        cell: ({ row }) => (
+          <span className="text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
+            {formatNumber(row.original.final_score, 1)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'risk_category',
+        header: 'Risiko',
         cell: ({ row }) => {
           const r = row.original;
           return (
-            <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
-              <StatusBadge
-                status={r.risk_category}
-                label={`${formatNumber(r.final_score, 1)} · ${
-                  r.risk_category === 'high'
-                    ? 'Tinggi'
-                    : r.risk_category === 'medium'
-                      ? 'Sedang'
-                      : 'Rendah'
-                }`}
-              />
-              {r.is_overridden && <StatusBadge status="override" label="PP 35" showDot={false} />}
-            </div>
+            <StatusBadge
+              status={r.is_overridden ? 'override' : r.risk_category}
+            />
           );
         },
       },
-      {
-        accessorKey: 'recommendation_note',
-        header: 'Catatan',
-        enableSorting: false,
-        cell: ({ row }) => (
-          <p className="max-w-[210px] line-clamp-2 text-xs leading-snug text-muted-foreground whitespace-normal">
-            {row.original.recommendation_note}
-          </p>
-        ),
-      },
-      {
-        id: 'actions',
-        header: () => <span className="sr-only">Aksi</span>,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="-mr-1.5 flex justify-end">
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={(event) => {
-                event.stopPropagation();
-                openDetailSheet(row.original);
-              }}
-            >
-              <Eye data-icon="inline-start" />
-              Detail
-            </Button>
-          </div>
-        ),
-      },
     ],
-    [openDetailSheet]
+    [isEmployee]
   );
 
   return (
     <AppShell
       title={isEmployee ? 'Risiko Saya' : 'Risiko Beban Kerja'}
-      breadcrumb="Analitik"
-      actions={
-        canRecalculate ? (
-          <Button size="sm" onClick={handleRecalculate} disabled={recalculating}>
-            {recalculating ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <Calculator data-icon="inline-start" />
-            )}
-            {recalculating ? 'Menghitung...' : 'Hitung Ulang'}
-          </Button>
-        ) : undefined
-      }
+      breadcrumb={isEmployee ? 'Ruang Kerja' : 'Analitik'}
     >
       <div className="flex flex-col gap-8">
         {/* Band 1: 4 KPI Cards */}
@@ -426,7 +348,7 @@ export default function WorkloadRiskPage() {
               icon={ShieldAlert}
               hint={
                 isEmployee
-                  ? `Minggu ${filtersMeta.period_week || '-'}`
+                  ? formatWeek(filtersMeta.period_week)
                   : `Dari ${summary.total_employees ?? 0} pegawai aktif`
               }
             />
@@ -458,7 +380,7 @@ export default function WorkloadRiskPage() {
           </section>
         )}
 
-        {/* Band 2: Sub-Indicators Chart + Open Spaced Breakdown (zero nested cards!) */}
+        {/* Band 2: Sub-Indicators Chart + Open Spaced Breakdown */}
         {!errorMsg && (
           <section className="grid grid-cols-1 gap-8 rounded-2xl border border-border bg-card p-6 lg:grid-cols-12">
             <div className="flex flex-col gap-4 lg:col-span-5">
@@ -468,7 +390,7 @@ export default function WorkloadRiskPage() {
                     {isEmployee ? 'Sub-Indikator Saya' : 'Rata-rata Sub-Indikator'}
                   </h2>
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {filtersMeta.week_start || '-'} s.d. {filtersMeta.week_end || '-'}
+                    {formatDate(filtersMeta.week_start)} s.d. {formatDate(filtersMeta.week_end)}
                   </p>
                 </div>
 
@@ -519,7 +441,7 @@ export default function WorkloadRiskPage() {
                       radius={[6, 6, 0, 0]}
                       maxBarSize={42}
                       isAnimationActive={!prefersReducedMotion}
-                      animationDuration={320}
+                      animationDuration={220}
                     >
                       {subIndicatorBars.map((entry) => (
                         <Cell key={entry.key} fill={getScoreBarFill(entry.score)} />
@@ -547,7 +469,7 @@ export default function WorkloadRiskPage() {
           </section>
         )}
 
-        {/* Band 3: Workload Risk DataTable (Unified Single-Row Select Filters) */}
+        {/* Band 3: Workload Risk DataTable */}
         <DataTable
           title={isEmployee ? 'Riwayat Risiko' : 'Matriks Risiko Pegawai'}
           countLabel="rekaman"
@@ -588,18 +510,16 @@ export default function WorkloadRiskPage() {
           }
           filterSlot={
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5">
-                <Clock className="size-3.5 text-muted-foreground" />
-                <input
-                  id="wr-period-week"
-                  name="period_week"
-                  type="week"
-                  value={periodWeek || filtersMeta.period_week || ''}
-                  onChange={(e) => setPeriodWeek(e.target.value)}
-                  aria-label="Pilih minggu periode"
-                  className="h-8 rounded-lg border border-input bg-background px-2 text-xs text-foreground tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
+              <WeekPicker
+                id="wr-period-week"
+                size="sm"
+                value={periodWeek || filtersMeta.period_week || ''}
+                onChange={setPeriodWeek}
+                clearable={Boolean(periodWeek)}
+                placeholder="Pilih minggu"
+                ariaLabel="Pilih minggu periode"
+                className="w-56"
+              />
 
               {!isEmployee && (
                 <>
@@ -609,7 +529,7 @@ export default function WorkloadRiskPage() {
                       setDepartmentFilter(val === ALL_VALUE ? '' : val)
                     }
                   >
-                    <SelectTrigger id="wr-dept-filter" size="sm" className="w-44 bg-background text-xs">
+                    <SelectTrigger id="wr-dept-filter" size="sm" className="w-44 rounded-lg bg-background text-xs">
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
                     <SelectContent>
@@ -617,7 +537,12 @@ export default function WorkloadRiskPage() {
                         <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
                         {departments.map((dept) => (
                           <SelectItem key={dept.id} value={String(dept.id)}>
-                            {dept.code} — {dept.name}
+                            <span className="inline-flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {dept.code}
+                              </span>
+                              <span>{dept.name}</span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -625,7 +550,7 @@ export default function WorkloadRiskPage() {
                   </Select>
 
                   <Select value={riskCategory} onValueChange={setRiskCategory}>
-                    <SelectTrigger id="wr-risk-filter" size="sm" className="w-36 bg-background text-xs">
+                    <SelectTrigger id="wr-risk-filter" size="sm" className="w-36 rounded-lg bg-background text-xs">
                       <SelectValue placeholder="Semua Risiko" />
                     </SelectTrigger>
                     <SelectContent>
@@ -639,7 +564,7 @@ export default function WorkloadRiskPage() {
                   </Select>
 
                   <Select value={overrideFilter} onValueChange={setOverrideFilter}>
-                    <SelectTrigger id="wr-override-filter" size="sm" className="w-40 bg-background text-xs">
+                    <SelectTrigger id="wr-override-filter" size="sm" className="w-40 rounded-lg bg-background text-xs">
                       <SelectValue placeholder="Semua Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -670,23 +595,34 @@ export default function WorkloadRiskPage() {
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={loadData}
-              aria-label="Muat ulang data"
-            >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
-            </Button>
+            canRecalculate ? (
+              <Button
+                size="sm"
+                className="rounded-lg"
+                onClick={handleRecalculate}
+                disabled={recalculating}
+              >
+                {recalculating ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <Calculator data-icon="inline-start" />
+                )}
+                {recalculating ? 'Menghitung...' : 'Hitung Ulang'}
+              </Button>
+            ) : undefined
           }
         />
       </div>
 
-      {/* Diagnostic Slide-Over Sheet (Open spacing + native Skeleton loading) */}
+      {/* Diagnostic Slide-Over Sheet */}
       <FormSheet
         open={detailSheetOpen && Boolean(selectedRisk)}
         onOpenChange={(open) => setDetailSheetOpen(open)}
-        title={selectedRisk ? `Diagnostik Risiko · ${selectedRisk.period_week}` : 'Diagnostik'}
+        title={
+          selectedRisk
+            ? `Diagnostik Risiko · ${formatWeekStart(selectedRisk.period_week)}`
+            : 'Diagnostik'
+        }
         description={
           selectedRisk
             ? `${selectedRisk.employee?.full_name || '-'} (${
@@ -715,7 +651,9 @@ export default function WorkloadRiskPage() {
           <div className="flex flex-col gap-6">
             <div className="flex items-end justify-between gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Skor Akhir</span>
+                <span className="text-xs text-muted-foreground">
+                  Periode {formatWeek(selectedRisk.period_week)}
+                </span>
                 <div className="flex items-baseline gap-1.5">
                   <AnimatedNumber
                     value={Number(selectedRisk.final_score || 0)}
@@ -734,7 +672,7 @@ export default function WorkloadRiskPage() {
             </div>
 
             {selectedRisk.override_reasons?.length > 0 && (
-              <div className="flex flex-col gap-1.5 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-xs text-destructive">
+              <div className="flex flex-col gap-1.5 rounded-xl border border-danger-border bg-danger-subtle p-3.5 text-xs text-danger">
                 <p className="font-medium">Pemicu Override PP No. 35/2021:</p>
                 <ul className="list-disc pl-4">
                   {selectedRisk.override_reasons.map((reason) => (
@@ -832,7 +770,8 @@ export default function WorkloadRiskPage() {
                         {assign.task?.title || `Penugasan #${assign.id}`}
                       </span>
                       <span className="shrink-0 text-muted-foreground tabular-nums">
-                        {formatNumber(assign.task?.estimated_hours, 1)}j · {assign.deadline}
+                        {formatNumber(assign.task?.estimated_hours, 1)}j ·{' '}
+                        {formatDate(assign.deadline)}
                       </span>
                     </div>
                   ))}

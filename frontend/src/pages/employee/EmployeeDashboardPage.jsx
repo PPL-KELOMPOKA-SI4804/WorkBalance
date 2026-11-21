@@ -12,11 +12,18 @@ import {
   HeartHandshake,
   MessageSquareWarning,
   Plus,
-  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import {
+  daysUntilDate,
+  formatDate,
+  formatWeek,
+  toApiDate,
+  toISODateLocal,
+} from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { surveyService } from '@/services/surveyService';
@@ -29,11 +36,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
   StatusBadge,
@@ -41,6 +57,7 @@ import {
 } from '@/components/workbalance';
 
 const DAY_NAMES_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const NO_ASSIGNMENT_VALUE = '__none__';
 
 function formatScore(val, digits = 1) {
   return Number(val || 0).toFixed(digits);
@@ -48,11 +65,8 @@ function formatScore(val, digits = 1) {
 
 function getDeadlineBadge(deadlineStr, status) {
   if (!deadlineStr || status === 'completed') return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(`${String(deadlineStr).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(due.getTime())) return null;
-  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = daysUntilDate(deadlineStr);
+  if (diffDays === null) return null;
   if (diffDays < 0) return { tone: 'danger', label: `Lewat ${Math.abs(diffDays)}h` };
   if (diffDays === 0) return { tone: 'warning', label: 'Hari ini' };
   if (diffDays <= 7) return { tone: 'warning', label: `H-${diffDays}` };
@@ -65,11 +79,8 @@ function buildRecentDailyChartData(workLogs = [], dailyLimit = 8) {
   today.setHours(0, 0, 0, 0);
 
   for (let offset = 6; offset >= 0; offset -= 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - offset);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate()
-    ).padStart(2, '0')}`;
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset);
+    const iso = toISODateLocal(d);
     buckets.push({
       iso,
       label: `${DAY_NAMES_ID[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}`,
@@ -79,7 +90,7 @@ function buildRecentDailyChartData(workLogs = [], dailyLimit = 8) {
 
   const byIso = new Map(buckets.map((b) => [b.iso, b]));
   for (const log of workLogs) {
-    const key = String(log.work_date || '').slice(0, 10);
+    const key = toApiDate(log.work_date);
     const bucket = byIso.get(key);
     if (bucket) {
       bucket.total += Number(log.hours_spent || 0);
@@ -129,7 +140,7 @@ export default function EmployeeDashboardPage() {
   const [logFormError, setLogFormError] = useState('');
   const [logForm, setLogForm] = useState({
     task_assignment_id: '',
-    work_date: new Date().toISOString().slice(0, 10),
+    work_date: toISODateLocal(),
     hours_spent: '2',
     activity_description: '',
   });
@@ -195,6 +206,8 @@ export default function EmployeeDashboardPage() {
     loadWorkspace();
   }, [loadWorkspace]);
 
+  useRefetchOnFocus(loadWorkspace);
+
   const activeAssignments = useMemo(
     () => assignments.filter((a) => a.status !== 'completed' && a.status !== 'cancelled'),
     [assignments]
@@ -215,29 +228,35 @@ export default function EmployeeDashboardPage() {
   );
   const weeklyHoursPct = Math.min(100, Math.round((currentWeekHours / normalWeeklyHours) * 100));
 
-  const openQuickLogSheet = (assignment = null) => {
+  const openQuickLogSheet = useCallback((assignment = null) => {
     setLogFormError('');
     setLogForm({
       task_assignment_id: assignment?.id ? String(assignment.id) : '',
-      work_date: new Date().toISOString().slice(0, 10),
+      work_date: toISODateLocal(),
       hours_spent: '2',
       activity_description: assignment?.task?.title
         ? `Pengerjaan: ${assignment.task.title}`
         : '',
     });
     setLogSheetOpen(true);
-  };
+  }, []);
 
   const handleQuickLogSubmit = async (event) => {
     event.preventDefault();
     setLogFormError('');
+
+    if (!logForm.work_date) {
+      setLogFormError('Tanggal kerja wajib diisi.');
+      return;
+    }
+
     setLogSubmitting(true);
 
     try {
       await workLogService.createWorkLog({
         employee_id: employee?.id,
         task_assignment_id: logForm.task_assignment_id ? Number(logForm.task_assignment_id) : null,
-        work_date: logForm.work_date,
+        work_date: toApiDate(logForm.work_date),
         hours_spent: Number(logForm.hours_spent),
         activity_description: logForm.activity_description.trim(),
       });
@@ -253,6 +272,7 @@ export default function EmployeeDashboardPage() {
     }
   };
 
+  // Calm Rows: 3 single-line columns; clicking any row opens Catat Log prefilled with that task
   const assignmentColumns = useMemo(
     () => [
       {
@@ -260,71 +280,45 @@ export default function EmployeeDashboardPage() {
         id: 'title',
         header: 'Tugas',
         cell: ({ row }) => {
-          const item = row.original;
+          const title = row.original.task?.title || `Penugasan #${row.original.id}`;
           return (
-            <div className="flex max-w-[280px] flex-col gap-0.5 whitespace-normal">
-              <span className="leading-snug font-medium text-foreground">
-                {item.task?.title || `Penugasan #${item.id}`}
-              </span>
-              {item.task?.estimated_hours != null && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  Estimasi {formatScore(item.task.estimated_hours, 1)}j
-                </span>
-              )}
-            </div>
+            <span className="block max-w-[300px] truncate font-medium text-foreground" title={title}>
+              {title}
+            </span>
           );
         },
       },
       {
         accessorKey: 'deadline',
         header: 'Tenggat',
-        cell: ({ row }) => {
-          const item = row.original;
-          const urgency = getDeadlineBadge(item.deadline, item.status);
-          return (
-            <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
-              <span className="text-xs text-foreground tabular-nums">
-                {String(item.deadline || '-').slice(0, 10)}
-              </span>
-              {urgency && (
-                <StatusBadge tone={urgency.tone} label={urgency.label} showDot={false} />
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
+            {formatDate(row.original.deadline)}
+          </span>
+        ),
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status === 'assigned' ? 'open' : row.original.status}
-            label={
-              row.original.status === 'assigned'
-                ? 'Ditugaskan'
-                : row.original.status === 'in_progress'
-                  ? 'Dikerjakan'
-                  : undefined
-            }
-          />
-        ),
-      },
-      {
-        id: 'actions',
-        header: () => <span className="sr-only">Aksi</span>,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="-mr-1.5 flex justify-end">
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => openQuickLogSheet(row.original)}
-            >
-              <Clock data-icon="inline-start" />
-              Catat Log
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const item = row.original;
+          const urgency = getDeadlineBadge(item.deadline, item.status);
+          if (urgency) {
+            return <StatusBadge tone={urgency.tone} label={urgency.label} />;
+          }
+          return (
+            <StatusBadge
+              status={item.status === 'assigned' ? 'open' : item.status}
+              label={
+                item.status === 'assigned'
+                  ? 'Ditugaskan'
+                  : item.status === 'in_progress'
+                    ? 'Dikerjakan'
+                    : undefined
+              }
+            />
+          );
+        },
       },
     ],
     []
@@ -340,16 +334,7 @@ export default function EmployeeDashboardPage() {
     : [];
 
   return (
-    <AppShell
-      title="Beranda"
-      breadcrumb="Ruang Kerja"
-      actions={
-        <Button size="sm" onClick={() => openQuickLogSheet(null)}>
-          <Plus data-icon="inline-start" />
-          Catat Log
-        </Button>
-      }
-    >
+    <AppShell title="Beranda" breadcrumb="Ruang Kerja">
       <div className="flex flex-col gap-8">
         {/* Compact Identity Header Strip */}
         <section className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 lg:flex-row lg:items-center">
@@ -375,7 +360,7 @@ export default function EmployeeDashboardPage() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground lg:border-t-0 lg:pt-0">
             <div className="flex items-center gap-1.5">
               <Building2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
-              <span className="font-mono font-medium text-foreground">
+              <span className="font-mono text-foreground">
                 {employee?.employee_code || '-'}
               </span>
             </div>
@@ -403,7 +388,6 @@ export default function EmployeeDashboardPage() {
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={loadWorkspace}>
-              <RefreshCw data-icon="inline-start" />
               Coba Lagi
             </Button>
           </div>
@@ -442,7 +426,7 @@ export default function EmployeeDashboardPage() {
 
             <KpiStatCard
               label="Workload Risk Saya"
-              value={riskRow ? formatScore(riskRow.final_score, 1) : '—'}
+              value={riskRow ? formatScore(riskRow.final_score, 1) : '-'}
               unit={riskRow ? '/ 100' : undefined}
               icon={Activity}
               status={riskRow?.risk_category || 'neutral'}
@@ -479,7 +463,7 @@ export default function EmployeeDashboardPage() {
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <div className="flex flex-col gap-6 xl:col-span-8">
             <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-col gap-0.5">
                   <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
                     Jam Kerja 7 Hari Terakhir
@@ -488,15 +472,26 @@ export default function EmployeeDashboardPage() {
                     Garis batas {dailyLimit} jam/hari (PP 35/2021)
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
-                    Normal
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-xs bg-[var(--chart-3)]" />
-                    Lembur
-                  </span>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
+                      Normal
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-xs bg-[var(--chart-3)]" />
+                      Lembur
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={() => openQuickLogSheet(null)}
+                  >
+                    <Plus data-icon="inline-start" />
+                    Catat Log
+                  </Button>
                 </div>
               </div>
 
@@ -520,6 +515,7 @@ export default function EmployeeDashboardPage() {
               searchable={true}
               searchPlaceholder="Cari tugas..."
               pageSize={6}
+              onRowClick={(row) => openQuickLogSheet(row)}
               emptyTitle="Tidak ada penugasan aktif"
               emptyDescription="Semua penugasan selesai atau belum ada tugas baru."
               actionsSlot={
@@ -536,13 +532,13 @@ export default function EmployeeDashboardPage() {
           {/* Right Rail: Personal 4 Sub-Indicators + Quick Links */}
           <div className="flex flex-col gap-6 xl:col-span-4">
             <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
                   Profil Beban Kerja
                 </h3>
                 {riskRow?.period_week && (
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {riskRow.period_week}
+                    {formatWeek(riskRow.period_week)}
                   </span>
                 )}
               </div>
@@ -655,22 +651,29 @@ export default function EmployeeDashboardPage() {
             <Label htmlFor="quick-log-assignment" className="text-xs">
               Penugasan (Opsional)
             </Label>
-            <select
-              id="quick-log-assignment"
-              name="task_assignment_id"
-              value={logForm.task_assignment_id}
-              onChange={(e) =>
-                setLogForm((prev) => ({ ...prev, task_assignment_id: e.target.value }))
+            <Select
+              value={logForm.task_assignment_id || NO_ASSIGNMENT_VALUE}
+              onValueChange={(val) =>
+                setLogForm((prev) => ({
+                  ...prev,
+                  task_assignment_id: val === NO_ASSIGNMENT_VALUE ? '' : val,
+                }))
               }
-              className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Aktivitas umum</option>
-              {activeAssignments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.task?.title || `Penugasan #${a.id}`}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="quick-log-assignment" className="w-full rounded-lg bg-background">
+                <SelectValue placeholder="Aktivitas umum" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={NO_ASSIGNMENT_VALUE}>Aktivitas umum</SelectItem>
+                  {activeAssignments.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.task?.title || `Penugasan #${a.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -678,15 +681,13 @@ export default function EmployeeDashboardPage() {
               <Label htmlFor="quick-log-date" className="text-xs">
                 Tanggal
               </Label>
-              <Input
+              <DatePicker
                 id="quick-log-date"
-                name="work_date"
-                type="date"
-                required
                 value={logForm.work_date}
-                onChange={(e) =>
-                  setLogForm((prev) => ({ ...prev, work_date: e.target.value }))
+                onChange={(val) =>
+                  setLogForm((prev) => ({ ...prev, work_date: val }))
                 }
+                ariaLabel="Tanggal kerja"
               />
             </div>
 
