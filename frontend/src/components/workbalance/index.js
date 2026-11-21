@@ -1,3 +1,4 @@
+export { AnimatedNumber } from './AnimatedNumber';
 export { PageHeader } from './PageHeader';
 export { KpiStatCard } from './KpiStatCard';
 export { StatusBadge } from './StatusBadge';

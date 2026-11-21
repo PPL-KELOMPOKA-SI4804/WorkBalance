@@ -39,14 +39,14 @@ export function CommandMenu({ open, onOpenChange, role }) {
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Navigasi Cepat WorkBalance"
-      description="Cari dan buka modul WorkBalance menggunakan papan ketik."
+      title="Navigasi Cepat"
+      description="Cari dan buka modul WorkBalance."
     >
       <Command>
         <CommandInput
           id="wb-command-search"
           name="command_search"
-          placeholder="Lompat ke modul WorkBalance..."
+          placeholder="Cari modul..."
         />
         <CommandList>
           <CommandEmpty>Modul tidak ditemukan.</CommandEmpty>
@@ -67,11 +67,11 @@ export function CommandMenu({ open, onOpenChange, role }) {
                       <span>{item.label}</span>
                     </div>
                     {isActive ? (
-                      <span className="text-[11px] font-medium text-primary">
+                      <span className="text-xs font-medium text-primary">
                         Aktif
                       </span>
                     ) : (
-                      <CornerDownLeft className="size-3.5 text-muted-foreground/60" />
+                      <CornerDownLeft className="size-3.5 text-muted-foreground" />
                     )}
                   </CommandItem>
                 );
