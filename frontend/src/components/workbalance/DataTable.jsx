@@ -18,7 +18,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
-  RefreshCw,
   Search,
   X,
 } from 'lucide-react';
@@ -249,7 +248,6 @@ export function DataTable({
           </div>
           {onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw data-icon="inline-start" />
               Coba Lagi
             </Button>
           )}
@@ -293,10 +291,14 @@ export function DataTable({
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort();
                     const sortDir = header.column.getIsSorted();
+                    const colMetaClass = header.column.columnDef.meta?.className;
                     return (
                       <TableHead
                         key={header.id}
-                        className="h-9 px-4 text-xs font-medium text-muted-foreground"
+                        className={cn(
+                          'h-9 px-4 text-xs font-medium text-muted-foreground',
+                          colMetaClass
+                        )}
                       >
                         {header.isPlaceholder ? null : canSort ? (
                           <button
@@ -332,18 +334,34 @@ export function DataTable({
               {rows.map((row) => (
                 <TableRow
                   key={row.id}
+                  tabIndex={onRowClick ? 0 : undefined}
                   onClick={
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onRowClick(row.original);
+                          }
+                        }
+                      : undefined
+                  }
                   className={cn(
                     'transition-colors',
-                    onRowClick && 'cursor-pointer'
+                    onRowClick &&
+                      'cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="px-4 py-3 text-sm whitespace-normal"
+                      className={cn(
+                        'px-4 py-3 text-sm whitespace-normal',
+                        cell.column.columnDef.meta?.className
+                      )}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

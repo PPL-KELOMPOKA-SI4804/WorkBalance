@@ -2,24 +2,24 @@ import { cn } from '@/lib/utils';
 
 const TONE_CLASSES = {
   success: {
-    pill: 'border-emerald-200 bg-emerald-50/80 text-emerald-800',
-    dot: 'bg-emerald-500',
+    pill: 'border-success-border bg-success-subtle text-success',
+    dot: 'bg-success-solid',
   },
   warning: {
-    pill: 'border-amber-200 bg-amber-50/80 text-amber-900',
-    dot: 'bg-amber-500',
+    pill: 'border-warning-border bg-warning-subtle text-warning',
+    dot: 'bg-warning-solid',
   },
   danger: {
-    pill: 'border-rose-200 bg-rose-50/80 text-rose-800',
-    dot: 'bg-rose-500',
+    pill: 'border-danger-border bg-danger-subtle text-danger',
+    dot: 'bg-danger-solid',
   },
   info: {
-    pill: 'border-sky-200 bg-sky-50/80 text-sky-900',
-    dot: 'bg-sky-500',
+    pill: 'border-info-border bg-info-subtle text-info',
+    dot: 'bg-info-solid',
   },
   neutral: {
     pill: 'border-border bg-muted text-foreground',
-    dot: 'bg-slate-500',
+    dot: 'bg-muted-foreground',
   },
 };
 

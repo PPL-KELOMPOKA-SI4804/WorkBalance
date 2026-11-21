@@ -24,17 +24,17 @@ const DECENT_WORK_META = {
   good: {
     label: 'Baik',
     color: 'var(--chart-2)',
-    textClass: 'text-emerald-700',
+    textClass: 'text-success',
   },
   needs_attention: {
     label: 'Perlu Perhatian',
     color: 'var(--chart-3)',
-    textClass: 'text-amber-800',
+    textClass: 'text-warning',
   },
   action_priority: {
     label: 'Prioritas Tindakan',
     color: 'var(--chart-5)',
-    textClass: 'text-rose-700',
+    textClass: 'text-danger',
   },
 };
 
