@@ -3,10 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
   Edit3,
-  Eye,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   Wrench,
@@ -14,6 +11,8 @@ import {
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { workplaceIssueService } from '@/services/workplaceIssueService';
@@ -34,15 +33,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
   ConfirmDialog,
   DataTable,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -80,21 +75,6 @@ function getIssueStatusMeta(status) {
   return ISSUE_STATUS_META[status] || ISSUE_STATUS_META.open;
 }
 
-function formatDateTime(isoString) {
-  if (!isoString) return '-';
-  try {
-    return new Date(isoString).toLocaleString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return isoString;
-  }
-}
-
 function emptyIssueForm(defaultDepartmentId = '') {
   return {
     category: PRESET_CATEGORIES[0],
@@ -103,27 +83,22 @@ function emptyIssueForm(defaultDepartmentId = '') {
   };
 }
 
-function ReporterIdentity({ reporter, compact = true }) {
+function ReporterDetailIdentity({ reporter }) {
   const rep = reporter || {};
-  const maxWidthClass = compact ? 'max-w-[140px]' : 'max-w-full';
 
   return (
-    <div className="flex items-center gap-2.5 whitespace-nowrap">
-      <Avatar className={compact ? 'size-7 border border-border' : 'size-8 border border-border'}>
+    <div className="flex items-center gap-2.5">
+      <Avatar className="size-8 border border-border">
         <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
           {getInitials(rep.full_name)}
         </AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-col">
-        <span
-          className={`${maxWidthClass} truncate ${
-            compact ? 'text-xs' : 'text-sm'
-          } font-medium text-foreground`}
-        >
+        <span className="truncate text-sm font-medium text-foreground">
           {rep.full_name || '-'}
         </span>
-        <span className={`${maxWidthClass} truncate text-xs text-muted-foreground`}>
-          <span className="font-mono">{rep.employee_code || '-'}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          <span className="font-mono font-normal">{rep.employee_code || '-'}</span>
           {rep.position?.title ? ` · ${rep.position.title}` : ''}
         </span>
       </div>
@@ -131,31 +106,17 @@ function ReporterIdentity({ reporter, compact = true }) {
   );
 }
 
-function DepartmentIdentity({ department, inline = false }) {
+function DepartmentDetailIdentity({ department }) {
   if (!department) {
-    return <span className="text-xs text-muted-foreground">-</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
 
   return (
-    <div
-      className={
-        inline
-          ? 'flex flex-wrap items-center gap-2'
-          : 'flex flex-col items-start gap-1 whitespace-nowrap'
-      }
-    >
-      <Badge variant="outline" className="font-mono text-xs">
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge variant="outline" className="font-mono text-xs font-normal">
         {department.code}
       </Badge>
-      <span
-        className={
-          inline
-            ? 'text-sm font-medium text-foreground'
-            : 'max-w-[130px] truncate text-xs text-muted-foreground'
-        }
-      >
-        {department.name}
-      </span>
+      <span className="text-sm font-medium text-foreground">{department.name}</span>
     </div>
   );
 }
@@ -250,6 +211,8 @@ export default function WorkplaceIssuesPage() {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const categoryOptions = useMemo(
     () => Array.from(new Set([...PRESET_CATEGORIES, ...apiCategories])),
     [apiCategories]
@@ -275,7 +238,7 @@ export default function WorkplaceIssuesPage() {
     setDepartmentFilter('');
   };
 
-  // --- Detail Handler ---
+  // Detail Handler
   const openDetailSheet = useCallback(async (issue) => {
     setDetailIssue(issue);
     setDetailSheetOpen(true);
@@ -290,7 +253,7 @@ export default function WorkplaceIssuesPage() {
     }
   }, []);
 
-  // --- Create / Edit Issue Handlers ---
+  // Create / Edit Issue Handlers
   const openCreateSheet = useCallback(() => {
     setEditingIssue(null);
     const initialDept = defaultDepartmentId || departments[0]?.id || '';
@@ -352,7 +315,7 @@ export default function WorkplaceIssuesPage() {
     }
   };
 
-  // --- Follow-up Handlers (Manager & Admin) ---
+  // Follow-up Handlers (Manager & Admin)
   const openFollowUpSheet = useCallback((issue) => {
     setFollowUpIssue(issue);
     setFollowUpForm({
@@ -395,7 +358,7 @@ export default function WorkplaceIssuesPage() {
     }
   };
 
-  // --- Delete Handler ---
+  // Delete Handler
   const handleConfirmDelete = async () => {
     if (!deletingIssue) return;
     setDeleteLoading(true);
@@ -417,76 +380,71 @@ export default function WorkplaceIssuesPage() {
   const columns = useMemo(() => {
     const cols = [
       {
-        accessorFn: (row) => `${row.category || ''} ${row.description || ''}`,
-        id: 'issue',
-        header: 'Kategori & Deskripsi',
+        accessorKey: 'category',
+        header: 'Kategori',
         cell: ({ row }) => {
-          const issue = row.original;
+          const category = row.original.category || '-';
           return (
-            <div className="flex max-w-[240px] flex-col gap-1 whitespace-normal">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {issue.category}
-                </Badge>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatDateTime(issue.created_at)}
-                </span>
-              </div>
-              <p className="line-clamp-2 text-xs leading-snug text-foreground">
-                {issue.description}
-              </p>
-            </div>
+            <span
+              className="block max-w-[220px] truncate text-xs font-medium text-foreground"
+              title={category}
+            >
+              {category}
+            </span>
           );
         },
       },
     ];
 
-    if (canHandle) {
+    if (!isEmployee) {
       cols.push({
         accessorFn: (row) => row.reporter?.full_name || '-',
         id: 'reporter',
         header: 'Pelapor',
-        cell: ({ row }) => <ReporterIdentity reporter={row.original.reporter} compact />,
+        cell: ({ row }) => {
+          const rep = row.original.reporter || {};
+          const name = rep.full_name || '-';
+          return (
+            <div className="flex items-center gap-2.5 whitespace-nowrap">
+              <Avatar className="size-7 border border-border">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                  {getInitials(name)}
+                </AvatarFallback>
+              </Avatar>
+              <span
+                className="max-w-[180px] truncate text-xs font-medium text-foreground"
+                title={name}
+              >
+                {name}
+              </span>
+            </div>
+          );
+        },
       });
     }
 
     cols.push(
       {
-        accessorFn: (row) => row.department?.name || '-',
-        id: 'department',
-        header: 'Departemen',
-        cell: ({ row }) => <DepartmentIdentity department={row.original.department} />,
-      },
-      {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => {
-          const issue = row.original;
-          const meta = getIssueStatusMeta(issue.status);
+          const meta = getIssueStatusMeta(row.original.status);
           return (
-            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+            <div className="whitespace-nowrap">
               <StatusBadge status={meta.status} label={meta.label} />
-              {issue.resolved_at && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatDateTime(issue.resolved_at)}
-                </span>
-              )}
             </div>
           );
         },
       },
       {
-        accessorKey: 'resolution_notes',
-        header: 'Catatan Tindak Lanjut',
-        enableSorting: false,
-        cell: ({ row }) =>
-          row.original.resolution_notes ? (
-            <p className="max-w-[200px] line-clamp-2 text-xs leading-snug text-muted-foreground whitespace-normal">
-              {row.original.resolution_notes}
-            </p>
-          ) : (
-            <span className="text-xs text-muted-foreground">Belum ada catatan</span>
-          ),
+        accessorFn: (row) => row.created_at || '',
+        id: 'created_at',
+        header: 'Tanggal',
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+            {formatDate(row.original.created_at)}
+          </span>
+        ),
       },
       {
         id: 'actions',
@@ -497,93 +455,40 @@ export default function WorkplaceIssuesPage() {
           const isOpen = issue.status === 'open';
 
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Lihat detail laporan"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openDetailSheet(issue);
-                    }}
-                  >
-                    <Eye className="size-4 text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Lihat detail laporan</TooltipContent>
-              </Tooltip>
-
-              {canHandle && (
-                <Button
-                  size="xs"
-                  className="rounded-lg"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openFollowUpSheet(issue);
-                  }}
-                >
-                  <Wrench className="size-4" data-icon="inline-start" />
-                  Tindak Lanjut
-                </Button>
-              )}
-
-              {isEmployee && isOpen && (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  className="rounded-lg"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEditSheet(issue);
-                  }}
-                >
-                  <Edit3 className="size-4" data-icon="inline-start" />
-                  Edit
-                </Button>
-              )}
-
-              {isOpen ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Hapus laporan"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeletingIssue(issue);
-                      }}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Hapus laporan menunggu</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground"
-                      aria-label="Terkunci untuk jejak audit"
-                    >
-                      <Lock className="size-3.5" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Laporan sedang ditangani atau selesai terkunci untuk menjaga jejak audit
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
+            <RowActionsMenu
+              ariaLabel="Aksi laporan masalah"
+              items={[
+                {
+                  key: 'follow-up',
+                  label: 'Tindak Lanjut',
+                  icon: Wrench,
+                  hidden: !canHandle,
+                  onSelect: () => openFollowUpSheet(issue),
+                },
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  hidden: !(isEmployee && isOpen),
+                  onSelect: () => openEditSheet(issue),
+                },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  hidden: !isOpen,
+                  onSelect: () => setDeletingIssue(issue),
+                },
+              ]}
+            />
           );
         },
       }
     );
 
     return cols;
-  }, [canHandle, isEmployee, openDetailSheet, openEditSheet, openFollowUpSheet]);
+  }, [canHandle, isEmployee, openEditSheet, openFollowUpSheet]);
 
   const detailStatusMeta = detailIssue ? getIssueStatusMeta(detailIssue.status) : null;
 
@@ -591,12 +496,6 @@ export default function WorkplaceIssuesPage() {
     <AppShell
       title="Laporan Masalah & K3"
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
-      actions={
-        <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
-          <Plus className="size-4" data-icon="inline-start" />
-          Laporkan Masalah
-        </Button>
-      }
     >
       <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Cards */}
@@ -754,7 +653,12 @@ export default function WorkplaceIssuesPage() {
                     <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
                     {departments.map((dept) => (
                       <SelectItem key={dept.id} value={String(dept.id)}>
-                        {dept.code} — {dept.name}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="font-mono text-xs font-normal text-muted-foreground">
+                            {dept.code}
+                          </span>
+                          <span>{dept.name}</span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -785,14 +689,9 @@ export default function WorkplaceIssuesPage() {
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="rounded-lg"
-              onClick={loadAllData}
-              aria-label="Muat ulang daftar"
-            >
-              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
+            <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+              <Plus className="size-4" data-icon="inline-start" />
+              Laporkan Masalah
             </Button>
           }
         />
@@ -842,7 +741,7 @@ export default function WorkplaceIssuesPage() {
                 }}
               >
                 <Edit3 className="size-4" data-icon="inline-start" />
-                Edit Laporan
+                Ubah Laporan
               </Button>
             )}
           </>
@@ -878,14 +777,30 @@ export default function WorkplaceIssuesPage() {
               <div className="flex flex-col gap-2">
                 <dt className="text-xs text-muted-foreground">Pelapor</dt>
                 <dd>
-                  <ReporterIdentity reporter={detailIssue.reporter} compact={false} />
+                  <ReporterDetailIdentity reporter={detailIssue.reporter} />
                 </dd>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <dt className="text-xs text-muted-foreground">Departemen Terkait</dt>
                 <dd>
-                  <DepartmentIdentity department={detailIssue.department} inline />
+                  <DepartmentDetailIdentity department={detailIssue.department} />
+                </dd>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs text-muted-foreground">Waktu Pelaporan</dt>
+                <dd className="text-sm font-medium text-foreground tabular-nums">
+                  {formatDateTime(detailIssue.created_at)}
+                </dd>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs text-muted-foreground">Waktu Penyelesaian</dt>
+                <dd className="text-sm font-medium text-foreground tabular-nums">
+                  {detailIssue.resolved_at
+                    ? formatDateTime(detailIssue.resolved_at)
+                    : 'Belum selesai'}
                 </dd>
               </div>
             </dl>
@@ -917,11 +832,6 @@ export default function WorkplaceIssuesPage() {
                 {detailIssue.resolution_notes ||
                   'Belum ada catatan tindak lanjut dari manajer atau HR.'}
               </p>
-              {detailIssue.resolved_at && (
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  Diselesaikan pada: {formatDateTime(detailIssue.resolved_at)}
-                </p>
-              )}
             </div>
           </div>
         )}
@@ -931,7 +841,7 @@ export default function WorkplaceIssuesPage() {
       <FormSheet
         open={formSheetOpen}
         onOpenChange={setFormSheetOpen}
-        title={editingIssue ? 'Edit Laporan Masalah' : 'Laporkan Masalah Baru'}
+        title={editingIssue ? 'Ubah Laporan Masalah' : 'Laporkan Masalah Baru'}
         description="Sampaikan kendala secara jelas dan konstruktif untuk ditindaklanjuti."
         size="md"
         footer={
@@ -1031,7 +941,12 @@ export default function WorkplaceIssuesPage() {
                   </SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={String(dept.id)}>
-                      {dept.code} — {dept.name}
+                      <span className="inline-flex items-center gap-2">
+                        <span className="font-mono text-xs font-normal text-muted-foreground">
+                          {dept.code}
+                        </span>
+                        <span>{dept.name}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>

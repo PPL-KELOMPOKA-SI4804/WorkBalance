@@ -8,15 +8,17 @@ import {
   ClipboardCheck,
   Clock,
   Edit3,
-  Eye,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { daysUntilDate, formatDate, toApiDate, toISODateLocal } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
+import { cn } from '@/lib/utils';
 import { extractApiError } from '@/services/api';
 import { departmentService } from '@/services/departmentService';
 import { employeeService } from '@/services/employeeService';
@@ -24,7 +26,6 @@ import { taskAssignmentService } from '@/services/taskAssignmentService';
 import { taskService } from '@/services/taskService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -40,8 +41,10 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   ConfirmDialog,
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -65,12 +68,8 @@ function getDeadlineIndicator(deadlineStr, status) {
     return null;
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(`${String(deadlineStr).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(due.getTime())) return null;
-
-  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = daysUntilDate(deadlineStr);
+  if (diffDays === null) return null;
 
   if (diffDays < 0) {
     return {
@@ -99,9 +98,11 @@ function getDeadlineIndicator(deadlineStr, status) {
 function emptyAssignmentForm(tasks = [], employees = []) {
   const assignableTasks = tasks.filter((t) => t.status !== 'cancelled');
   const firstTask = assignableTasks[0] || tasks[0];
+  const fallbackDate = new Date();
+  fallbackDate.setDate(fallbackDate.getDate() + 7);
   const defaultDeadline = firstTask?.due_date
-    ? String(firstTask.due_date).slice(0, 10)
-    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    ? toApiDate(firstTask.due_date)
+    : toISODateLocal(fallbackDate);
 
   return {
     task_id: firstTask?.id ? String(firstTask.id) : '',
@@ -112,7 +113,9 @@ function emptyAssignmentForm(tasks = [], employees = []) {
 }
 
 export default function TaskAssignmentsPage({ readOnly = false }) {
+  const { user } = useAuth();
   const prefersReducedMotion = useReducedMotion();
+  const isEmployee = user?.role === 'employee';
 
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -216,6 +219,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
     () =>
       Boolean(
@@ -256,7 +261,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     return employees;
   }, [employees, editingAssignment]);
 
-  // --- Detail Handler ---
+  // Detail Handler
   const openDetailSheet = useCallback(async (assignment) => {
     setSelectedAssignment(assignment);
     setDetailSheetOpen(true);
@@ -272,7 +277,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     }
   }, []);
 
-  // --- Create / Edit Handlers ---
+  // Create / Edit Handlers
   const openCreateSheet = useCallback(() => {
     setEditingAssignment(null);
     setForm(emptyAssignmentForm(tasks, employees));
@@ -285,7 +290,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     setForm({
       task_id: assignment.task_id ? String(assignment.task_id) : '',
       employee_id: assignment.employee_id ? String(assignment.employee_id) : '',
-      deadline: assignment.deadline ? String(assignment.deadline).slice(0, 10) : '',
+      deadline: toApiDate(assignment.deadline),
       status: assignment.status || 'assigned',
     });
     setFormError('');
@@ -299,7 +304,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
       task_id: taskIdValue,
       deadline:
         !editingAssignment && matchedTask?.due_date
-          ? String(matchedTask.due_date).slice(0, 10)
+          ? toApiDate(matchedTask.due_date)
           : prev.deadline,
     }));
   };
@@ -307,6 +312,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+
+    const deadlineApi = toApiDate(form.deadline);
 
     if (!form.task_id) {
       setFormError('Tugas yang ditugaskan wajib dipilih.');
@@ -316,7 +323,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
       setFormError('Pegawai penerima wajib dipilih.');
       return;
     }
-    if (!form.deadline) {
+    if (!deadlineApi) {
       setFormError('Tenggat penugasan wajib diisi.');
       return;
     }
@@ -326,7 +333,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     const payload = {
       task_id: Number(form.task_id),
       employee_id: Number(form.employee_id),
-      deadline: form.deadline,
+      deadline: deadlineApi,
       status: form.status,
     };
 
@@ -347,7 +354,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     }
   };
 
-  // --- Delete Handler ---
+  // Delete Handler
   const handleConfirmDelete = async () => {
     if (!deletingAssignment) return;
     setDeleteLoading(true);
@@ -365,66 +372,68 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     }
   };
 
-  const columns = useMemo(
-    () => [
-      {
+  const columns = useMemo(() => {
+    const cols = [];
+
+    if (!isEmployee) {
+      cols.push({
         accessorFn: (row) => row.employee?.full_name || '-',
         id: 'employee',
-        header: 'Pegawai Penerima',
+        header: 'Pegawai',
         cell: ({ row }) => {
           const emp = row.original.employee || {};
+          const fullName = emp.full_name || '-';
           return (
-            <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
+            <div className="flex min-w-0 max-w-[190px] items-center gap-2.5">
+              <Avatar className="size-7 shrink-0 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 max-w-[180px] flex-col">
-                <span className="truncate text-xs font-medium text-foreground">
-                  {emp.full_name || '-'}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  <span className="font-mono">{emp.employee_code || '-'}</span>
-                  {emp.position?.title ? ` · ${emp.position.title}` : ''}
-                </span>
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) => row.task?.title || '-',
-        id: 'task',
-        header: 'Tugas & Prioritas',
-        cell: ({ row }) => {
-          const task = row.original.task;
-          const priorityMeta = PRIORITY_META[task?.priority] || PRIORITY_META.medium;
-          return (
-            <div className="flex max-w-[230px] flex-col gap-1 whitespace-normal">
-              <span className="line-clamp-2 text-xs leading-snug font-medium text-foreground">
-                {task?.title || '-'}
+              <span className="truncate text-xs font-medium text-foreground" title={fullName}>
+                {fullName}
               </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <StatusBadge tone={priorityMeta.tone} label={priorityMeta.label} />
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                  {task?.department?.code || '-'}
-                </span>
-              </div>
             </div>
           );
         },
-      },
-      {
-        accessorFn: (row) => Number(row.task?.estimated_hours || 0),
-        id: 'estimated_hours',
-        header: 'Estimasi',
-        cell: ({ row }) => (
-          <span className="text-xs font-medium whitespace-nowrap text-foreground tabular-nums">
-            {Number(row.original.task?.estimated_hours || 0).toFixed(1)} jam
+      });
+    }
+
+    cols.push({
+      accessorFn: (row) => row.task?.title || '-',
+      id: 'task',
+      header: 'Tugas',
+      cell: ({ row }) => {
+        const title = row.original.task?.title || '-';
+        return (
+          <span
+            className="block max-w-[260px] truncate text-xs font-medium text-foreground"
+            title={title}
+          >
+            {title}
           </span>
-        ),
+        );
       },
+    });
+
+    if (isEmployee) {
+      cols.push({
+        accessorFn: (row) => row.task?.priority || 'medium',
+        id: 'priority',
+        header: 'Prioritas',
+        meta: { className: 'hidden sm:table-cell' },
+        cell: ({ row }) => {
+          const meta = PRIORITY_META[row.original.task?.priority] || PRIORITY_META.medium;
+          return (
+            <div className="whitespace-nowrap">
+              <StatusBadge tone={meta.tone} label={meta.label} />
+            </div>
+          );
+        },
+      });
+    }
+
+    cols.push(
       {
         accessorKey: 'deadline',
         header: 'Tenggat',
@@ -432,18 +441,15 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           const item = row.original;
           const deadlineHint = getDeadlineIndicator(item.deadline, item.status);
           return (
-            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground tabular-nums">
-                {item.deadline ? String(item.deadline).slice(0, 10) : '-'}
-              </span>
-              {deadlineHint && (
-                <StatusBadge
-                  tone={deadlineHint.tone}
-                  label={deadlineHint.text}
-                  showDot={false}
-                />
+            <span
+              title={deadlineHint?.text}
+              className={cn(
+                'text-xs font-medium whitespace-nowrap tabular-nums',
+                deadlineHint?.tone === 'danger' ? 'text-destructive' : 'text-foreground'
               )}
-            </div>
+            >
+              {formatDate(item.deadline)}
+            </span>
           );
         },
       },
@@ -459,84 +465,40 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
             </div>
           );
         },
-      },
-      {
-        accessorFn: (row) => row.assigner?.full_name || '-',
-        id: 'assigner',
-        header: 'Ditugaskan Oleh',
-        cell: ({ row }) => {
-          const item = row.original;
-          return (
-            <div className="flex flex-col whitespace-nowrap">
-              <span className="max-w-[130px] truncate text-xs font-medium text-foreground">
-                {item.assigner?.full_name || '-'}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {item.assigned_at ? String(item.assigned_at).slice(0, 10) : '-'}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
+      }
+    );
+
+    if (!readOnly) {
+      cols.push({
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
         cell: ({ row }) => {
           const item = row.original;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openDetailSheet(item);
-                }}
-                title="Lihat Detail Penugasan"
-                aria-label="Lihat Detail Penugasan"
-              >
-                <Eye className="size-4" />
-              </Button>
-              {!readOnly && (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openEditSheet(item);
-                    }}
-                    title="Ubah Penugasan"
-                    aria-label="Ubah Penugasan"
-                  >
-                    <Edit3 className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDeletingAssignment(item);
-                    }}
-                    title="Hapus Penugasan"
-                    aria-label="Hapus Penugasan"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </>
-              )}
-            </div>
+            <RowActionsMenu
+              ariaLabel="Menu aksi penugasan"
+              items={[
+                {
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditSheet(item),
+                },
+                {
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  onSelect: () => setDeletingAssignment(item),
+                },
+              ]}
+            />
           );
         },
-      },
-    ],
-    [openDetailSheet, openEditSheet, readOnly]
-  );
+      });
+    }
+
+    return cols;
+  }, [isEmployee, openEditSheet, readOnly]);
 
   const selectedStatusMeta = selectedAssignment
     ? ASSIGNMENT_STATUS_META[selectedAssignment.status] || ASSIGNMENT_STATUS_META.assigned
@@ -554,14 +516,6 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     <AppShell
       title={readOnly ? 'Penugasan Saya' : 'Penugasan Kerja'}
       breadcrumb={readOnly ? 'Ruang Kerja' : 'Operasional'}
-      actions={
-        !readOnly ? (
-          <Button size="sm" onClick={openCreateSheet}>
-            <Plus data-icon="inline-start" className="size-4" />
-            Tambah Penugasan
-          </Button>
-        ) : undefined
-      }
     >
       <div className="flex flex-col gap-8">
         {/* 4 KPI Summary Cards */}
@@ -651,7 +605,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" onClick={openCreateSheet}>
+                <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
                   <Plus data-icon="inline-start" className="size-4" />
                   Tambah Penugasan
                 </Button>
@@ -702,7 +656,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                       <SelectItem value={ALL_VALUE}>Semua Pegawai</SelectItem>
                       {employees.map((emp) => (
                         <SelectItem key={emp.id} value={String(emp.id)}>
-                          {emp.full_name} ({emp.employee_code})
+                          <span className="inline-flex items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {emp.employee_code}
+                            </span>
+                            <span>{emp.full_name}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -728,7 +687,16 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                     <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
                     {departments.map((dept) => (
                       <SelectItem key={dept.id} value={String(dept.id)}>
-                        {dept.code ? `${dept.code} — ${dept.name}` : dept.name}
+                        {dept.code ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {dept.code}
+                            </span>
+                            <span>{dept.name}</span>
+                          </span>
+                        ) : (
+                          dept.name
+                        )}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -776,15 +744,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
             </div>
           }
           actionsSlot={
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={loadAllData}
-              aria-label="Muat ulang data"
-            >
-              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-            </Button>
+            !readOnly ? (
+              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                <Plus data-icon="inline-start" className="size-4" />
+                Tambah Penugasan
+              </Button>
+            ) : undefined
           }
         />
       </div>
@@ -796,11 +761,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
         title="Detail Penugasan"
         description={
           selectedAssignment
-            ? `${selectedAssignment.employee?.full_name || '-'} (${
-                selectedAssignment.employee?.employee_code || '-'
-              }) · Tenggat ${
-                selectedAssignment.deadline ? String(selectedAssignment.deadline).slice(0, 10) : '-'
-              }`
+            ? `${selectedAssignment.employee?.full_name || '-'} · Tenggat ${formatDate(selectedAssignment.deadline)}`
             : undefined
         }
         size="md"
@@ -865,8 +826,13 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                   <span className="truncate text-sm font-medium text-foreground">
                     {selectedAssignment.employee?.full_name || '-'}
                   </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {selectedAssignment.employee?.employee_code || '-'}
+                  <span className="truncate text-xs text-muted-foreground">
+                    <span className="font-mono">
+                      {selectedAssignment.employee?.employee_code || '-'}
+                    </span>
+                    {selectedAssignment.employee?.department?.name
+                      ? ` · ${selectedAssignment.employee.department.name}`
+                      : ''}
                   </span>
                 </div>
               </div>
@@ -874,8 +840,13 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-muted-foreground">Departemen</span>
-                  <span className="text-sm font-medium text-foreground">
-                    {selectedAssignment.task?.department?.name || '-'}
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                    {selectedAssignment.task?.department?.code && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {selectedAssignment.task.department.code}
+                      </span>
+                    )}
+                    <span>{selectedAssignment.task?.department?.name || '-'}</span>
                   </span>
                 </div>
 
@@ -890,9 +861,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                   <span className="text-xs text-muted-foreground">Tenggat Penugasan</span>
                   <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground tabular-nums">
                     <Calendar className="size-3.5 text-muted-foreground" />
-                    {selectedAssignment.deadline
-                      ? String(selectedAssignment.deadline).slice(0, 10)
-                      : '-'}
+                    {formatDate(selectedAssignment.deadline)}
                   </span>
                 </div>
 
@@ -906,9 +875,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 <div className="flex flex-col gap-0.5 sm:col-span-2">
                   <span className="text-xs text-muted-foreground">Tanggal Penugasan</span>
                   <span className="text-sm font-medium text-foreground tabular-nums">
-                    {selectedAssignment.assigned_at
-                      ? String(selectedAssignment.assigned_at).slice(0, 10)
-                      : '-'}
+                    {formatDate(selectedAssignment.assigned_at)}
                   </span>
                 </div>
               </div>
@@ -997,8 +964,16 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 <SelectGroup>
                   {taskOptions.map((task) => (
                     <SelectItem key={task.id} value={String(task.id)}>
-                      [{task.department?.code || '-'}] {task.title} (
-                      {Number(task.estimated_hours || 0).toFixed(1)}j)
+                      <span className="inline-flex items-center gap-2">
+                        {task.department?.code && (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {task.department.code}
+                          </span>
+                        )}
+                        <span>
+                          {task.title} ({Number(task.estimated_hours || 0).toFixed(1)}j)
+                        </span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -1022,7 +997,15 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 <SelectGroup>
                   {employeeOptions.map((emp) => (
                     <SelectItem key={emp.id} value={String(emp.id)}>
-                      {emp.full_name} ({emp.employee_code}) — {emp.department?.name || '-'}
+                      <span className="inline-flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {emp.employee_code}
+                        </span>
+                        <span>
+                          {emp.full_name}
+                          {emp.department?.name ? ` · ${emp.department.name}` : ''}
+                        </span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -1035,14 +1018,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               <Label htmlFor="assignment-deadline" className="text-xs">
                 Tenggat Penugasan <span className="text-destructive">*</span>
               </Label>
-              <Input
+              <DatePicker
                 id="assignment-deadline"
-                name="deadline"
-                type="date"
-                required
                 value={form.deadline}
-                onChange={(e) => setForm((prev) => ({ ...prev, deadline: e.target.value }))}
-                className="rounded-lg tabular-nums"
+                onChange={(val) => setForm((prev) => ({ ...prev, deadline: val }))}
+                placeholder="DD-MM-YYYY"
+                ariaLabel="Tenggat Penugasan"
               />
             </div>
 
@@ -1090,7 +1071,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               akan dihapus.
               {(deletingAssignment.status === 'completed' ||
                 Number(deletingAssignment.work_logs_count || 0) > 0) && (
-                <span className="mt-2 block rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+                <span className="mt-2 block rounded-xl border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning">
                   Perhatian: Penugasan yang sudah selesai atau memiliki riwayat work log akan
                   ditolak oleh sistem untuk menjaga integritas data.
                 </span>

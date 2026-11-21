@@ -3,9 +3,7 @@ import {
   AlertCircle,
   Building2,
   Edit3,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   UserCheck,
@@ -14,12 +12,12 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { departmentService } from '@/services/departmentService';
 import { employeeService } from '@/services/employeeService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +38,7 @@ import {
   DataTable,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -69,6 +68,9 @@ export default function DepartmentsPage({ readOnly = false }) {
   // Filters
   const [search, setSearch] = useState('');
   const [managerFilter, setManagerFilter] = useState('');
+
+  // Detail Slide-Over Sheet State
+  const [detailDepartment, setDetailDepartment] = useState(null);
 
   // Create/Edit Slide-Over Sheet State
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -114,6 +116,8 @@ export default function DepartmentsPage({ readOnly = false }) {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  useRefetchOnFocus(loadAllData);
 
   const hasActiveFilters = useMemo(
     () => Boolean(search.trim() || managerFilter),
@@ -211,9 +215,11 @@ export default function DepartmentsPage({ readOnly = false }) {
     setDeleteLoading(true);
 
     try {
-      const res = await departmentService.deleteDepartment(deletingDepartment.id);
+      const targetId = deletingDepartment.id;
+      const res = await departmentService.deleteDepartment(targetId);
       toast.success(res.message || 'Data departemen berhasil dihapus.');
       setDeletingDepartment(null);
+      setDetailDepartment((prev) => (prev?.id === targetId ? null : prev));
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Departemen tidak dapat dihapus.').message);
@@ -229,7 +235,7 @@ export default function DepartmentsPage({ readOnly = false }) {
         accessorKey: 'code',
         header: 'Kode',
         cell: ({ row }) => (
-          <span className="inline-flex items-center rounded-lg border border-border bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground whitespace-nowrap">
+          <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground whitespace-nowrap">
             {row.original.code}
           </span>
         ),
@@ -237,86 +243,44 @@ export default function DepartmentsPage({ readOnly = false }) {
       {
         accessorKey: 'name',
         header: 'Departemen',
-        cell: ({ row }) => {
-          const dept = row.original;
-          return (
-            <div className="flex max-w-[260px] flex-col gap-0.5 whitespace-normal">
-              <span className="font-medium text-foreground">{dept.name}</span>
-              <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
-                {dept.description || 'Belum ada deskripsi departemen.'}
-              </span>
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <span
+            className="block max-w-[260px] truncate text-sm font-medium text-foreground"
+            title={row.original.name}
+          >
+            {row.original.name}
+          </span>
+        ),
       },
       {
         accessorFn: (row) => row.manager?.full_name || '',
         id: 'manager',
-        header: 'Manajer Departemen',
+        header: 'Manajer',
+        meta: { className: 'hidden sm:table-cell' },
         cell: ({ row }) => {
           const manager = row.original.manager;
           if (!manager) {
             return <StatusBadge tone="warning" label="Belum Ditentukan" />;
           }
           return (
-            <div className="flex items-center gap-2.5 whitespace-nowrap">
-              <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                  {getInitials(manager.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex min-w-0 max-w-[220px] flex-col">
-                <span className="truncate text-xs font-medium text-foreground">
-                  {manager.full_name}
-                </span>
-                <span className="truncate text-xs text-muted-foreground tabular-nums">
-                  {manager.employee_code}
-                  {manager.position?.title ? ` · ${manager.position.title}` : ''}
-                </span>
-              </div>
-            </div>
+            <span
+              className="block max-w-[200px] truncate text-sm text-foreground"
+              title={manager.full_name}
+            >
+              {manager.full_name}
+            </span>
           );
         },
       },
       {
         accessorFn: (row) => Number(row.employees_count || 0),
         id: 'employees_count',
-        header: 'Pegawai Terkait',
+        header: 'Pegawai',
         cell: ({ row }) => {
           const employeesCount = Number(row.original.employees_count || 0);
-          const activeCount = Number(row.original.active_employees_count || 0);
           return (
-            <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
-              <Badge
-                variant={employeesCount > 0 ? 'secondary' : 'outline'}
-                className="gap-1 text-xs font-medium tabular-nums"
-                title={
-                  employeesCount > 0
-                    ? 'Tidak dapat dihapus karena masih memiliki pegawai terdaftar'
-                    : 'Belum memiliki pegawai terdaftar'
-                }
-              >
-                {employeesCount > 0 && <Lock className="size-3.5 text-muted-foreground" />}
-                {employeesCount} pegawai
-              </Badge>
-              {employeesCount > 0 && (
-                <span className="pl-1 text-xs text-muted-foreground tabular-nums">
-                  {activeCount} aktif
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) => Number(row.tasks_count || 0),
-        id: 'tasks_count',
-        header: 'Tugas Terkait',
-        cell: ({ row }) => {
-          const tasksCount = Number(row.original.tasks_count || 0);
-          return (
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums">
-              {tasksCount} tugas
+            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
+              {employeesCount} pegawai
             </span>
           );
         },
@@ -333,42 +297,28 @@ export default function DepartmentsPage({ readOnly = false }) {
           const inUse =
             Number(dept.employees_count || 0) > 0 || Number(dept.tasks_count || 0) > 0;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditSheet(dept);
-                }}
-                aria-label={`Ubah ${dept.name}`}
-                title="Ubah Departemen"
-                className="rounded-lg text-muted-foreground hover:text-primary"
-              >
-                <Edit3 className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingDepartment(dept);
-                }}
-                aria-label={`Hapus ${dept.name}`}
-                title={
-                  inUse
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${dept.name}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditSheet(dept),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: inUse
                     ? 'Masih memiliki relasi aktif (penghapusan ditolak sistem)'
-                    : 'Hapus Departemen'
-                }
-                className={
-                  inUse
-                    ? 'rounded-lg text-muted-foreground hover:text-amber-700'
-                    : 'rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                }
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+                    : 'Hapus Departemen',
+                  onSelect: () => setDeletingDepartment(dept),
+                },
+              ]}
+            />
           );
         },
       });
@@ -381,19 +331,6 @@ export default function DepartmentsPage({ readOnly = false }) {
     <AppShell
       title={readOnly ? 'Struktur Departemen' : 'Departemen'}
       breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
-      actions={
-        readOnly ? (
-          <Badge variant="outline" className="gap-1.5 text-xs font-normal text-muted-foreground">
-            <Lock className="size-3.5" />
-            Mode Baca Saja
-          </Badge>
-        ) : (
-          <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
-            <Plus data-icon="inline-start" className="size-4" />
-            Tambah Departemen
-          </Button>
-        )
-      }
     >
       <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Summary Cards */}
@@ -460,6 +397,7 @@ export default function DepartmentsPage({ readOnly = false }) {
           onSearchChange={setSearch}
           searchPlaceholder="Cari kode, nama, atau manajer..."
           pageSize={10}
+          onRowClick={(dept) => setDetailDepartment(dept)}
           emptyTitle={
             hasActiveFilters
               ? 'Tidak ada departemen yang sesuai filter'
@@ -529,18 +467,141 @@ export default function DepartmentsPage({ readOnly = false }) {
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={loadAllData}
-              aria-label="Muat ulang data"
-              className="rounded-lg"
-            >
-              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-            </Button>
+            !readOnly ? (
+              <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+                <Plus data-icon="inline-start" className="size-4" />
+                Tambah Departemen
+              </Button>
+            ) : undefined
           }
         />
       </div>
+
+      {/* Detail Department Slide-Over FormSheet */}
+      <FormSheet
+        open={Boolean(detailDepartment)}
+        onOpenChange={(open) => {
+          if (!open) setDetailDepartment(null);
+        }}
+        title="Detail Departemen"
+        description={detailDepartment ? `Ringkasan struktur unit ${detailDepartment.name}.` : undefined}
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailDepartment(null)}
+              className="rounded-lg"
+            >
+              Tutup
+            </Button>
+            {!readOnly && detailDepartment && (
+              <Button
+                type="button"
+                onClick={() => {
+                  const target = detailDepartment;
+                  setDetailDepartment(null);
+                  openEditSheet(target);
+                }}
+                className="rounded-lg"
+              >
+                <Edit3 data-icon="inline-start" className="size-4" />
+                Ubah Departemen
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailDepartment && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground">
+                  {detailDepartment.code}
+                </span>
+                <StatusBadge
+                  tone={detailDepartment.manager ? 'success' : 'warning'}
+                  label={detailDepartment.manager ? 'Memiliki Manajer' : 'Belum Ada Manajer'}
+                />
+              </div>
+              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+                {detailDepartment.name}
+              </h4>
+            </div>
+
+            <Separator />
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Kode Departemen</dt>
+                <dd className="font-mono text-sm font-normal text-foreground">
+                  {detailDepartment.code}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Total Pegawai</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {Number(detailDepartment.employees_count || 0)} pegawai
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Pegawai Aktif</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {Number(detailDepartment.active_employees_count || 0)} aktif
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Tugas Terkait</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {Number(detailDepartment.tasks_count || 0)} tugas
+                </dd>
+              </div>
+            </dl>
+
+            <Separator />
+
+            <div className="flex flex-col gap-2.5">
+              <h5 className="text-xs font-semibold text-foreground">Manajer Departemen</h5>
+              {detailDepartment.manager ? (
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+                  <Avatar className="size-9 shrink-0 border border-border">
+                    <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                      {getInitials(detailDepartment.manager.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {detailDepartment.manager.full_name}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      <span className="font-mono font-normal tabular-nums">
+                        {detailDepartment.manager.employee_code}
+                      </span>
+                      {detailDepartment.manager.position?.title
+                        ? ` · ${detailDepartment.manager.position.title}`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <StatusBadge tone="warning" label="Belum Ditentukan" />
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-1.5">
+              <h5 className="text-xs font-semibold text-foreground">Deskripsi Unit / Fungsi</h5>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {detailDepartment.description || 'Belum ada deskripsi departemen.'}
+              </p>
+            </div>
+          </div>
+        )}
+      </FormSheet>
 
       {/* Create / Edit Department Slide-Over FormSheet */}
       <FormSheet
@@ -659,7 +720,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                     {managerOptions.map((emp) => (
                       <SelectItem key={emp.id} value={String(emp.id)}>
                         {emp.full_name} ({emp.employee_code})
-                        {emp.position?.title ? ` — ${emp.position.title}` : ''}
+                        {emp.position?.title ? ` · ${emp.position.title}` : ''}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -698,10 +759,11 @@ export default function DepartmentsPage({ readOnly = false }) {
             <>
               Anda akan menghapus departemen{' '}
               <span className="font-semibold text-foreground">{deletingDepartment.name}</span> (
-              <span className="font-medium tabular-nums">{deletingDepartment.code}</span>).
+              <span className="font-mono font-normal tabular-nums">{deletingDepartment.code}</span>
+              ).
               {(Number(deletingDepartment.employees_count || 0) > 0 ||
                 Number(deletingDepartment.tasks_count || 0) > 0) && (
-                <span className="mt-2.5 block rounded-xl border border-amber-200/80 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800 tabular-nums">
+                <span className="mt-2.5 block rounded-xl border border-warning-border bg-warning-subtle px-3.5 py-2.5 text-xs text-warning tabular-nums">
                   Perhatian: Departemen ini masih memiliki{' '}
                   {deletingDepartment.employees_count || 0} pegawai dan{' '}
                   {deletingDepartment.tasks_count || 0} tugas terkait. Sistem akan menolak

@@ -562,25 +562,25 @@ class ManagerDashboardService
     ): string {
         if ($isOverridden) {
             if ($weeklyHours >= 55.0) {
-                return 'Jam kerja minggu ini >= 55 jam (Override PP No. 35/2021) — perlu redistribusi tugas segera.';
+                return 'Jam kerja minggu ini >= 55 jam (Override PP No. 35/2021). Perlu redistribusi tugas segera.';
             }
             if ($maxDailyOvertime > 4.0) {
-                return 'Lembur harian melebihi 4 jam (Override PP No. 35/2021) — perlu penyesuaian beban kerja.';
+                return 'Lembur harian melebihi 4 jam (Override PP No. 35/2021). Perlu penyesuaian beban kerja.';
             }
 
-            return 'Akumulasi lembur mingguan melebihi 18 jam (Override PP No. 35/2021) — perlu pemulihan beban.';
+            return 'Akumulasi lembur mingguan melebihi 18 jam (Override PP No. 35/2021). Perlu pemulihan beban.';
         }
 
         if ($riskCategory === 'high') {
-            return 'Kombinasi beban tugas dan tekanan tenggat tinggi — perlu peninjauan prioritas.';
+            return 'Kombinasi beban tugas dan tekanan tenggat tinggi. Perlu peninjauan prioritas.';
         }
 
         if ($overdueCount > 0) {
-            return "{$overdueCount} penugasan melewati tenggat waktu — disarankan sinkronisasi prioritas.";
+            return "{$overdueCount} penugasan melewati tenggat waktu. Disarankan sinkronisasi prioritas.";
         }
 
         if ($taskLoadScore >= 50.0) {
-            return 'Estimasi jam tugas aktif melebihi kapasitas mingguan — pantau progres berkala.';
+            return 'Estimasi jam tugas aktif melebihi kapasitas mingguan. Pantau progres berkala.';
         }
 
         if ($urgentCount > 0) {
@@ -588,7 +588,7 @@ class ManagerDashboardService
         }
 
         if ($riskCategory === 'medium') {
-            return 'Indikator beban kerja kategori sedang — lanjutkan pemantauan rutin.';
+            return 'Indikator beban kerja kategori sedang. Lanjutkan pemantauan rutin.';
         }
 
         return 'Beban kerja dan waktu kerja berada dalam batas seimbang.';

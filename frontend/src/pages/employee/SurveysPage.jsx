@@ -2,17 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
-  BarChart3,
   Edit3,
   Info,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatMonth, toApiMonth } from '@/lib/format';
 import { extractApiError } from '@/services/api';
 import { surveyService } from '@/services/surveyService';
 import { Badge } from '@/components/ui/badge';
@@ -44,25 +44,27 @@ import {
   DataTable,
   FormSheet,
   KpiStatCard,
+  MonthPicker,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
 const ALL_VALUE = '__all__';
 
 const WLB_LIKERT_LABELS = {
-  1: '1 — Sangat Buruk',
-  2: '2 — Kurang Baik',
-  3: '3 — Cukup',
-  4: '4 — Baik',
-  5: '5 — Sangat Seimbang',
+  1: 'Sangat Buruk',
+  2: 'Kurang Baik',
+  3: 'Cukup',
+  4: 'Baik',
+  5: 'Sangat Seimbang',
 };
 
 const WORKLOAD_LIKERT_LABELS = {
-  1: '1 — Sangat Ringan',
-  2: '2 — Terkendali',
-  3: '3 — Sedang',
-  4: '4 — Cukup Berat',
-  5: '5 — Sangat Berat',
+  1: 'Sangat Ringan',
+  2: 'Terkendali',
+  3: 'Sedang',
+  4: 'Cukup Berat',
+  5: 'Sangat Berat',
 };
 
 function getDimensionBadgeMeta(score) {
@@ -88,11 +90,9 @@ function getDimensionBadgeMeta(score) {
 }
 
 function emptySurveyForm() {
-  const now = new Date();
-  const periodMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   return {
     title: '',
-    period_month: periodMonth,
+    period_month: toApiMonth(new Date()),
     description: '',
     is_active: true,
   };
@@ -104,6 +104,25 @@ function emptyResponseForm() {
     workload_perception_score: 3,
     comments: '',
   };
+}
+
+function getSurveyActiveCount(survey) {
+  if (survey?.active_employees_count !== null && survey?.active_employees_count !== undefined) {
+    return Number(survey.active_employees_count);
+  }
+  if (
+    survey?.total_active_employees !== null &&
+    survey?.total_active_employees !== undefined
+  ) {
+    return Number(survey.total_active_employees);
+  }
+  if (Array.isArray(survey?.department_aggregates) && survey.department_aggregates.length > 0) {
+    return survey.department_aggregates.reduce(
+      (sum, dept) => sum + Number(dept.active_employees_count || 0),
+      0
+    );
+  }
+  return null;
 }
 
 function Nfr02PrivacyCue({ isEmployee, compact = false }) {
@@ -150,7 +169,7 @@ export default function SurveysPage() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
 
-  // Aggregate Detail Sheet (Manager / Admin — STRICTLY DEPARTMENT AGGREGATES ONLY)
+  // Aggregate Detail Sheet (Manager / Admin: strictly department aggregates only)
   const [aggregateSheetOpen, setAggregateSheetOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState(null);
 
@@ -197,6 +216,8 @@ export default function SurveysPage() {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
     () => Boolean(search.trim() || activeFilter),
     [search, activeFilter]
@@ -207,7 +228,7 @@ export default function SurveysPage() {
     setActiveFilter('');
   };
 
-  // --- Questionnaire CRUD (Admin & Manager) ---
+  // Questionnaire CRUD (Admin & Manager)
   const openCreateSurveySheet = useCallback(() => {
     setEditingSurvey(null);
     setSurveyForm(emptySurveyForm());
@@ -219,7 +240,7 @@ export default function SurveysPage() {
     setEditingSurvey(survey);
     setSurveyForm({
       title: survey.title || '',
-      period_month: survey.period_month || '',
+      period_month: toApiMonth(survey.period_month) || '',
       description: survey.description || '',
       is_active: Boolean(survey.is_active),
     });
@@ -234,12 +255,25 @@ export default function SurveysPage() {
 
   const handleSurveySubmit = async (e) => {
     e.preventDefault();
-    setSurveySubmitting(true);
     setSurveyFormError('');
 
+    const trimmedTitle = surveyForm.title.trim();
+    const normalizedPeriod = toApiMonth(surveyForm.period_month);
+
+    if (!trimmedTitle) {
+      setSurveyFormError('Judul survei wajib diisi.');
+      return;
+    }
+    if (!normalizedPeriod) {
+      setSurveyFormError('Periode bulan wajib dipilih.');
+      return;
+    }
+
+    setSurveySubmitting(true);
+
     const payload = {
-      title: surveyForm.title.trim(),
-      period_month: surveyForm.period_month.trim(),
+      title: trimmedTitle,
+      period_month: normalizedPeriod,
       description: surveyForm.description.trim() || null,
       is_active: Boolean(surveyForm.is_active),
     };
@@ -280,7 +314,7 @@ export default function SurveysPage() {
     }
   };
 
-  // --- Employee Response Handlers ---
+  // Employee Response Handlers
   const openResponseSheet = useCallback((survey) => {
     setRespondingSurvey(survey);
     if (survey.my_response) {
@@ -330,7 +364,7 @@ export default function SurveysPage() {
     }
   };
 
-  // --- Department Aggregate Columns (NFR-02: Department-level aggregated metrics ONLY) ---
+  // Department Aggregate Columns (NFR-02: Department-level aggregated metrics ONLY)
   const departmentAggregateColumns = useMemo(
     () => [
       {
@@ -338,10 +372,13 @@ export default function SurveysPage() {
         header: 'Departemen',
         cell: ({ row }) => (
           <div className="flex items-center gap-2 whitespace-nowrap">
-            <Badge variant="outline" className="font-mono text-xs">
+            <Badge variant="outline" className="font-mono text-xs font-normal">
               {row.original.department_code}
             </Badge>
-            <span className="text-xs font-medium text-foreground">
+            <span
+              className="max-w-[180px] truncate text-xs font-medium text-foreground"
+              title={row.original.department_name}
+            >
               {row.original.department_name}
             </span>
           </div>
@@ -354,15 +391,12 @@ export default function SurveysPage() {
         cell: ({ row }) => {
           const rate = Number(row.original.participation_rate || 0);
           return (
-            <div className="flex flex-col gap-1 whitespace-nowrap">
-              <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
-                <span className="font-medium text-foreground">
-                  {row.original.respondents_count} / {row.original.active_employees_count}
-                </span>
-                <span className="text-muted-foreground">{rate.toFixed(1)}%</span>
-              </div>
-              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-20" />
-            </div>
+            <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
+              <span className="font-medium">
+                {row.original.respondents_count} / {row.original.active_employees_count}
+              </span>{' '}
+              <span className="text-muted-foreground">({rate.toFixed(1)}%)</span>
+            </span>
           );
         },
       },
@@ -376,7 +410,7 @@ export default function SurveysPage() {
         cell: ({ row }) => {
           const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
           return (
-            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+            <div className="flex items-center gap-2 whitespace-nowrap">
               <span className="text-xs font-medium text-foreground tabular-nums">
                 {row.original.avg_wlb_score !== null && row.original.avg_wlb_score !== undefined
                   ? `${Number(row.original.avg_wlb_score).toFixed(2)} / 5`
@@ -408,21 +442,19 @@ export default function SurveysPage() {
     []
   );
 
-  // --- Main Survey Table Columns ---
+  // Main Survey Table Columns (max 4 data columns + RowActionsMenu, strictly 1 line per cell)
   const columns = useMemo(() => {
     const baseCols = [
       {
         accessorKey: 'title',
-        header: 'Judul & Deskripsi Survei',
+        header: 'Judul',
         cell: ({ row }) => (
-          <div className="flex max-w-[260px] flex-col gap-0.5 whitespace-normal">
-            <span className="line-clamp-1 text-xs font-medium text-foreground">
-              {row.original.title}
-            </span>
-            <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
-              {row.original.description || 'Survei berkala keseimbangan kehidupan kerja'}
-            </span>
-          </div>
+          <span
+            className="block max-w-[260px] truncate text-xs font-medium text-foreground"
+            title={row.original.title}
+          >
+            {row.original.title}
+          </span>
         ),
       },
       {
@@ -430,14 +462,14 @@ export default function SurveysPage() {
         header: 'Periode',
         cell: ({ row }) => (
           <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {row.original.period_month}
+            {formatMonth(row.original.period_month)}
           </span>
         ),
       },
       {
         accessorFn: (row) => (row.is_active ? 1 : 0),
         id: 'status',
-        header: 'Status Periode',
+        header: 'Status',
         cell: ({ row }) => (
           <div className="whitespace-nowrap">
             <StatusBadge
@@ -455,23 +487,15 @@ export default function SurveysPage() {
         {
           accessorFn: (row) => (row.my_response ? 1 : 0),
           id: 'my_participation',
-          header: 'Partisipasi Saya',
+          header: 'Partisipasi',
           cell: ({ row }) => {
-            const resp = row.original.my_response;
-            if (!resp) {
-              return (
-                <div className="whitespace-nowrap">
-                  <StatusBadge status="pending" label="Belum Diisi" />
-                </div>
-              );
-            }
+            const hasResponded = Boolean(row.original.my_response);
             return (
-              <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-                <StatusBadge status="completed" label="Sudah Diisi" />
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  WLB: {resp.work_life_balance_score}/5 · Beban:{' '}
-                  {resp.workload_perception_score}/5
-                </span>
+              <div className="whitespace-nowrap">
+                <StatusBadge
+                  status={hasResponded ? 'completed' : 'pending'}
+                  label={hasResponded ? 'Sudah Diisi' : 'Belum Diisi'}
+                />
               </div>
             );
           },
@@ -482,29 +506,21 @@ export default function SurveysPage() {
           enableSorting: false,
           cell: ({ row }) => {
             const survey = row.original;
+            if (!survey.is_active) {
+              return null;
+            }
             return (
-              <div className="-mr-1.5 flex justify-end whitespace-nowrap">
-                {survey.is_active ? (
-                  <Button
-                    size="xs"
-                    variant={survey.my_response ? 'outline' : 'default'}
-                    className="rounded-lg"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openResponseSheet(survey);
-                    }}
-                  >
-                    <Edit3 className="size-4" data-icon="inline-start" />
-                    {survey.my_response ? 'Ubah Jawaban' : 'Isi Survei'}
-                  </Button>
-                ) : survey.my_response ? (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Terkirim
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Periode ditutup</span>
-                )}
-              </div>
+              <RowActionsMenu
+                ariaLabel="Aksi survei"
+                items={[
+                  {
+                    key: 'respond',
+                    label: survey.my_response ? 'Perbarui Jawaban' : 'Isi Survei',
+                    icon: Edit3,
+                    onSelect: () => openResponseSheet(survey),
+                  },
+                ]}
+              />
             );
           },
         },
@@ -516,73 +532,23 @@ export default function SurveysPage() {
       ...baseCols,
       {
         accessorFn: (row) => Number(row.responses_count || 0),
-        id: 'responses',
-        header: 'Responden',
-        cell: ({ row }) => {
-          const rate = Number(row.original.participation_rate || 0);
-          return (
-            <div className="flex flex-col gap-1 whitespace-nowrap">
-              <div className="flex items-center gap-1.5 text-xs tabular-nums">
-                <span className="font-medium text-foreground">
-                  {row.original.responses_count ?? 0}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  ({rate.toFixed(1)}%)
-                </span>
-              </div>
-              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-24" />
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) =>
-          row.converted_wlb_dimension_score !== null &&
-          row.converted_wlb_dimension_score !== undefined
-            ? Number(row.converted_wlb_dimension_score)
-            : -1,
-        id: 'wlb_score',
-        header: 'Skor WLB (Dimensi 2)',
+        id: 'participation',
+        header: 'Partisipasi',
         cell: ({ row }) => {
           const survey = row.original;
-          const dimMeta = getDimensionBadgeMeta(survey.converted_wlb_dimension_score);
+          const respondents = Number(survey.responses_count ?? 0);
+          const activeCount = getSurveyActiveCount(survey);
+          const rate = Number(survey.participation_rate || 0);
+
           return (
-            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground tabular-nums">
-                {survey.avg_wlb_score !== null && survey.avg_wlb_score !== undefined
-                  ? `${Number(survey.avg_wlb_score).toFixed(2)} / 5`
-                  : '-'}
-              </span>
-              <StatusBadge
-                status={dimMeta.status}
-                tone={dimMeta.tone}
-                label={dimMeta.label}
-              />
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) =>
-          row.avg_workload_perception_score !== null &&
-          row.avg_workload_perception_score !== undefined
-            ? Number(row.avg_workload_perception_score)
-            : -1,
-        id: 'workload_perception',
-        header: 'Persepsi Beban',
-        cell: ({ row }) => {
-          const score = row.original.avg_workload_perception_score;
-          if (score === null || score === undefined) {
-            return <span className="text-xs text-muted-foreground">-</span>;
-          }
-          const num = Number(score);
-          return (
-            <div className="flex flex-col gap-1 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground tabular-nums">
-                {num.toFixed(2)} / 5
-              </span>
-              <Progress value={Math.min(100, Math.max(0, (num / 5) * 100))} className="h-1.5 w-20" />
-            </div>
+            <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
+              <span className="font-medium">
+                {activeCount !== null && activeCount > 0
+                  ? `${respondents} / ${activeCount}`
+                  : respondents}
+              </span>{' '}
+              <span className="text-muted-foreground">({rate.toFixed(1)}%)</span>
+            </span>
           );
         },
       },
@@ -594,69 +560,32 @@ export default function SurveysPage() {
           const survey = row.original;
           const hasResponses = Number(survey.responses_count || 0) > 0;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="outline"
-                size="xs"
-                className="rounded-lg"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openAggregateSheet(survey);
-                }}
-              >
-                <BarChart3 className="size-4" data-icon="inline-start" />
-                Agregat
-              </Button>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Ubah survei"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openEditSurveySheet(survey);
-                    }}
-                  >
-                    <Edit3 className="size-4 text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Ubah periode survei</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Hapus survei"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDeletingSurvey(survey);
-                    }}
-                  >
-                    <Trash2
-                      className={
-                        hasResponses
-                          ? 'size-4 text-muted-foreground'
-                          : 'size-4 text-destructive'
-                      }
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {hasResponses
+            <RowActionsMenu
+              ariaLabel="Aksi periode survei"
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditSurveySheet(survey),
+                },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: hasResponses
                     ? 'Sudah memiliki respons (penghapusan dilindungi sistem)'
-                    : 'Hapus survei'}
-                </TooltipContent>
-              </Tooltip>
-            </div>
+                    : 'Hapus survei',
+                  onSelect: () => setDeletingSurvey(survey),
+                },
+              ]}
+            />
           );
         },
       },
     ];
-  }, [isEmployee, openAggregateSheet, openEditSurveySheet, openResponseSheet]);
+  }, [isEmployee, openEditSurveySheet, openResponseSheet]);
 
   const overallWlbMeta = getDimensionBadgeMeta(summary.overall_wlb_dimension_score);
   const overallParticipation = Number(summary.overall_participation_rate || 0);
@@ -665,17 +594,7 @@ export default function SurveysPage() {
     <AppShell
       title="Survei Kondisi Kerja"
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <Nfr02PrivacyCue isEmployee={isEmployee} compact />
-          {canManage && (
-            <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
-              <Plus className="size-4" data-icon="inline-start" />
-              Buat Survei
-            </Button>
-          )}
-        </div>
-      }
+      actions={<Nfr02PrivacyCue isEmployee={isEmployee} compact />}
     >
       <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Cards */}
@@ -793,7 +712,7 @@ export default function SurveysPage() {
           searchable
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Cari judul survei atau YYYY-MM..."
+          searchPlaceholder="Cari judul atau periode survei..."
           pageSize={10}
           onRowClick={(row) => {
             if (isEmployee) {
@@ -878,27 +797,24 @@ export default function SurveysPage() {
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="rounded-lg"
-              onClick={loadAllData}
-              aria-label="Muat ulang data"
-            >
-              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-            </Button>
+            canManage ? (
+              <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
+                <Plus className="size-4" data-icon="inline-start" />
+                Buat Survei
+              </Button>
+            ) : undefined
           }
         />
       </div>
 
-      {/* Sheet 1: Hasil Agregat Departemen (Manager & Admin — STRICT NFR-02 AGGREGATION ONLY) */}
+      {/* Sheet 1: Hasil Agregat Departemen (Manager & Admin: strict NFR-02 aggregation only) */}
       {!isEmployee && (
         <FormSheet
           open={aggregateSheetOpen && Boolean(selectedSurvey)}
           onOpenChange={setAggregateSheetOpen}
           title={
             selectedSurvey
-              ? `Agregat Departemen · ${selectedSurvey.period_month}`
+              ? `Agregat Departemen · ${formatMonth(selectedSurvey.period_month)}`
               : 'Agregat Departemen'
           }
           description={selectedSurvey?.title || undefined}
@@ -916,11 +832,18 @@ export default function SurveysPage() {
         >
           {selectedSurvey && (
             <div className="flex flex-col gap-6">
-              <div className="flex items-center">
-                <Nfr02PrivacyCue isEmployee={false} />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center">
+                  <Nfr02PrivacyCue isEmployee={false} />
+                </div>
+                {selectedSurvey.description && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {selectedSurvey.description}
+                  </p>
+                )}
               </div>
 
-              {/* Overall Period Aggregate Summary — open divided strip, no nested boxes */}
+              {/* Overall Period Aggregate Summary: open divided strip, no nested boxes */}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-border">
                 <div className="flex flex-col gap-2 sm:pr-5">
                   <span className="text-xs text-muted-foreground">Partisipasi Periode</span>
@@ -1092,17 +1015,14 @@ export default function SurveysPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="survey-period-month">Periode Bulan (YYYY-MM)</Label>
-                <Input
+                <Label htmlFor="survey-period-month">Periode Bulan</Label>
+                <MonthPicker
                   id="survey-period-month"
-                  name="period_month"
-                  type="month"
-                  required
+                  ariaLabel="Periode Bulan"
                   value={surveyForm.period_month}
-                  onChange={(e) =>
-                    setSurveyForm((prev) => ({ ...prev, period_month: e.target.value }))
+                  onChange={(val) =>
+                    setSurveyForm((prev) => ({ ...prev, period_month: val }))
                   }
-                  className="rounded-lg bg-background tabular-nums"
                 />
               </div>
 
@@ -1164,8 +1084,8 @@ export default function SurveysPage() {
                 <span className="font-semibold text-foreground">
                   {deletingSurvey.title}
                 </span>{' '}
-                (<span className="tabular-nums">{deletingSurvey.period_month}</span>) akan
-                dihapus.
+                (<span className="tabular-nums">{formatMonth(deletingSurvey.period_month)}</span>)
+                akan dihapus.
                 {Number(deletingSurvey.responses_count || 0) > 0 && (
                   <span className="mt-2 block text-xs text-destructive">
                     Perhatian: Survei ini sudah memiliki {deletingSurvey.responses_count}{' '}
@@ -1193,7 +1113,7 @@ export default function SurveysPage() {
           }
           description={
             respondingSurvey
-              ? `${respondingSurvey.title} (${respondingSurvey.period_month})`
+              ? `${respondingSurvey.title} (${formatMonth(respondingSurvey.period_month)})`
               : undefined
           }
           size="md"
@@ -1230,8 +1150,15 @@ export default function SurveysPage() {
               onSubmit={handleResponseSubmit}
               className="flex flex-col gap-6"
             >
-              <div className="flex items-center">
-                <Nfr02PrivacyCue isEmployee />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center">
+                  <Nfr02PrivacyCue isEmployee />
+                </div>
+                {respondingSurvey.description && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {respondingSurvey.description}
+                  </p>
+                )}
               </div>
 
               <AnimatePresence initial={false}>

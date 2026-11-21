@@ -4,11 +4,8 @@ import {
   Calendar,
   Clock,
   Edit3,
-  Eye,
   GraduationCap,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   Users,
@@ -16,6 +13,13 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import {
+  formatDate,
+  parseISODateLocal,
+  toApiDate,
+  toISODateLocal,
+} from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { trainingService } from '@/services/trainingService';
@@ -38,8 +42,10 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   ConfirmDialog,
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -59,14 +65,14 @@ const PARTICIPATION_STATUS_META = {
 };
 
 function getScheduleMeta(startDateStr, endDateStr) {
-  if (!startDateStr || !endDateStr) {
+  const start = parseISODateLocal(startDateStr);
+  const end = parseISODateLocal(endDateStr);
+  if (!start || !end) {
     return { label: 'Terjadwal', tone: 'neutral' };
   }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const start = new Date(`${String(startDateStr).slice(0, 10)}T00:00:00`);
-  const end = new Date(`${String(endDateStr).slice(0, 10)}T00:00:00`);
 
   if (today < start) {
     return { label: 'Akan Datang', tone: 'info' };
@@ -90,8 +96,8 @@ function emptyTrainingForm() {
     category: 'Teknis & Rekayasa',
     provider: '',
     duration_hours: '8',
-    start_date: start.toISOString().slice(0, 10),
-    end_date: end.toISOString().slice(0, 10),
+    start_date: toISODateLocal(start),
+    end_date: toISODateLocal(end),
   };
 }
 
@@ -169,6 +175,8 @@ export default function TrainingsPage() {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
     () => Boolean(search.trim() || scheduleFilter || categoryFilter),
     [search, scheduleFilter, categoryFilter]
@@ -185,7 +193,7 @@ export default function TrainingsPage() {
     return Array.from(merged);
   }, [categories]);
 
-  // --- Detail Handler ---
+  // Detail Handler
   const openDetailSheet = useCallback(async (training) => {
     setSelectedTraining(training);
     setDetailSheetOpen(true);
@@ -201,7 +209,7 @@ export default function TrainingsPage() {
     }
   }, []);
 
-  // --- Create / Edit Handlers ---
+  // Create / Edit Handlers
   const openCreateSheet = useCallback(() => {
     setEditingTraining(null);
     setForm(emptyTrainingForm());
@@ -216,8 +224,8 @@ export default function TrainingsPage() {
       category: training.category || '',
       provider: training.provider || '',
       duration_hours: String(Number(training.duration_hours || 1)),
-      start_date: training.start_date ? String(training.start_date).slice(0, 10) : '',
-      end_date: training.end_date ? String(training.end_date).slice(0, 10) : '',
+      start_date: toApiDate(training.start_date),
+      end_date: toApiDate(training.end_date),
     });
     setFormError('');
     setFormSheetOpen(true);
@@ -227,7 +235,15 @@ export default function TrainingsPage() {
     e.preventDefault();
     setFormError('');
 
-    if (form.end_date < form.start_date) {
+    const startDate = toApiDate(form.start_date);
+    const endDate = toApiDate(form.end_date);
+
+    if (!startDate || !endDate) {
+      setFormError('Tanggal mulai dan tanggal selesai wajib dipilih.');
+      return;
+    }
+
+    if (endDate < startDate) {
       setFormError('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
       return;
     }
@@ -239,8 +255,8 @@ export default function TrainingsPage() {
       category: form.category.trim(),
       provider: form.provider.trim(),
       duration_hours: Number(form.duration_hours),
-      start_date: form.start_date,
-      end_date: form.end_date,
+      start_date: startDate,
+      end_date: endDate,
     };
 
     try {
@@ -260,15 +276,20 @@ export default function TrainingsPage() {
     }
   };
 
-  // --- Delete Handler ---
+  // Delete Handler
   const handleConfirmDelete = async () => {
     if (!deletingTraining) return;
     setDeleteLoading(true);
 
     try {
-      const res = await trainingService.deleteTraining(deletingTraining.id);
+      const targetId = deletingTraining.id;
+      const res = await trainingService.deleteTraining(targetId);
       toast.success(res.message || 'Program pelatihan berhasil dihapus.');
       setDeletingTraining(null);
+      if (selectedTraining?.id === targetId) {
+        setDetailSheetOpen(false);
+        setSelectedTraining(null);
+      }
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Program pelatihan tidak dapat dihapus.').message);
@@ -284,59 +305,29 @@ export default function TrainingsPage() {
     () => [
       {
         accessorKey: 'title',
-        header: 'Program Pelatihan',
-        cell: ({ row }) => {
-          const item = row.original;
-          return (
-            <div className="flex max-w-[260px] flex-col gap-1 whitespace-normal">
-              <span className="line-clamp-2 font-medium text-foreground">{item.title}</span>
-              <Badge variant="secondary" className="w-fit text-xs font-normal">
-                {item.category}
-              </Badge>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'provider',
-        header: 'Penyelenggara',
+        header: 'Program',
         cell: ({ row }) => (
-          <span className="block max-w-[180px] line-clamp-2 text-xs font-medium text-foreground whitespace-normal">
-            {row.original.provider}
-          </span>
-        ),
-      },
-      {
-        accessorFn: (row) => Number(row.duration_hours || 0),
-        id: 'duration_hours',
-        header: 'Durasi',
-        cell: ({ row }) => (
-          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {Number(row.original.duration_hours || 0).toFixed(1)} jam
+          <span
+            className="block max-w-[260px] truncate text-sm font-medium text-foreground"
+            title={row.original.title}
+          >
+            {row.original.title}
           </span>
         ),
       },
       {
         accessorKey: 'start_date',
-        header: 'Jadwal',
-        cell: ({ row }) => {
-          const item = row.original;
-          return (
-            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {item.start_date ? String(item.start_date).slice(0, 10) : '-'}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                s.d. {item.end_date ? String(item.end_date).slice(0, 10) : '-'}
-              </span>
-            </div>
-          );
-        },
+        header: 'Mulai',
+        cell: ({ row }) => (
+          <span className="text-sm text-foreground whitespace-nowrap tabular-nums">
+            {formatDate(row.original.start_date)}
+          </span>
+        ),
       },
       {
         accessorFn: (row) => getScheduleMeta(row.start_date, row.end_date).label,
         id: 'schedule_status',
-        header: 'Status Jadwal',
+        header: 'Status',
         cell: ({ row }) => {
           const scheduleMeta = getScheduleMeta(row.original.start_date, row.original.end_date);
           return <StatusBadge tone={scheduleMeta.tone} label={scheduleMeta.label} />;
@@ -346,22 +337,13 @@ export default function TrainingsPage() {
         accessorFn: (row) => Number(row.participations_count || 0),
         id: 'participations_count',
         header: 'Peserta',
+        meta: { className: 'hidden sm:table-cell' },
         cell: ({ row }) => {
           const count = Number(row.original.participations_count || 0);
-          const inUse = count > 0;
           return (
-            <Badge
-              variant={inUse ? 'secondary' : 'outline'}
-              className="gap-1 text-xs font-medium whitespace-nowrap tabular-nums"
-              title={
-                inUse
-                  ? 'Tidak dapat dihapus karena masih memiliki data keikutsertaan pegawai'
-                  : 'Belum memiliki peserta terdaftar'
-              }
-            >
-              {inUse && <Lock className="size-3.5 text-muted-foreground" />}
+            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
               {count} peserta
-            </Badge>
+            </span>
           );
         },
       },
@@ -373,60 +355,33 @@ export default function TrainingsPage() {
           const item = row.original;
           const inUse = Number(item.participations_count || 0) > 0;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openDetailSheet(item);
-                }}
-                aria-label={`Lihat detail ${item.title}`}
-                title="Lihat Detail Pelatihan"
-                className="rounded-lg text-muted-foreground hover:text-primary"
-              >
-                <Eye className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditSheet(item);
-                }}
-                aria-label={`Ubah ${item.title}`}
-                title="Ubah Pelatihan"
-                className="rounded-lg text-muted-foreground hover:text-primary"
-              >
-                <Edit3 className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingTraining(item);
-                }}
-                aria-label={`Hapus ${item.title}`}
-                title={
-                  inUse
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${item.title}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditSheet(item),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: inUse
                     ? 'Masih memiliki peserta terdaftar (penghapusan ditolak sistem)'
-                    : 'Hapus Pelatihan'
-                }
-                className={
-                  inUse
-                    ? 'rounded-lg text-muted-foreground hover:text-amber-700'
-                    : 'rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                }
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+                    : 'Hapus Pelatihan',
+                  onSelect: () => setDeletingTraining(item),
+                },
+              ]}
+            />
           );
         },
       },
     ],
-    [openDetailSheet, openEditSheet]
+    [openEditSheet]
   );
 
   const selectedScheduleMeta = selectedTraining
@@ -434,16 +389,7 @@ export default function TrainingsPage() {
     : null;
 
   return (
-    <AppShell
-      title="Katalog Pelatihan"
-      breadcrumb="Kesejahteraan"
-      actions={
-        <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
-          <Plus data-icon="inline-start" className="size-4" />
-          Tambah Pelatihan
-        </Button>
-      }
-    >
+    <AppShell title="Katalog Pelatihan" breadcrumb="Kesejahteraan">
       <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
@@ -597,14 +543,9 @@ export default function TrainingsPage() {
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={loadAllData}
-              aria-label="Muat ulang data"
-              className="rounded-lg"
-            >
-              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
+            <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+              <Plus data-icon="inline-start" className="size-4" />
+              Tambah Pelatihan
             </Button>
           }
         />
@@ -627,6 +568,7 @@ export default function TrainingsPage() {
         footer={
           <>
             <Button
+              type="button"
               variant="outline"
               onClick={() => setDetailSheetOpen(false)}
               className="rounded-lg"
@@ -635,6 +577,7 @@ export default function TrainingsPage() {
             </Button>
             {selectedTraining && (
               <Button
+                type="button"
                 onClick={() => {
                   const target = selectedTraining;
                   setDetailSheetOpen(false);
@@ -681,23 +624,26 @@ export default function TrainingsPage() {
                   {Number(selectedTraining.duration_hours || 0).toFixed(1)} jam
                 </dd>
               </div>
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-xs text-muted-foreground">Tanggal Mulai</dt>
+              <div className="col-span-2 flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jadwal Pelaksanaan</dt>
                 <dd className="font-medium text-foreground tabular-nums">
-                  {selectedTraining.start_date
-                    ? String(selectedTraining.start_date).slice(0, 10)
-                    : '-'}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-xs text-muted-foreground">Tanggal Selesai</dt>
-                <dd className="font-medium text-foreground tabular-nums">
-                  {selectedTraining.end_date
-                    ? String(selectedTraining.end_date).slice(0, 10)
-                    : '-'}
+                  {formatDate(selectedTraining.start_date)} s.d.{' '}
+                  {formatDate(selectedTraining.end_date)}
                 </dd>
               </div>
             </dl>
+
+            {selectedTraining.description && (
+              <>
+                <Separator />
+                <div className="flex flex-col gap-1.5">
+                  <h5 className="text-xs font-semibold text-foreground">Deskripsi Program</h5>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {selectedTraining.description}
+                  </p>
+                </div>
+              </>
+            )}
 
             <Separator />
 
@@ -722,23 +668,30 @@ export default function TrainingsPage() {
                     };
                     const empName =
                       part.employee?.full_name || `Pegawai #${part.employee_id}`;
+                    const deptName = part.employee?.department?.name || '-';
                     return (
                       <li
                         key={part.id}
                         className="flex items-center justify-between gap-3 py-2.5 text-xs first:pt-0 last:pb-0"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <Avatar className="size-8 border border-border">
+                          <Avatar className="size-8 shrink-0 border border-border">
                             <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                               {getInitials(empName)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex min-w-0 flex-col">
-                            <span className="truncate font-medium text-foreground">
+                            <span
+                              className="truncate font-medium text-foreground"
+                              title={empName}
+                            >
                               {empName}
                             </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {part.employee?.department?.name || '-'}
+                            <span
+                              className="truncate text-xs text-muted-foreground"
+                              title={deptName}
+                            >
+                              {deptName}
                             </span>
                           </div>
                         </div>
@@ -905,14 +858,11 @@ export default function TrainingsPage() {
               <Label htmlFor="training-start-date" className="text-xs font-medium">
                 Tanggal Mulai
               </Label>
-              <Input
+              <DatePicker
                 id="training-start-date"
-                name="start_date"
-                type="date"
-                required
                 value={form.start_date}
-                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                className="rounded-lg tabular-nums"
+                onChange={(val) => setForm({ ...form, start_date: val })}
+                ariaLabel="Tanggal Mulai"
               />
             </div>
 
@@ -920,14 +870,11 @@ export default function TrainingsPage() {
               <Label htmlFor="training-end-date" className="text-xs font-medium">
                 Tanggal Selesai
               </Label>
-              <Input
+              <DatePicker
                 id="training-end-date"
-                name="end_date"
-                type="date"
-                required
                 value={form.end_date}
-                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                className="rounded-lg tabular-nums"
+                onChange={(val) => setForm({ ...form, end_date: val })}
+                ariaLabel="Tanggal Selesai"
               />
             </div>
           </div>
@@ -948,7 +895,7 @@ export default function TrainingsPage() {
               <span className="font-semibold text-foreground">{deletingTraining.title}</span> akan
               dihapus dari katalog.
               {Number(deletingTraining.participations_count || 0) > 0 && (
-                <span className="mt-2.5 block rounded-xl border border-amber-200/80 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800 tabular-nums">
+                <span className="mt-2.5 block rounded-xl border border-warning-border bg-warning-subtle px-3.5 py-2.5 text-xs text-warning tabular-nums">
                   Perhatian: Program ini masih memiliki {deletingTraining.participations_count}{' '}
                   peserta terdaftar. Penghapusan akan ditolak sistem untuk menjaga integritas data.
                 </span>

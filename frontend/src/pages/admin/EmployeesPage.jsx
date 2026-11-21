@@ -3,9 +3,7 @@ import {
   AlertCircle,
   Briefcase,
   Edit3,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   UserCheck,
@@ -15,11 +13,12 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, toApiDate, toISODateLocal } from '@/lib/format';
 import { getInitials, ROLE_LABELS } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { employeeService } from '@/services/employeeService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,8 +37,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ConfirmDialog,
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -55,7 +56,7 @@ function emptyEmployeeForm(departments, positions, employmentTypes) {
     department_id: departments[0]?.id ? String(departments[0].id) : '',
     position_id: positions[0]?.id ? String(positions[0].id) : '',
     employment_type_id: employmentTypes[0]?.id ? String(employmentTypes[0].id) : '',
-    join_date: new Date().toISOString().slice(0, 10),
+    join_date: toISODateLocal(),
     status: 'active',
   };
 }
@@ -66,6 +67,13 @@ function emptyTypeForm() {
     work_days_per_week: '5',
     normal_weekly_hours: '40',
   };
+}
+
+function getDailyOvertimeThreshold(typeItem) {
+  if (typeItem?.max_daily_hours !== undefined && typeItem?.max_daily_hours !== null) {
+    return Number(typeItem.max_daily_hours);
+  }
+  return Number(typeItem?.work_days_per_week) === 6 ? 7 : 8;
 }
 
 export default function EmployeesPage({ readOnly = false }) {
@@ -92,6 +100,10 @@ export default function EmployeesPage({ readOnly = false }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+
+  // Detail FormSheet State
+  const [detailEmployee, setDetailEmployee] = useState(null);
+  const [detailType, setDetailType] = useState(null);
 
   // Employee FormSheet State
   const [employeeSheetOpen, setEmployeeSheetOpen] = useState(false);
@@ -156,6 +168,8 @@ export default function EmployeesPage({ readOnly = false }) {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
     () => Boolean(search.trim() || statusFilter || departmentFilter || typeFilter),
     [search, statusFilter, departmentFilter, typeFilter]
@@ -168,7 +182,7 @@ export default function EmployeesPage({ readOnly = false }) {
     setTypeFilter('');
   };
 
-  // --- Employee CRUD Handlers ---
+  // Employee CRUD Handlers
   const openCreateEmployeeSheet = useCallback(() => {
     setEditingEmployee(null);
     setEmployeeForm(emptyEmployeeForm(departments, positions, employmentTypes));
@@ -187,7 +201,7 @@ export default function EmployeesPage({ readOnly = false }) {
       department_id: String(emp.department_id || ''),
       position_id: String(emp.position_id || ''),
       employment_type_id: String(emp.employment_type_id || ''),
-      join_date: emp.join_date ? String(emp.join_date).slice(0, 10) : '',
+      join_date: toApiDate(emp.join_date),
       status: emp.status || 'active',
     });
     setEmployeeFormError('');
@@ -207,6 +221,12 @@ export default function EmployeesPage({ readOnly = false }) {
       return;
     }
 
+    const joinDate = toApiDate(employeeForm.join_date);
+    if (!joinDate) {
+      setEmployeeFormError('Tanggal bergabung wajib dipilih.');
+      return;
+    }
+
     setEmployeeSubmitting(true);
 
     const payload = {
@@ -215,7 +235,7 @@ export default function EmployeesPage({ readOnly = false }) {
       department_id: Number(employeeForm.department_id),
       position_id: Number(employeeForm.position_id),
       employment_type_id: Number(employeeForm.employment_type_id),
-      join_date: employeeForm.join_date,
+      join_date: joinDate,
       status: employeeForm.status,
       role: employeeForm.role,
     };
@@ -250,9 +270,11 @@ export default function EmployeesPage({ readOnly = false }) {
     setDeleteEmployeeLoading(true);
 
     try {
-      const res = await employeeService.deleteEmployee(deletingEmployee.id);
+      const targetId = deletingEmployee.id;
+      const res = await employeeService.deleteEmployee(targetId);
       toast.success(res.message || 'Data pegawai berhasil dihapus.');
       setDeletingEmployee(null);
+      setDetailEmployee((prev) => (prev?.id === targetId ? null : prev));
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Gagal menghapus pegawai.').message);
@@ -262,7 +284,7 @@ export default function EmployeesPage({ readOnly = false }) {
     }
   };
 
-  // --- Employment Type CRUD Handlers ---
+  // Employment Type CRUD Handlers
   const openCreateTypeSheet = useCallback(() => {
     setEditingType(null);
     setTypeForm(emptyTypeForm());
@@ -314,9 +336,11 @@ export default function EmployeesPage({ readOnly = false }) {
     setDeleteTypeLoading(true);
 
     try {
-      const res = await employeeService.deleteEmploymentType(deletingType.id);
+      const targetId = deletingType.id;
+      const res = await employeeService.deleteEmploymentType(targetId);
       toast.success(res.message || 'Jenis kepegawaian berhasil dihapus.');
       setDeletingType(null);
+      setDetailType((prev) => (prev?.id === targetId ? null : prev));
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Jenis kepegawaian tidak dapat dihapus.').message);
@@ -326,7 +350,7 @@ export default function EmployeesPage({ readOnly = false }) {
     }
   };
 
-  // --- DataTable Columns: Employees ---
+  // DataTable Columns: Employees
   const employeeColumns = useMemo(() => {
     const baseColumns = [
       {
@@ -335,27 +359,19 @@ export default function EmployeesPage({ readOnly = false }) {
         header: 'Pegawai',
         cell: ({ row }) => {
           const emp = row.original;
-          const role = emp.user_account?.role;
           return (
             <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
+              <Avatar className="size-8 shrink-0 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name, emp.user_account?.email)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 max-w-[230px] flex-col">
-                <span className="truncate text-xs font-medium text-foreground">
-                  {emp.full_name}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {emp.user_account?.email || 'Tanpa akun login'}
-                  {role && (
-                    <span className="ml-1 font-medium text-primary">
-                      ({ROLE_LABELS[role] || role})
-                    </span>
-                  )}
-                </span>
-              </div>
+              <span
+                className="max-w-[200px] truncate text-sm font-medium text-foreground"
+                title={emp.full_name}
+              >
+                {emp.full_name}
+              </span>
             </div>
           );
         },
@@ -364,55 +380,27 @@ export default function EmployeesPage({ readOnly = false }) {
         accessorKey: 'employee_code',
         header: 'Kode',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+          <span className="font-mono text-xs font-normal text-foreground whitespace-nowrap tabular-nums">
             {row.original.employee_code}
           </span>
         ),
       },
       {
-        accessorFn: (row) => `${row.position?.title || ''} ${row.department?.name || ''}`,
-        id: 'department_position',
-        header: 'Departemen & Jabatan',
+        accessorFn: (row) => row.department?.name || '',
+        id: 'department',
+        header: 'Departemen',
+        meta: { className: 'hidden md:table-cell' },
         cell: ({ row }) => {
-          const emp = row.original;
+          const deptName = row.original.department?.name || '-';
           return (
-            <div className="flex max-w-[210px] flex-col gap-0.5 whitespace-normal">
-              <span className="line-clamp-1 text-xs font-medium text-foreground">
-                {emp.position?.title || '-'}
-              </span>
-              <span className="line-clamp-1 text-xs text-muted-foreground">
-                {emp.department?.name || '-'}
-              </span>
-            </div>
+            <span
+              className="block max-w-[200px] truncate text-sm text-muted-foreground"
+              title={deptName}
+            >
+              {deptName}
+            </span>
           );
         },
-      },
-      {
-        accessorFn: (row) => row.employment_type?.name || '',
-        id: 'employment_type',
-        header: 'Jenis Kepegawaian',
-        cell: ({ row }) => {
-          const empType = row.original.employment_type;
-          return (
-            <div className="flex flex-col gap-0.5 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground">{empType?.name || '-'}</span>
-              {empType && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {empType.work_days_per_week} hr · {empType.normal_weekly_hours}j/mg
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'join_date',
-        header: 'Tgl Bergabung',
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {row.original.join_date ? String(row.original.join_date).slice(0, 10) : '-'}
-          </span>
-        ),
       },
       {
         accessorKey: 'status',
@@ -431,34 +419,25 @@ export default function EmployeesPage({ readOnly = false }) {
         cell: ({ row }) => {
           const emp = row.original;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditEmployeeSheet(emp);
-                }}
-                aria-label={`Ubah ${emp.full_name}`}
-                title="Ubah Pegawai"
-                className="rounded-lg text-muted-foreground hover:text-primary"
-              >
-                <Edit3 className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingEmployee(emp);
-                }}
-                aria-label={`Hapus ${emp.full_name}`}
-                title="Hapus Pegawai"
-                className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${emp.full_name}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditEmployeeSheet(emp),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  onSelect: () => setDeletingEmployee(emp),
+                },
+              ]}
+            />
           );
         },
       });
@@ -467,67 +446,50 @@ export default function EmployeesPage({ readOnly = false }) {
     return baseColumns;
   }, [readOnly, openEditEmployeeSheet]);
 
-  // --- DataTable Columns: Employment Types ---
+  // DataTable Columns: Employment Types
   const typeColumns = useMemo(() => {
     const baseColumns = [
       {
         accessorKey: 'name',
-        header: 'Nama Jenis Kepegawaian',
+        header: 'Nama',
         cell: ({ row }) => (
-          <span className="font-medium text-foreground">{row.original.name}</span>
+          <span
+            className="block max-w-[220px] truncate text-sm font-medium text-foreground"
+            title={row.original.name}
+          >
+            {row.original.name}
+          </span>
         ),
       },
       {
         accessorKey: 'work_days_per_week',
-        header: 'Hari Kerja / Minggu',
+        header: 'Hari/Minggu',
         cell: ({ row }) => (
-          <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
+          <span className="text-sm text-foreground whitespace-nowrap tabular-nums">
             {row.original.work_days_per_week} hari/minggu
           </span>
         ),
       },
       {
-        accessorFn: (row) => (Number(row.work_days_per_week) === 6 ? 7 : 8),
-        id: 'daily_overtime_limit',
-        header: 'Ambang Lembur Harian',
-        cell: ({ row }) => {
-          const dailyLimit = Number(row.original.work_days_per_week) === 6 ? 7 : 8;
-          return (
-            <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-              &gt; {dailyLimit} jam/hari (PP 35/2021)
-            </span>
-          );
-        },
-      },
-      {
         accessorKey: 'normal_weekly_hours',
-        header: 'Jam Normal / Minggu',
+        header: 'Jam Normal',
+        meta: { className: 'hidden sm:table-cell' },
         cell: ({ row }) => (
-          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {row.original.normal_weekly_hours} jam
+          <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.normal_weekly_hours} jam/minggu
           </span>
         ),
       },
       {
         accessorFn: (row) => Number(row.employees_count || 0),
         id: 'employees_count',
-        header: 'Pegawai Terkait',
+        header: 'Pegawai',
         cell: ({ row }) => {
           const count = Number(row.original.employees_count || 0);
-          const inUse = count > 0;
           return (
-            <Badge
-              variant={inUse ? 'secondary' : 'outline'}
-              className="gap-1 text-xs font-medium whitespace-nowrap tabular-nums"
-              title={
-                inUse
-                  ? 'Tidak dapat dihapus karena masih direferensikan oleh data pegawai aktif'
-                  : 'Belum digunakan oleh pegawai'
-              }
-            >
-              {inUse && <Lock className="size-3.5 text-muted-foreground" />}
+            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
               {count} pegawai
-            </Badge>
+            </span>
           );
         },
       },
@@ -542,42 +504,28 @@ export default function EmployeesPage({ readOnly = false }) {
           const typeItem = row.original;
           const inUse = Number(typeItem.employees_count || 0) > 0;
           return (
-            <div className="-mr-1.5 flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditTypeSheet(typeItem);
-                }}
-                aria-label={`Ubah ${typeItem.name}`}
-                title="Ubah Jenis Kepegawaian"
-                className="rounded-lg text-muted-foreground hover:text-primary"
-              >
-                <Edit3 className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingType(typeItem);
-                }}
-                aria-label={`Hapus ${typeItem.name}`}
-                title={
-                  inUse
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${typeItem.name}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditTypeSheet(typeItem),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: inUse
                     ? 'Masih digunakan oleh pegawai (penghapusan ditolak sistem)'
-                    : 'Hapus Jenis Kepegawaian'
-                }
-                className={
-                  inUse
-                    ? 'rounded-lg text-muted-foreground hover:text-amber-700'
-                    : 'rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                }
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+                    : 'Hapus Jenis Kepegawaian',
+                  onSelect: () => setDeletingType(typeItem),
+                },
+              ]}
+            />
           );
         },
       });
@@ -593,24 +541,6 @@ export default function EmployeesPage({ readOnly = false }) {
     <AppShell
       title={readOnly ? 'Direktori Pegawai' : 'Pegawai'}
       breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
-      actions={
-        readOnly ? (
-          <Badge variant="outline" className="gap-1.5 text-xs font-normal text-muted-foreground">
-            <Lock className="size-3.5" />
-            Mode Baca Saja
-          </Badge>
-        ) : activeTab === 'employees' ? (
-          <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
-            <Plus data-icon="inline-start" className="size-4" />
-            Tambah Pegawai
-          </Button>
-        ) : (
-          <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
-            <Plus data-icon="inline-start" className="size-4" />
-            Tambah Jenis Kepegawaian
-          </Button>
-        )
-      }
     >
       <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Summary Cards */}
@@ -686,6 +616,7 @@ export default function EmployeesPage({ readOnly = false }) {
               onSearchChange={setSearch}
               searchPlaceholder="Cari nama, kode, atau email..."
               pageSize={10}
+              onRowClick={(emp) => setDetailEmployee(emp)}
               emptyTitle={
                 hasActiveFilters
                   ? 'Tidak ada pegawai yang sesuai filter'
@@ -815,15 +746,12 @@ export default function EmployeesPage({ readOnly = false }) {
                 </div>
               }
               actionsSlot={
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={loadAllData}
-                  aria-label="Muat ulang data"
-                  className="rounded-lg"
-                >
-                  <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-                </Button>
+                !readOnly ? (
+                  <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
+                    <Plus data-icon="inline-start" className="size-4" />
+                    Tambah Pegawai
+                  </Button>
+                ) : undefined
               }
             />
           </TabsContent>
@@ -841,6 +769,7 @@ export default function EmployeesPage({ readOnly = false }) {
               searchable
               searchPlaceholder="Cari jenis kepegawaian..."
               pageSize={10}
+              onRowClick={(typeItem) => setDetailType(typeItem)}
               emptyTitle="Belum ada jenis kepegawaian"
               emptyDescription="Tambahkan kategori hubungan kerja untuk menetapkan standar hari dan jam kerja normal."
               emptyAction={
@@ -852,20 +781,218 @@ export default function EmployeesPage({ readOnly = false }) {
                 ) : undefined
               }
               actionsSlot={
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={loadAllData}
-                  aria-label="Muat ulang data"
-                  className="rounded-lg"
-                >
-                  <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-                </Button>
+                !readOnly ? (
+                  <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
+                    <Plus data-icon="inline-start" className="size-4" />
+                    Tambah Jenis Kepegawaian
+                  </Button>
+                ) : undefined
               }
             />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* FormSheet: Employee Detail */}
+      <FormSheet
+        open={Boolean(detailEmployee)}
+        onOpenChange={(open) => {
+          if (!open) setDetailEmployee(null);
+        }}
+        title="Detail Pegawai"
+        description={
+          detailEmployee ? `Profil kepegawaian dan informasi akun ${detailEmployee.full_name}.` : undefined
+        }
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailEmployee(null)}
+              className="rounded-lg"
+            >
+              Tutup
+            </Button>
+            {!readOnly && detailEmployee && (
+              <Button
+                type="button"
+                onClick={() => {
+                  const target = detailEmployee;
+                  setDetailEmployee(null);
+                  openEditEmployeeSheet(target);
+                }}
+                className="rounded-lg"
+              >
+                <Edit3 data-icon="inline-start" className="size-4" />
+                Ubah Pegawai
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailEmployee && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-3.5">
+              <Avatar className="size-11 shrink-0 border border-border">
+                <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
+                  {getInitials(detailEmployee.full_name, detailEmployee.user_account?.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="truncate text-base font-semibold tracking-[-0.01em] text-foreground">
+                    {detailEmployee.full_name}
+                  </h4>
+                  <StatusBadge
+                    status={detailEmployee.status === 'active' ? 'active' : 'inactive'}
+                  />
+                </div>
+                <span className="font-mono text-xs font-normal text-muted-foreground tabular-nums">
+                  {detailEmployee.employee_code}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Departemen</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.department?.name || '-'}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jabatan / Posisi</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.position?.title || '-'}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jenis Kepegawaian</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.employment_type?.name || '-'}
+                  {detailEmployee.employment_type && (
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground tabular-nums">
+                      {detailEmployee.employment_type.work_days_per_week} hari/minggu ·{' '}
+                      {detailEmployee.employment_type.normal_weekly_hours} jam/minggu
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Tanggal Bergabung</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {formatDate(detailEmployee.join_date)}
+                </dd>
+              </div>
+            </dl>
+
+            <Separator />
+
+            <div className="flex flex-col gap-3">
+              <h5 className="text-xs font-semibold text-foreground">Akun &amp; Akses</h5>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-xs text-muted-foreground">Email Akun</dt>
+                  <dd className="break-all font-medium text-foreground">
+                    {detailEmployee.user_account?.email || 'Tanpa akun login'}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-xs text-muted-foreground">Status Akun / Peran</dt>
+                  <dd className="font-medium text-foreground">
+                    {detailEmployee.user_account?.role
+                      ? ROLE_LABELS[detailEmployee.user_account.role] ||
+                        detailEmployee.user_account.role
+                      : 'Belum memiliki akun'}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        )}
+      </FormSheet>
+
+      {/* FormSheet: Employment Type Detail */}
+      <FormSheet
+        open={Boolean(detailType)}
+        onOpenChange={(open) => {
+          if (!open) setDetailType(null);
+        }}
+        title="Detail Jenis Kepegawaian"
+        description="Standar hari kerja dan ambang lembur harian sesuai PP No. 35/2021."
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailType(null)}
+              className="rounded-lg"
+            >
+              Tutup
+            </Button>
+            {!readOnly && detailType && (
+              <Button
+                type="button"
+                onClick={() => {
+                  const target = detailType;
+                  setDetailType(null);
+                  openEditTypeSheet(target);
+                }}
+                className="rounded-lg"
+              >
+                <Edit3 data-icon="inline-start" className="size-4" />
+                Ubah Kategori
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailType && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1.5">
+              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+                {detailType.name}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Acuan standar waktu kerja untuk perhitungan kapasitas dan lembur pegawai.
+              </p>
+            </div>
+
+            <Separator />
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Hari Kerja / Minggu</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {detailType.work_days_per_week} hari/minggu
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Ambang Lembur Harian</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  &gt; {getDailyOvertimeThreshold(detailType)} jam/hari
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jam Normal / Minggu</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {detailType.normal_weekly_hours} jam/minggu
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Pegawai Terkait</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {Number(detailType.employees_count || 0)} pegawai
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </FormSheet>
 
       {/* FormSheet: Create / Edit Employee */}
       <FormSheet
@@ -1044,16 +1171,13 @@ export default function EmployeesPage({ readOnly = false }) {
                 <Label htmlFor="emp-join-date" className="text-xs font-medium">
                   Tanggal Bergabung
                 </Label>
-                <Input
+                <DatePicker
                   id="emp-join-date"
-                  name="join_date"
-                  type="date"
-                  required
                   value={employeeForm.join_date}
-                  onChange={(e) =>
-                    setEmployeeForm({ ...employeeForm, join_date: e.target.value })
+                  onChange={(val) =>
+                    setEmployeeForm({ ...employeeForm, join_date: val })
                   }
-                  className="rounded-lg tabular-nums"
+                  ariaLabel="Tanggal Bergabung"
                 />
               </div>
             </div>
@@ -1160,8 +1284,10 @@ export default function EmployeesPage({ readOnly = false }) {
             <>
               Data pegawai{' '}
               <span className="font-semibold text-foreground">{deletingEmployee.full_name}</span> (
-              <span className="font-medium tabular-nums">{deletingEmployee.employee_code}</span>)
-              beserta akun login terkait akan dihapus secara permanen.
+              <span className="font-mono font-normal tabular-nums">
+                {deletingEmployee.employee_code}
+              </span>
+              ) beserta akun login terkait akan dihapus secara permanen.
             </>
           ) : undefined
         }
@@ -1294,7 +1420,7 @@ export default function EmployeesPage({ readOnly = false }) {
               Anda akan menghapus kategori{' '}
               <span className="font-semibold text-foreground">{deletingType.name}</span>.
               {Number(deletingType.employees_count || 0) > 0 && (
-                <span className="mt-2.5 block rounded-xl border border-amber-200/80 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800 tabular-nums">
+                <span className="mt-2.5 block rounded-xl border border-warning-border bg-warning-subtle px-3.5 py-2.5 text-xs text-warning tabular-nums">
                   Perhatian: Jenis kepegawaian ini masih digunakan oleh{' '}
                   {deletingType.employees_count} pegawai. Sistem akan menolak penghapusan untuk
                   menjaga integritas data.

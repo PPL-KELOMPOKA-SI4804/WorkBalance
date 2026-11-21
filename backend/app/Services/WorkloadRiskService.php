@@ -666,25 +666,25 @@ class WorkloadRiskService
         int $overdueCount
     ): string {
         if ($isOverridden) {
-            return 'Beban Tinggi (Override PP No. 35/2021) — Disarankan redistribusi tugas segera dan pemulihan waktu istirahat.';
+            return 'Beban Tinggi (Override PP No. 35/2021). Disarankan redistribusi tugas segera dan pemulihan waktu istirahat.';
         }
 
         if ($riskCategory === 'high') {
-            return 'Beban Tinggi — Perlu Redistribusi Tugas atau penjadwalan ulang tenggat prioritas bersama manajer.';
+            return 'Beban Tinggi. Perlu redistribusi tugas atau penjadwalan ulang tenggat prioritas bersama manajer.';
         }
 
         if ($riskCategory === 'medium') {
             if ($overdueCount > 0) {
-                return 'Perlu Perhatian — Terdapat penugasan melewati tenggat waktu; tinjau kapasitas dan prioritas mingguan.';
+                return 'Perlu Perhatian. Terdapat penugasan melewati tenggat waktu; tinjau kapasitas dan prioritas mingguan.';
             }
             if ($taskLoadScore >= 50.0 || $deadlinePressureScore >= 75.0) {
-                return 'Perlu Perhatian — Estimasi jam tugas dan tenggat cukup padat; hindari penambahan tugas baru sementara.';
+                return 'Perlu Perhatian. Estimasi jam tugas dan tenggat cukup padat; hindari penambahan tugas baru sementara.';
             }
 
-            return 'Perlu Perhatian — Indikator beban kerja berada pada kategori sedang; lakukan pemantauan berkala.';
+            return 'Perlu Perhatian. Indikator beban kerja berada pada kategori sedang; lakukan pemantauan berkala.';
         }
 
-        return 'Beban Seimbang — Proporsi jam kerja, kapasitas cuti, dan tenggat tugas berada dalam ambang sehat.';
+        return 'Beban Seimbang. Proporsi jam kerja, kapasitas cuti, dan tenggat tugas berada dalam ambang sehat.';
     }
 
     /**
