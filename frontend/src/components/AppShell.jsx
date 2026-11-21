@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   getInitials,
   getNavGroupsForRole,
@@ -43,7 +44,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CommandMenu } from '@/components/workbalance';
+import { BrandLogo, CommandMenu, ThemeSwitch } from '@/components/workbalance';
 
 const SIDEBAR_STORAGE_KEY = 'wb_sidebar_collapsed';
 
@@ -103,7 +104,7 @@ function SidebarNav({ groups, pathname, collapsed, onNavigate, layoutScope = 'de
                     )}
                   />
                   {!collapsed && (
-                    <span className="relative z-10 truncate leading-none">
+                    <span className="relative z-10 truncate leading-5">
                       {item.label}
                     </span>
                   )}
@@ -171,6 +172,8 @@ export default function AppShell({
   const location = useLocation();
   const navigate = useNavigate();
 
+  useDocumentTitle(title);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readInitialCollapsed);
@@ -234,19 +237,7 @@ export default function AppShell({
             className="flex items-center focus-visible:outline-none"
             aria-label="Beranda WorkBalance"
           >
-            {collapsed ? (
-              <img
-                src="/assets/workbalance_logo.svg"
-                alt="WorkBalance"
-                className="size-7 object-contain"
-              />
-            ) : (
-              <img
-                src="/assets/workbalance_horizontal_logo.svg"
-                alt="WorkBalance"
-                className="-ml-1 h-8 w-auto object-contain"
-              />
-            )}
+            <BrandLogo variant={collapsed ? 'mark' : 'horizontal'} />
           </Link>
         </div>
 
@@ -267,11 +258,7 @@ export default function AppShell({
           className="flex w-72 flex-col gap-0 bg-sidebar p-0"
         >
           <SheetHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 py-0">
-            <img
-              src="/assets/workbalance_horizontal_logo.svg"
-              alt="WorkBalance"
-              className="-ml-1 h-8 w-auto object-contain"
-            />
+            <BrandLogo variant="horizontal" />
             <SheetTitle className="sr-only">Navigasi WorkBalance</SheetTitle>
             <SheetDescription className="sr-only">
               Menu navigasi utama berdasarkan peran pengguna.
@@ -388,12 +375,14 @@ export default function AppShell({
             >
               <Search className="size-3.5" />
               <span className="hidden xl:inline">Cari modul...</span>
-              <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-none font-medium text-foreground">
+              <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs leading-none font-normal text-foreground">
                 Ctrl K
               </kbd>
             </Button>
 
             {actions}
+
+            <ThemeSwitch />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

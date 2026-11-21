@@ -1,8 +1,7 @@
-
 <svg xmlns="http://www.w3.org/2000/svg"
-     width="800"
+     width="920"
      height="220"
-     viewBox="0 0 800 220">
+     viewBox="0 0 920 220">
 
   <!-- BRAND SYMBOL -->
   <g transform="translate(15, 0) scale(0.82)">
@@ -28,21 +27,21 @@
 
   </g>
 
-  <!-- WORDMARK -->
-  <text x="245" y="112"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="68"
+  <!-- WORDMARK (Enlarged to balance brand symbol) -->
+  <text x="234" y="130"
+        font-family="'Plus Jakarta Sans', Arial, Helvetica, sans-serif"
+        font-size="104"
         font-weight="700"
-        letter-spacing="-3">
+        letter-spacing="-3.5">
 
     <tspan fill="#1E293B">Work</tspan><tspan fill="#0284C7">Balance</tspan>
 
   </text>
 
   <!-- TAGLINE -->
-  <text x="250" y="157"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="22"
+  <text x="240" y="176"
+        font-family="'Plus Jakarta Sans', Arial, Helvetica, sans-serif"
+        font-size="24"
         font-weight="500"
         letter-spacing="4"
         fill="#334155">

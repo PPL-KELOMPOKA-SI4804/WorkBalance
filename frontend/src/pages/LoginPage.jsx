@@ -15,13 +15,14 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getDefaultRouteForRole, useAuth } from '@/context/AuthContext';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { extractApiError } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
-import { StatusBadge } from '@/components/workbalance';
+import { BrandLogo, StatusBadge, ThemeSwitch } from '@/components/workbalance';
 
 const DEMO_ACCOUNTS = [
   {
@@ -70,6 +71,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const prefersReducedMotion = useReducedMotion();
 
+  useDocumentTitle('Masuk');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -110,15 +113,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-12">
+    <div className="relative grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-12">
+      <div className="absolute top-4 right-4 z-20 sm:top-6 sm:right-6">
+        <ThemeSwitch />
+      </div>
+
       {/* Left Architectural Context Panel */}
       <aside className="hidden flex-col justify-between border-r border-border bg-sidebar p-10 lg:col-span-6 lg:flex xl:col-span-7 xl:p-14">
         <div>
-          <img
-            src="/assets/workbalance_horizontal_logo.svg"
-            alt="WorkBalance"
-            className="-ml-1 h-9 w-auto object-contain"
-          />
+          <BrandLogo variant="lockup" />
         </div>
 
         <div className="my-auto flex max-w-xl flex-col gap-8 py-8">
@@ -168,11 +171,9 @@ export default function LoginPage() {
       <main className="flex flex-col items-center justify-center px-6 py-12 sm:px-10 lg:col-span-6 xl:col-span-5">
         <div className="flex w-full max-w-[380px] flex-col gap-7">
           <div className="flex flex-col gap-1.5">
-            <img
-              src="/assets/workbalance_horizontal_logo.svg"
-              alt="WorkBalance"
-              className="-ml-1 mb-3 h-8 w-auto self-start object-contain lg:hidden"
-            />
+            <div className="mb-3 self-start lg:hidden">
+              <BrandLogo variant="horizontal" />
+            </div>
             <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground text-balance">
               Masuk ke ruang kerja
             </h1>

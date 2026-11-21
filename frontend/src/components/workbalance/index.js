@@ -1,4 +1,6 @@
 export { AnimatedNumber } from './AnimatedNumber';
+export { BrandLogo } from './BrandLogo';
+export { ThemeSwitch } from './ThemeSwitch';
 export { PageHeader } from './PageHeader';
 export { KpiStatCard } from './KpiStatCard';
 export { StatusBadge } from './StatusBadge';
