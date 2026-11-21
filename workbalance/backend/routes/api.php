@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrainingController;
 use App\Http\Controllers\Api\V1\TrainingParticipationController;
 use App\Http\Controllers\Api\V1\WorkLogController;
+use App\Http\Controllers\Api\V1\WorkloadRiskController;
 use App\Http\Controllers\Api\V1\WorkplaceIssueController;
 use Illuminate\Support\Facades\Route;
 
@@ -124,6 +125,16 @@ Route::prefix('v1')->group(function () {
         // Manager Team Condition, Workload & Issues Dashboard Summary (PBI-10: FR-19)
         Route::middleware(['survey.privacy', 'role:admin,manager'])->group(function () {
             Route::get('/dashboard/manager', [ManagerDashboardController::class, 'index']);
+        });
+
+        // Workload Risk Analysis & Recalculation (PBI-11: FR-17)
+        Route::middleware('role:admin,manager,employee')->group(function () {
+            Route::get('/analytics/workload-risk', [WorkloadRiskController::class, 'index']);
+            Route::get('/analytics/workload-risk/{workloadRisk}', [WorkloadRiskController::class, 'show']);
+        });
+
+        Route::middleware('role:admin,manager')->group(function () {
+            Route::post('/analytics/workload-risk', [WorkloadRiskController::class, 'calculate']);
         });
     });
 });
