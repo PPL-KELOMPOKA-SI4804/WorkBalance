@@ -9,38 +9,64 @@ import {
   MessageSquareWarning,
   Plus,
   RefreshCw,
-  Search,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   Wrench,
-  X,
 } from 'lucide-react';
-import AppShell from '../../components/AppShell';
-import { useAuth } from '../../context/AuthContext';
-import { extractApiError } from '../../services/api';
-import { workplaceIssueService } from '../../services/workplaceIssueService';
+import { toast } from 'sonner';
+import AppShell from '@/components/AppShell';
+import { useAuth } from '@/context/AuthContext';
+import { getInitials } from '@/lib/navigation';
+import { extractApiError } from '@/services/api';
+import { workplaceIssueService } from '@/services/workplaceIssueService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ConfirmDialog,
+  DataTable,
+  FormSheet,
+  KpiStatCard,
+  StatusBadge,
+} from '@/components/workbalance';
 
-const STATUS_PILLS = [
-  { value: '', label: 'Semua' },
-  { value: 'open', label: 'Menunggu' },
-  { value: 'in_progress', label: 'Ditangani' },
-  { value: 'resolved', label: 'Selesai' },
-];
+const ALL_VALUE = '__all__';
+const AUTO_DEPARTMENT_VALUE = '__auto__';
 
-const ISSUE_STATUS_STYLES = {
+const ISSUE_STATUS_META = {
   open: {
+    status: 'open',
     label: 'Menunggu',
-    badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
     detailText: 'Menunggu peninjauan oleh manajer atau HR',
   },
   in_progress: {
+    status: 'in_progress',
     label: 'Ditangani',
-    badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
     detailText: 'Sedang dalam proses tindak lanjut tim terkait',
   },
   resolved: {
+    status: 'resolved',
     label: 'Selesai',
-    badgeClass: 'bg-[#D1FAE5] text-[#047857]',
     detailText: 'Permasalahan telah ditindaklanjuti dan selesai',
   },
 };
@@ -53,6 +79,10 @@ const PRESET_CATEGORIES = [
   'Kenyamanan & K3',
   'Lainnya',
 ];
+
+function getIssueStatusMeta(status) {
+  return ISSUE_STATUS_META[status] || ISSUE_STATUS_META.open;
+}
 
 function formatDateTime(isoString) {
   if (!isoString) return '-';
@@ -99,42 +129,35 @@ export default function WorkplaceIssuesPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
 
-  // Toast feedback
-  const [toast, setToast] = useState(null);
-
-  // Detail Modal
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  // Detail Sheet
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [detailIssue, setDetailIssue] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Create / Edit Issue Modal
-  const [formModalOpen, setFormModalOpen] = useState(false);
+  // Create / Edit Issue Sheet
+  const [formSheetOpen, setFormSheetOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState(null);
   const [issueForm, setIssueForm] = useState(() => emptyIssueForm(defaultDepartmentId));
   const [formError, setFormError] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Follow-up Modal (Manager & Admin)
-  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  // Follow-up Sheet (Manager & Admin)
+  const [followUpSheetOpen, setFollowUpSheetOpen] = useState(false);
   const [followUpIssue, setFollowUpIssue] = useState(null);
-  const [followUpForm, setFollowUpForm] = useState({ status: 'in_progress', resolution_notes: '' });
+  const [followUpForm, setFollowUpForm] = useState({
+    status: 'in_progress',
+    resolution_notes: '',
+  });
   const [followUpError, setFollowUpError] = useState('');
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
 
-  // Delete Modal
+  // Delete Dialog
   const [deletingIssue, setDeletingIssue] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message });
-    setTimeout(() => {
-      setToast((current) => (current?.message === message ? null : current));
-    }, 4500);
-  }, []);
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -143,7 +166,7 @@ export default function WorkplaceIssuesPage() {
     try {
       const data = await workplaceIssueService.getIssues({
         search: search.trim(),
-        status: statusFilter,
+        status: statusFilter === 'all' ? '' : statusFilter,
         category: categoryFilter,
         department_id: departmentFilter,
       });
@@ -161,7 +184,9 @@ export default function WorkplaceIssuesPage() {
         }
       );
     } catch (err) {
-      setErrorMsg(extractApiError(err, 'Gagal memuat daftar laporan permasalahan kerja.').message);
+      setErrorMsg(
+        extractApiError(err, 'Gagal memuat daftar laporan permasalahan kerja.').message
+      );
     } finally {
       setLoading(false);
     }
@@ -176,43 +201,54 @@ export default function WorkplaceIssuesPage() {
     [apiCategories]
   );
 
+  const formCategoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...PRESET_CATEGORIES, ...(issueForm.category ? [issueForm.category] : [])])
+      ),
+    [issueForm.category]
+  );
+
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || statusFilter || categoryFilter || departmentFilter),
+    () =>
+      Boolean(
+        search.trim() || statusFilter !== 'all' || categoryFilter || departmentFilter
+      ),
     [search, statusFilter, categoryFilter, departmentFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('');
+    setStatusFilter('all');
     setCategoryFilter('');
     setDepartmentFilter('');
   };
 
   // --- Detail Handler ---
-  const openDetailModal = async (issue) => {
+  const openDetailSheet = useCallback(async (issue) => {
     setDetailIssue(issue);
-    setDetailModalOpen(true);
+    setDetailSheetOpen(true);
     setDetailLoading(true);
     try {
       const fresh = await workplaceIssueService.getIssue(issue.id);
       setDetailIssue(fresh);
     } catch {
-      // Fall back silently to list row snapshot if detail refresh fails
+      // Keep list row snapshot if detail refresh fails
     } finally {
       setDetailLoading(false);
     }
-  };
+  }, []);
 
   // --- Create / Edit Issue Handlers ---
-  const openCreateModal = () => {
+  const openCreateSheet = useCallback(() => {
     setEditingIssue(null);
     const initialDept = defaultDepartmentId || departments[0]?.id || '';
     setIssueForm(emptyIssueForm(initialDept));
     setFormError('');
-    setFormModalOpen(true);
-  };
+    setFormSheetOpen(true);
+  }, [defaultDepartmentId, departments]);
 
-  const openEditModal = (issue) => {
+  const openEditSheet = useCallback((issue) => {
     setEditingIssue(issue);
     setIssueForm({
       category: issue.category || PRESET_CATEGORIES[0],
@@ -220,8 +256,8 @@ export default function WorkplaceIssuesPage() {
       description: issue.description || '',
     });
     setFormError('');
-    setFormModalOpen(true);
-  };
+    setFormSheetOpen(true);
+  }, []);
 
   const handleIssueSubmit = async (e) => {
     e.preventDefault();
@@ -233,7 +269,9 @@ export default function WorkplaceIssuesPage() {
       return;
     }
     if (trimmedDesc.length < 10) {
-      setFormError('Deskripsi permasalahan minimal 10 karakter agar mudah ditindaklanjuti.');
+      setFormError(
+        'Deskripsi permasalahan minimal 10 karakter agar mudah ditindaklanjuti.'
+      );
       return;
     }
 
@@ -247,30 +285,32 @@ export default function WorkplaceIssuesPage() {
     try {
       if (editingIssue) {
         const res = await workplaceIssueService.updateIssue(editingIssue.id, payload);
-        showToast('success', res.message || 'Laporan permasalahan kerja berhasil diperbarui.');
+        toast.success(res.message || 'Laporan permasalahan kerja berhasil diperbarui.');
       } else {
         const res = await workplaceIssueService.createIssue(payload);
-        showToast('success', res.message || 'Laporan permasalahan kerja berhasil dikirim.');
+        toast.success(res.message || 'Laporan permasalahan kerja berhasil dikirim.');
       }
-      setFormModalOpen(false);
+      setFormSheetOpen(false);
       await loadAllData();
     } catch (err) {
-      setFormError(extractApiError(err, 'Gagal menyimpan laporan permasalahan kerja.').message);
+      setFormError(
+        extractApiError(err, 'Gagal menyimpan laporan permasalahan kerja.').message
+      );
     } finally {
       setFormSubmitting(false);
     }
   };
 
   // --- Follow-up Handlers (Manager & Admin) ---
-  const openFollowUpModal = (issue) => {
+  const openFollowUpSheet = useCallback((issue) => {
     setFollowUpIssue(issue);
     setFollowUpForm({
       status: issue.status || 'open',
       resolution_notes: issue.resolution_notes || '',
     });
     setFollowUpError('');
-    setFollowUpModalOpen(true);
-  };
+    setFollowUpSheetOpen(true);
+  }, []);
 
   const handleFollowUpSubmit = async (e) => {
     e.preventDefault();
@@ -280,7 +320,9 @@ export default function WorkplaceIssuesPage() {
     const trimmedNotes = followUpForm.resolution_notes.trim();
 
     if (followUpForm.status === 'resolved' && trimmedNotes.length < 5) {
-      setFollowUpError('Mohon isi catatan penyelesaian minimal 5 karakter sebelum menandai laporan selesai.');
+      setFollowUpError(
+        'Mohon isi catatan penyelesaian minimal 5 karakter sebelum menandai laporan selesai.'
+      );
       return;
     }
 
@@ -290,11 +332,13 @@ export default function WorkplaceIssuesPage() {
         status: followUpForm.status,
         resolution_notes: trimmedNotes || null,
       });
-      showToast('success', res.message || 'Status tindak lanjut laporan berhasil diperbarui.');
-      setFollowUpModalOpen(false);
+      toast.success(res.message || 'Status tindak lanjut laporan berhasil diperbarui.');
+      setFollowUpSheetOpen(false);
       await loadAllData();
     } catch (err) {
-      setFollowUpError(extractApiError(err, 'Gagal memperbarui status penanganan laporan.').message);
+      setFollowUpError(
+        extractApiError(err, 'Gagal memperbarui status penanganan laporan.').message
+      );
     } finally {
       setFollowUpSubmitting(false);
     }
@@ -306,835 +350,847 @@ export default function WorkplaceIssuesPage() {
     setDeleteLoading(true);
     try {
       const res = await workplaceIssueService.deleteIssue(deletingIssue.id);
-      showToast('success', res.message || 'Laporan permasalahan kerja berhasil dihapus.');
+      toast.success(res.message || 'Laporan permasalahan kerja berhasil dihapus.');
       setDeletingIssue(null);
       await loadAllData();
     } catch (err) {
-      showToast('error', extractApiError(err, 'Laporan tidak dapat dihapus.').message);
+      toast.error(extractApiError(err, 'Laporan tidak dapat dihapus.').message);
       setDeletingIssue(null);
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const kpiCards = [
-    {
-      label: isEmployee ? 'Total Laporan Saya' : 'Total Laporan Masuk',
-      value: summary.total ?? 0,
-      badge: isEmployee ? 'Aspirasi & kendala pribadi' : 'Seluruh departemen',
-      badgeClass: 'bg-slate-100 text-slate-600',
-      icon: MessageSquareWarning,
-      iconBg: 'bg-slate-100 text-[#1E293B]',
-    },
-    {
-      label: 'Menunggu Penanganan',
-      value: summary.open ?? 0,
-      badge: 'Status: Menunggu (Open)',
-      badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-      icon: Clock,
-      iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
-    },
-    {
-      label: 'Sedang Ditangani',
-      value: summary.in_progress ?? 0,
-      badge: 'Status: Ditangani (In Progress)',
-      badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-      icon: Wrench,
-      iconBg: 'bg-[#FEF3C7] text-[#F59E0B]',
-    },
-    {
-      label: 'Selesai Ditangani',
-      value: summary.resolved ?? 0,
-      badge: `Rasio Penyelesaian: ${Number(summary.resolution_rate || 0).toFixed(1)}%`,
-      badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-      icon: CheckCircle2,
-      iconBg: 'bg-[#D1FAE5] text-[#10B981]',
-    },
-  ];
+  const resolutionRate = Number(summary.resolution_rate || 0);
+
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        accessorFn: (row) => `${row.category || ''} ${row.description || ''}`,
+        id: 'issue',
+        header: 'Kategori & Deskripsi',
+        cell: ({ row }) => {
+          const issue = row.original;
+          return (
+            <div className="flex max-w-[240px] flex-col gap-1 whitespace-normal">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="secondary" className="text-[11px] font-normal">
+                  {issue.category}
+                </Badge>
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                  {formatDateTime(issue.created_at)}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-xs leading-snug text-foreground">
+                {issue.description}
+              </p>
+            </div>
+          );
+        },
+      },
+    ];
+
+    if (canHandle) {
+      cols.push({
+        accessorFn: (row) => row.reporter?.full_name || '-',
+        id: 'reporter',
+        header: 'Pelapor',
+        cell: ({ row }) => {
+          const rep = row.original.reporter || {};
+          return (
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <Avatar className="size-7 border border-border">
+                <AvatarFallback className="bg-muted text-[10px] font-semibold text-foreground">
+                  {getInitials(rep.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col">
+                <span className="max-w-[140px] truncate text-xs font-medium text-foreground">
+                  {rep.full_name || '-'}
+                </span>
+                <span className="max-w-[140px] truncate text-[11px] text-muted-foreground">
+                  <span className="font-mono">{rep.employee_code || '-'}</span>
+                  {rep.position?.title ? ` · ${rep.position.title}` : ''}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      });
+    }
+
+    cols.push(
+      {
+        accessorFn: (row) => row.department?.name || '-',
+        id: 'department',
+        header: 'Departemen',
+        cell: ({ row }) => {
+          const dept = row.original.department;
+          if (!dept) {
+            return <span className="text-xs text-muted-foreground">-</span>;
+          }
+          return (
+            <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
+              <Badge variant="outline" className="font-mono text-[11px]">
+                {dept.code}
+              </Badge>
+              <span className="max-w-[130px] truncate text-[11px] text-muted-foreground">
+                {dept.name}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => {
+          const issue = row.original;
+          const meta = getIssueStatusMeta(issue.status);
+          return (
+            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+              <StatusBadge status={meta.status} label={meta.label} />
+              {issue.resolved_at && (
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                  {formatDateTime(issue.resolved_at)}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'resolution_notes',
+        header: 'Catatan Tindak Lanjut',
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.resolution_notes ? (
+            <p className="max-w-[200px] line-clamp-2 text-xs leading-snug text-muted-foreground whitespace-normal">
+              {row.original.resolution_notes}
+            </p>
+          ) : (
+            <span className="text-xs italic text-muted-foreground/70">
+              Belum ada catatan
+            </span>
+          ),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const issue = row.original;
+          const isOpen = issue.status === 'open';
+
+          return (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Lihat detail laporan"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openDetailSheet(issue);
+                    }}
+                  >
+                    <Eye className="size-4 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Lihat detail laporan</TooltipContent>
+              </Tooltip>
+
+              {canHandle && (
+                <Button
+                  size="xs"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openFollowUpSheet(issue);
+                  }}
+                >
+                  <Wrench data-icon="inline-start" />
+                  Tindak Lanjut
+                </Button>
+              )}
+
+              {isEmployee && isOpen && (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openEditSheet(issue);
+                  }}
+                >
+                  <Edit3 data-icon="inline-start" />
+                  Edit
+                </Button>
+              )}
+
+              {isOpen ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Hapus laporan"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeletingIssue(issue);
+                      }}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Hapus laporan menunggu</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground/60"
+                      aria-label="Terkunci untuk jejak audit"
+                    >
+                      <Lock className="size-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Laporan sedang ditangani atau selesai terkunci untuk menjaga jejak audit
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          );
+        },
+      }
+    );
+
+    return cols;
+  }, [canHandle, isEmployee, openDetailSheet, openEditSheet, openFollowUpSheet]);
+
+  const detailStatusMeta = detailIssue ? getIssueStatusMeta(detailIssue.status) : null;
 
   return (
     <AppShell
       title="Pelaporan Permasalahan Kerja"
       breadcrumb={
         isEmployee
-          ? 'Suara Pekerja / Laporan & Pemantauan Kendala Kerja'
-          : 'Suara Pekerja / Penanganan & Resolusi Kendala Kerja / PBI-08'
+          ? 'Kesejahteraan & Pelatihan / Laporan & Pemantauan Kendala Kerja'
+          : 'Kesejahteraan & Kompetensi / Penanganan & Resolusi Kendala Kerja'
       }
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Cari kategori, deskripsi, atau pelapor..."
+      actions={
+        <Button size="sm" onClick={openCreateSheet}>
+          <Plus data-icon="inline-start" />
+          Laporkan Masalah
+        </Button>
+      }
     >
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          role="status"
-          className={`fixed top-5 right-5 z-50 max-w-md flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg border ${
-            toast.type === 'success'
-              ? 'bg-white border-emerald-200 text-[#047857]'
-              : 'bg-white border-red-200 text-[#B91C1C]'
-          }`}
-        >
-          {toast.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm font-medium text-[#1E293B] flex-1">{toast.message}</p>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600"
-            aria-label="Tutup notifikasi"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <div className="flex flex-col gap-6">
+        {/* Row 1: 4 KPI Cards */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <Skeleton key={n} className="h-32 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiStatCard
+              label={isEmployee ? 'Total Laporan Saya' : 'Total Laporan Masuk'}
+              value={summary.total ?? 0}
+              unit="laporan"
+              icon={MessageSquareWarning}
+              hint={isEmployee ? 'Aspirasi & kendala pribadi' : 'Seluruh departemen'}
+            />
 
-      <div className="space-y-6">
-        {/* 4 KPI Summary Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          {kpiCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.label}
-                className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs hover:border-slate-300 transition"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">{card.label}</span>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                    <Icon className="w-[18px] h-[18px]" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-bold text-[#1E293B] tabular-nums mt-2">
-                  {card.value}
-                </p>
-                <span
-                  className={`inline-block mt-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${card.badgeClass}`}
-                >
-                  {card.badge}
-                </span>
-              </div>
-            );
-          })}
-        </section>
+            <KpiStatCard
+              label="Menunggu Penanganan"
+              value={summary.open ?? 0}
+              unit="laporan"
+              icon={Clock}
+              status="open"
+              statusLabel="Menunggu"
+              hint="Perlu peninjauan"
+            />
+
+            <KpiStatCard
+              label="Sedang Ditangani"
+              value={summary.in_progress ?? 0}
+              unit="laporan"
+              icon={Wrench}
+              status="in_progress"
+              statusLabel="Ditangani"
+              hint="Dalam proses tindak lanjut"
+            />
+
+            <KpiStatCard
+              label="Selesai Ditangani"
+              value={summary.resolved ?? 0}
+              unit="selesai"
+              icon={CheckCircle2}
+              progress={resolutionRate}
+              status="resolved"
+              statusLabel={`Resolusi ${resolutionRate.toFixed(1)}%`}
+            />
+          </section>
+        )}
 
         {/* Non-punitive / Governance Callout */}
-        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-[#E0F2FE] border border-sky-200/80 text-xs text-[#0369A1]">
-          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#0284C7]" />
-          <p className="leading-relaxed">
-            <span className="font-semibold">Saluran Suara Pekerja & Jejak Audit:</span>{' '}
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+          <p>
+            <span className="font-medium text-foreground">
+              Saluran Suara Pekerja &amp; Jejak Audit:
+            </span>{' '}
             {isEmployee
               ? 'Sampaikan kendala beban kerja, jadwal, fasilitas, atau komunikasi tim secara terbuka dan konstruktif. Laporan berstatus Menunggu masih dapat Anda ubah atau batalkan; laporan yang sudah diproses terkunci sebagai jejak audit penanganan.'
               : 'Tindak lanjuti setiap kendala kerja secara konstruktif dan transparan. Rasio penyelesaian laporan berkontribusi langsung pada sub-indikator Dimensi 5 (Suara Pekerja) dalam Decent Work Score.'}
           </p>
         </div>
 
-        {/* Error State */}
-        {errorMsg && (
-          <div className="bg-white rounded-xl border border-red-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#1E293B]">Gagal Memuat Laporan Permasalahan</h2>
-                <p className="text-sm text-slate-600 mt-0.5">{errorMsg}</p>
-              </div>
+        {/* Row 2: Issues DataTable */}
+        <DataTable
+          title={isEmployee ? 'Daftar Laporan Saya' : 'Daftar Laporan Permasalahan Kerja'}
+          countLabel="laporan"
+          columns={columns}
+          data={issues}
+          loading={loading}
+          error={errorMsg}
+          onRetry={loadAllData}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Cari kategori, deskripsi, atau pelapor..."
+          pageSize={10}
+          onRowClick={(row) => openDetailSheet(row)}
+          emptyTitle={
+            hasActiveFilters
+              ? 'Tidak ada laporan sesuai filter'
+              : 'Belum ada laporan permasalahan'
+          }
+          emptyDescription={
+            hasActiveFilters
+              ? 'Tidak ditemukan laporan yang sesuai dengan kata kunci atau filter yang dipilih.'
+              : isEmployee
+                ? 'Anda belum mengirimkan laporan permasalahan tempat kerja. Gunakan tombol di bawah jika ada kendala yang perlu ditindaklanjuti.'
+                : 'Belum ada laporan permasalahan kerja yang tercatat pada sistem.'
+          }
+          emptyAction={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Reset Filter
+                </Button>
+              )}
+              <Button size="sm" onClick={openCreateSheet}>
+                <Plus data-icon="inline-start" />
+                Laporkan Masalah
+              </Button>
             </div>
-            <button
-              type="button"
-              onClick={loadAllData}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-sm font-semibold transition cursor-pointer shrink-0"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Lagi</span>
-            </button>
-          </div>
-        )}
+          }
+          filterSlot={
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={statusFilter}
+                onValueChange={(val) => val && setStatusFilter(val)}
+                variant="outline"
+                size="sm"
+              >
+                <ToggleGroupItem value="all" className="text-xs">
+                  Semua
+                </ToggleGroupItem>
+                <ToggleGroupItem value="open" className="text-xs">
+                  Menunggu
+                </ToggleGroupItem>
+                <ToggleGroupItem value="in_progress" className="text-xs">
+                  Ditangani
+                </ToggleGroupItem>
+                <ToggleGroupItem value="resolved" className="text-xs">
+                  Selesai
+                </ToggleGroupItem>
+              </ToggleGroup>
 
-        {/* Issues Table Card */}
-        {!errorMsg && (
-          <section className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-            {/* Toolbar */}
-            <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-semibold text-[#1E293B]">
-                  {isEmployee ? 'Daftar Laporan Saya' : 'Daftar Laporan Permasalahan Kerja'}
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                  {issues.length}
+              <Select
+                name="filter_category"
+                value={categoryFilter || ALL_VALUE}
+                onValueChange={(val) =>
+                  setCategoryFilter(val === ALL_VALUE ? '' : val)
+                }
+              >
+                <SelectTrigger
+                  id="wi-filter-category"
+                  size="sm"
+                  aria-label="Filter kategori permasalahan"
+                  className="w-44 bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Kategori</SelectItem>
+                    {categoryOptions.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+
+              <Select
+                name="filter_department_id"
+                value={departmentFilter || ALL_VALUE}
+                onValueChange={(val) =>
+                  setDepartmentFilter(val === ALL_VALUE ? '' : val)
+                }
+              >
+                <SelectTrigger
+                  id="wi-filter-department"
+                  size="sm"
+                  aria-label="Filter departemen"
+                  className="w-44 bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Departemen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={String(dept.id)}>
+                        {dept.code} — {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          }
+          actionsSlot={
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={loadAllData}
+              aria-label="Muat ulang daftar"
+            >
+              <RefreshCw className={loading ? 'animate-spin' : ''} />
+            </Button>
+          }
+        />
+      </div>
+
+      {/* Sheet 1: Detail Laporan */}
+      <FormSheet
+        open={detailSheetOpen && Boolean(detailIssue)}
+        onOpenChange={setDetailSheetOpen}
+        title="Detail Laporan Permasalahan Kerja"
+        description={
+          detailIssue
+            ? `ID Laporan #${detailIssue.id} · Dikirim ${formatDateTime(detailIssue.created_at)}`
+            : undefined
+        }
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDetailSheetOpen(false)}>
+              Tutup
+            </Button>
+            {canHandle && detailIssue && (
+              <Button
+                onClick={() => {
+                  const target = detailIssue;
+                  setDetailSheetOpen(false);
+                  openFollowUpSheet(target);
+                }}
+              >
+                <Wrench data-icon="inline-start" />
+                Tindak Lanjut
+              </Button>
+            )}
+            {isEmployee && detailIssue?.status === 'open' && (
+              <Button
+                onClick={() => {
+                  const target = detailIssue;
+                  setDetailSheetOpen(false);
+                  openEditSheet(target);
+                }}
+              >
+                <Edit3 data-icon="inline-start" />
+                Edit Laporan
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailIssue && (
+          <div className="flex flex-col gap-5">
+            {detailLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Spinner />
+                <span>Menyegarkan detail laporan...</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 p-3.5">
+                <span className="text-xs text-muted-foreground">Kategori</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {detailIssue.category}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative w-full sm:w-52">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari kendala / pelapor..."
-                    className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  />
-                </div>
-
-                {/* Status Filter Pills */}
-                <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
-                  {STATUS_PILLS.map((pill) => (
-                    <button
-                      key={pill.label}
-                      type="button"
-                      onClick={() => setStatusFilter(pill.value)}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
-                        statusFilter === pill.value
-                          ? 'bg-white text-[#1E293B] shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  aria-label="Filter kategori permasalahan"
-                >
-                  <option value="">Semua Kategori</option>
-                  {categoryOptions.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  aria-label="Filter departemen"
-                >
-                  <option value="">Semua Departemen</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.code} — {dept.name}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  type="button"
-                  onClick={loadAllData}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition cursor-pointer"
-                  title="Muat ulang daftar"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Buat Laporan Baru</span>
-                </button>
+              <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 p-3.5">
+                <span className="text-xs text-muted-foreground">Status Penanganan</span>
+                {detailStatusMeta && (
+                  <div className="flex flex-col items-start gap-1">
+                    <StatusBadge
+                      status={detailStatusMeta.status}
+                      label={detailStatusMeta.label}
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      {detailStatusMeta.detailText}
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* Loading State */}
-            {loading ? (
-              <div className="p-6 space-y-3">
-                {[1, 2, 3, 4].map((row) => (
-                  <div key={row} className="h-14 bg-slate-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : issues.length === 0 ? (
-              /* Empty State */
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                  <MessageSquareWarning className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#1E293B] mt-3">
-                  {hasActiveFilters
-                    ? 'Tidak Ada Laporan Sesuai Filter'
-                    : 'Belum Ada Laporan Permasalahan'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  {hasActiveFilters
-                    ? 'Tidak ditemukan laporan yang sesuai dengan kata kunci atau filter yang dipilih.'
-                    : isEmployee
-                      ? 'Anda belum mengirimkan laporan permasalahan tempat kerja. Gunakan tombol di bawah jika ada kendala yang perlu ditindaklanjuti.'
-                      : 'Belum ada laporan permasalahan kerja yang tercatat pada sistem.'}
-                </p>
-                <div className="mt-4 flex items-center justify-center gap-2.5">
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                    >
-                      Reset Filter
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={openCreateModal}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Buat Laporan Baru</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Responsive Table */
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      <th className="py-3 px-4">Kategori & Deskripsi</th>
-                      {canHandle && <th className="py-3 px-4">Pelapor</th>}
-                      <th className="py-3 px-4">Departemen</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Catatan Tindak Lanjut</th>
-                      <th className="py-3 px-4 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
-                    {issues.map((issue) => {
-                      const statusMeta = ISSUE_STATUS_STYLES[issue.status] || ISSUE_STATUS_STYLES.open;
-                      const isOpen = issue.status === 'open';
-                      return (
-                        <tr key={issue.id} className="hover:bg-slate-50/70 transition align-top">
-                          <td className="py-3.5 px-4 max-w-sm">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700">
-                                {issue.category}
-                              </span>
-                              <span className="text-[11px] text-slate-400 tabular-nums">
-                                {formatDateTime(issue.created_at)}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-700 mt-1.5 line-clamp-2 leading-relaxed">
-                              {issue.description}
-                            </p>
-                          </td>
-
-                          {canHandle && (
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <p className="font-medium text-[#1E293B] text-xs">
-                                {issue.reporter?.full_name || '-'}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                <span className="font-mono">{issue.reporter?.employee_code || '-'}</span>
-                                {issue.reporter?.position?.title
-                                  ? ` · ${issue.reporter.position.title}`
-                                  : ''}
-                              </p>
-                            </td>
-                          )}
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            {issue.department ? (
-                              <div>
-                                <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-semibold">
-                                  {issue.department.code}
-                                </span>
-                                <p className="text-xs text-slate-600 mt-1">{issue.department.name}</p>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400">-</span>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusMeta.badgeClass}`}
-                            >
-                              {statusMeta.label}
-                            </span>
-                            {issue.resolved_at && (
-                              <p className="text-[11px] text-[#047857] mt-1 tabular-nums">
-                                Selesai: {formatDateTime(issue.resolved_at)}
-                              </p>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 max-w-xs">
-                            {issue.resolution_notes ? (
-                              <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                                {issue.resolution_notes}
-                              </p>
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">
-                                Belum ada catatan tindak lanjut
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openDetailModal(issue)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                                title="Lihat detail laporan"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>Detail</span>
-                              </button>
-
-                              {canHandle && (
-                                <button
-                                  type="button"
-                                  onClick={() => openFollowUpModal(issue)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                                  title="Tindak lanjuti & perbarui status"
-                                >
-                                  <Wrench className="w-3.5 h-3.5" />
-                                  <span>Tindak Lanjut</span>
-                                </button>
-                              )}
-
-                              {isEmployee && isOpen && (
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(issue)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-sky-200 bg-[#E0F2FE]/60 text-[#0369A1] hover:bg-[#E0F2FE] text-xs font-medium transition cursor-pointer"
-                                  title="Edit laporan"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                              )}
-
-                              {isOpen ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setDeletingIssue(issue)}
-                                  className="p-1.5 rounded-lg border border-red-200 text-[#EF4444] hover:bg-[#FEE2E2]/60 transition cursor-pointer"
-                                  title="Hapus laporan menunggu"
-                                  aria-label="Hapus laporan"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              ) : (
-                                <span
-                                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed inline-flex items-center"
-                                  title="Laporan yang sedang ditangani atau selesai terkunci untuk menjaga jejak audit"
-                                >
-                                  <Lock className="w-3.5 h-3.5" />
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
-      </div>
-
-      {/* Modal 1: Detail Laporan */}
-      {detailModalOpen && detailIssue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-xl w-full shadow-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  Detail Laporan Permasalahan Kerja
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  ID Laporan #{detailIssue.id} · Dikirim {formatDateTime(detailIssue.created_at)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDetailModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-                aria-label="Tutup detail"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {detailLoading && (
-                <p className="text-xs text-slate-400">Menyegarkan detail laporan...</p>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-slate-400 font-medium">Kategori</p>
-                  <p className="text-sm font-semibold text-[#1E293B] mt-1">
-                    {detailIssue.category}
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-slate-400 font-medium">Status Penanganan</p>
-                  <div className="mt-1">
-                    <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        (ISSUE_STATUS_STYLES[detailIssue.status] || ISSUE_STATUS_STYLES.open)
-                          .badgeClass
-                      }`}
-                    >
-                      {(ISSUE_STATUS_STYLES[detailIssue.status] || ISSUE_STATUS_STYLES.open).label}
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3.5">
+                <span className="text-xs text-muted-foreground">Pelapor</span>
+                <div className="flex items-center gap-2.5">
+                  <Avatar className="size-8 border border-border">
+                    <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+                      {getInitials(detailIssue.reporter?.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {detailIssue.reporter?.full_name || '-'}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      <span className="font-mono">
+                        {detailIssue.reporter?.employee_code || '-'}
+                      </span>
+                      {detailIssue.reporter?.position?.title
+                        ? ` · ${detailIssue.reporter.position.title}`
+                        : ''}
                     </span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-slate-400 font-medium">Pelapor</p>
-                  <p className="text-sm font-semibold text-[#1E293B] mt-1">
-                    {detailIssue.reporter?.full_name || '-'}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {detailIssue.reporter?.employee_code || ''}
-                    {detailIssue.reporter?.position?.title
-                      ? ` · ${detailIssue.reporter.position.title}`
-                      : ''}
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-slate-400 font-medium">Departemen Terkait</p>
-                  <p className="text-sm font-semibold text-[#1E293B] mt-1">
-                    {detailIssue.department
-                      ? `${detailIssue.department.code} — ${detailIssue.department.name}`
-                      : '-'}
-                  </p>
-                </div>
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Deskripsi Permasalahan
-                </p>
-                <div className="mt-1.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {detailIssue.description}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Catatan & Tindak Lanjut Manajer / HR
-                </p>
-                <div
-                  className={`mt-1.5 p-3.5 rounded-xl border text-sm leading-relaxed ${
-                    detailIssue.resolution_notes
-                      ? 'bg-[#D1FAE5]/30 border-emerald-200 text-slate-700'
-                      : 'bg-slate-50 border-slate-200/70 text-slate-400 italic'
-                  }`}
-                >
-                  {detailIssue.resolution_notes ||
-                    'Belum ada catatan tindak lanjut dari manajer atau HR.'}
-                </div>
-                {detailIssue.resolved_at && (
-                  <p className="text-xs text-[#047857] mt-1.5 font-medium tabular-nums">
-                    Diselesaikan pada: {formatDateTime(detailIssue.resolved_at)}
-                  </p>
-                )}
+              <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 p-3.5">
+                <span className="text-xs text-muted-foreground">Departemen Terkait</span>
+                <span className="text-sm font-medium text-foreground">
+                  {detailIssue.department
+                    ? `${detailIssue.department.code} — ${detailIssue.department.name}`
+                    : '-'}
+                </span>
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              {canHandle && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDetailModalOpen(false);
-                    openFollowUpModal(detailIssue);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  <Wrench className="w-3.5 h-3.5" />
-                  <span>Tindak Lanjut</span>
-                </button>
-              )}
+            <Separator />
 
-              {isEmployee && detailIssue.status === 'open' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDetailModalOpen(false);
-                    openEditModal(detailIssue);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit Laporan</span>
-                </button>
-              )}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                Deskripsi Permasalahan
+              </span>
+              <div className="rounded-lg border border-border bg-muted/20 p-3.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                {detailIssue.description}
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => setDetailModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                Catatan &amp; Tindak Lanjut Manajer / HR
+              </span>
+              <div
+                className={
+                  detailIssue.resolution_notes
+                    ? 'rounded-lg border border-border bg-card p-3.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground'
+                    : 'rounded-lg border border-border bg-muted/20 p-3.5 text-sm italic text-muted-foreground'
+                }
               >
-                Tutup
-              </button>
+                {detailIssue.resolution_notes ||
+                  'Belum ada catatan tindak lanjut dari manajer atau HR.'}
+              </div>
+              {detailIssue.resolved_at && (
+                <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                  Diselesaikan pada: {formatDateTime(detailIssue.resolved_at)}
+                </p>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </FormSheet>
 
-      {/* Modal 2: Buat / Edit Laporan */}
-      {formModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full shadow-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  {editingIssue ? 'Edit Laporan Permasalahan Kerja' : 'Buat Laporan Permasalahan Baru'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Sampaikan kendala secara jelas dan konstruktif untuk ditindaklanjuti.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-                aria-label="Tutup form"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* Sheet 2: Buat / Edit Laporan */}
+      <FormSheet
+        open={formSheetOpen}
+        onOpenChange={setFormSheetOpen}
+        title={
+          editingIssue ? 'Edit Laporan Permasalahan Kerja' : 'Buat Laporan Permasalahan Baru'
+        }
+        description="Sampaikan kendala secara jelas dan konstruktif untuk ditindaklanjuti."
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFormSheetOpen(false)}
+              disabled={formSubmitting}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="workplace-issue-form"
+              disabled={formSubmitting}
+            >
+              {formSubmitting && <Spinner data-icon="inline-start" />}
+              {formSubmitting
+                ? 'Menyimpan...'
+                : editingIssue
+                  ? 'Simpan Perubahan'
+                  : 'Kirim Laporan'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="workplace-issue-form"
+          onSubmit={handleIssueSubmit}
+          className="flex flex-col gap-4"
+        >
+          {formError && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{formError}</span>
             </div>
+          )}
 
-            <form onSubmit={handleIssueSubmit} className="p-6 space-y-4">
-              {formError && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FEE2E2] text-[#B91C1C] text-xs">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Kategori Permasalahan <span className="text-[#EF4444]">*</span>
-                </label>
-                <select
-                  value={issueForm.category}
-                  onChange={(e) => setIssueForm((prev) => ({ ...prev, category: e.target.value }))}
-                  required
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                >
-                  {Array.from(
-                    new Set([...PRESET_CATEGORIES, ...(issueForm.category ? [issueForm.category] : [])])
-                  ).map((cat) => (
-                    <option key={cat} value={cat}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="wi-category">
+              Kategori Permasalahan <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              name="category"
+              value={issueForm.category}
+              onValueChange={(val) =>
+                setIssueForm((prev) => ({ ...prev, category: val }))
+              }
+            >
+              <SelectTrigger id="wi-category" className="w-full bg-background">
+                <SelectValue placeholder="Pilih Kategori" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {formCategoryOptions.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
                       {cat}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Departemen Terkait
-                </label>
-                <select
-                  value={issueForm.department_id}
-                  onChange={(e) =>
-                    setIssueForm((prev) => ({ ...prev, department_id: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                >
-                  <option value="">Otomatis sesuai departemen saya</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={String(dept.id)}>
-                      {dept.code} — {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Deskripsi Permasalahan <span className="text-[#EF4444]">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  value={issueForm.description}
-                  onChange={(e) =>
-                    setIssueForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder="Jelaskan situasi, dampak terhadap kenyamanan atau beban kerja, serta konteks lokasi/waktu bila relevan..."
-                  required
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                />
-                <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
-                  Minimal 10 karakter ({issueForm.description.trim().length} karakter tertulis).
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setFormModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSubmitting}
-                  className="px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  {formSubmitting
-                    ? 'Menyimpan...'
-                    : editingIssue
-                      ? 'Simpan Perubahan'
-                      : 'Kirim Laporan'}
-                </button>
-              </div>
-            </form>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      )}
 
-      {/* Modal 3: Tindak Lanjut Laporan (Manager & Admin) */}
-      {followUpModalOpen && followUpIssue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full shadow-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  Tindak Lanjut Laporan Permasalahan
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Pelapor: {followUpIssue.reporter?.full_name || '-'} · Kategori:{' '}
-                  {followUpIssue.category}
-                </p>
-              </div>
-              <button
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="wi-department">Departemen Terkait</Label>
+            <Select
+              name="department_id"
+              value={issueForm.department_id || AUTO_DEPARTMENT_VALUE}
+              onValueChange={(val) =>
+                setIssueForm((prev) => ({
+                  ...prev,
+                  department_id: val === AUTO_DEPARTMENT_VALUE ? '' : val,
+                }))
+              }
+            >
+              <SelectTrigger id="wi-department" className="w-full bg-background">
+                <SelectValue placeholder="Otomatis sesuai departemen saya" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={AUTO_DEPARTMENT_VALUE}>
+                    Otomatis sesuai departemen saya
+                  </SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={String(dept.id)}>
+                      {dept.code} — {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="wi-description">
+              Deskripsi Permasalahan <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="wi-description"
+              name="description"
+              rows={5}
+              required
+              value={issueForm.description}
+              onChange={(e) =>
+                setIssueForm((prev) => ({ ...prev, description: e.target.value }))
+              }
+              placeholder="Jelaskan situasi, dampak terhadap kenyamanan atau beban kerja, serta konteks lokasi/waktu bila relevan..."
+              className="bg-background"
+            />
+            <p className="font-mono text-[11px] text-muted-foreground tabular-nums">
+              Minimal 10 karakter ({issueForm.description.trim().length} karakter tertulis).
+            </p>
+          </div>
+        </form>
+      </FormSheet>
+
+      {/* Sheet 3: Tindak Lanjut Laporan (Manager & Admin) */}
+      {canHandle && (
+        <FormSheet
+          open={followUpSheetOpen && Boolean(followUpIssue)}
+          onOpenChange={setFollowUpSheetOpen}
+          title="Tindak Lanjut Laporan Permasalahan"
+          description={
+            followUpIssue
+              ? `Pelapor: ${followUpIssue.reporter?.full_name || '-'} · Kategori: ${followUpIssue.category}`
+              : undefined
+          }
+          size="md"
+          footer={
+            <>
+              <Button
                 type="button"
-                onClick={() => setFollowUpModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-                aria-label="Tutup tindak lanjut"
+                variant="outline"
+                onClick={() => setFollowUpSheetOpen(false)}
+                disabled={followUpSubmitting}
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleFollowUpSubmit} className="p-6 space-y-4">
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                form="workplace-followup-form"
+                disabled={followUpSubmitting}
+              >
+                {followUpSubmitting && <Spinner data-icon="inline-start" />}
+                {followUpSubmitting ? 'Menyimpan...' : 'Simpan Tindak Lanjut'}
+              </Button>
+            </>
+          }
+        >
+          {followUpIssue && (
+            <form
+              id="workplace-followup-form"
+              onSubmit={handleFollowUpSubmit}
+              className="flex flex-col gap-4"
+            >
               {followUpError && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FEE2E2] text-[#B91C1C] text-xs">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
                   <span>{followUpError}</span>
                 </div>
               )}
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-600 leading-relaxed">
-                <p className="font-semibold text-slate-700 mb-1">Ringkasan Laporan:</p>
-                <p>{followUpIssue.description}</p>
+              <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/30 p-3.5 text-xs leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">Ringkasan Laporan</span>
+                <p className="whitespace-pre-wrap">{followUpIssue.description}</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Status Penanganan <span className="text-[#EF4444]">*</span>
-                </label>
-                <select
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="wi-followup-status">
+                  Status Penanganan <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  name="status"
                   value={followUpForm.status}
-                  onChange={(e) =>
-                    setFollowUpForm((prev) => ({ ...prev, status: e.target.value }))
+                  onValueChange={(val) =>
+                    setFollowUpForm((prev) => ({ ...prev, status: val }))
                   }
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:border-[#0284C7] focus:outline-none"
                 >
-                  <option value="open">Menunggu (Open)</option>
-                  <option value="in_progress">Sedang Ditangani (In Progress)</option>
-                  <option value="resolved">Selesai Ditangani (Resolved)</option>
-                </select>
+                  <SelectTrigger id="wi-followup-status" className="w-full bg-background">
+                    <SelectValue placeholder="Pilih Status Penanganan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="open">Menunggu (Open)</SelectItem>
+                      <SelectItem value="in_progress">
+                        Sedang Ditangani (In Progress)
+                      </SelectItem>
+                      <SelectItem value="resolved">
+                        Selesai Ditangani (Resolved)
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="wi-followup-notes">
                   Catatan Tindak Lanjut / Resolusi{' '}
-                  {followUpForm.status === 'resolved' && <span className="text-[#EF4444]">*</span>}
-                </label>
-                <textarea
-                  rows={4}
+                  {followUpForm.status === 'resolved' && (
+                    <span className="text-destructive">*</span>
+                  )}
+                </Label>
+                <Textarea
+                  id="wi-followup-notes"
+                  name="resolution_notes"
+                  rows={5}
                   value={followUpForm.resolution_notes}
                   onChange={(e) =>
-                    setFollowUpForm((prev) => ({ ...prev, resolution_notes: e.target.value }))
+                    setFollowUpForm((prev) => ({
+                      ...prev,
+                      resolution_notes: e.target.value,
+                    }))
                   }
                   placeholder="Tuliskan langkah penanganan, penjadwalan ulang, atau solusi yang telah diterapkan..."
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
+                  className="bg-background"
                 />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setFollowUpModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={followUpSubmitting}
-                  className="px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 text-white text-xs font-semibold transition cursor-pointer"
-                >
-                  {followUpSubmitting ? 'Menyimpan...' : 'Simpan Tindak Lanjut'}
-                </button>
+                {followUpForm.status === 'resolved' && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Wajib diisi minimal 5 karakter sebelum menandai laporan selesai.
+                  </p>
+                )}
               </div>
             </form>
-          </div>
-        </div>
+          )}
+        </FormSheet>
       )}
 
-      {/* Modal 4: Konfirmasi Hapus */}
-      {deletingIssue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full shadow-xl p-6">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">Hapus Laporan Permasalahan?</h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Anda akan menghapus laporan kategori{' '}
-                  <span className="font-semibold text-[#1E293B]">{deletingIssue.category}</span>{' '}
-                  yang masih berstatus <span className="font-semibold">Menunggu</span>. Tindakan ini
-                  tidak dapat dibatalkan.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeletingIssue(null)}
-                disabled={deleteLoading}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={deleteLoading}
-                className="px-4 py-2 rounded-lg bg-[#EF4444] hover:bg-[#B91C1C] disabled:opacity-60 text-white text-xs font-semibold transition cursor-pointer"
-              >
-                {deleteLoading ? 'Menghapus...' : 'Ya, Hapus Laporan'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Dialog Konfirmasi Hapus */}
+      <ConfirmDialog
+        open={Boolean(deletingIssue)}
+        onOpenChange={(open) => {
+          if (!open) setDeletingIssue(null);
+        }}
+        title="Hapus Laporan Permasalahan?"
+        description={
+          deletingIssue ? (
+            <>
+              Anda akan menghapus laporan kategori{' '}
+              <span className="font-semibold text-foreground">
+                {deletingIssue.category}
+              </span>{' '}
+              yang masih berstatus <span className="font-semibold">Menunggu</span>.
+              Tindakan ini tidak dapat dibatalkan.
+            </>
+          ) : undefined
+        }
+        confirmLabel={deleteLoading ? 'Menghapus...' : 'Ya, Hapus Laporan'}
+        loading={deleteLoading}
+        onConfirm={handleConfirmDelete}
+      />
     </AppShell>
   );
 }

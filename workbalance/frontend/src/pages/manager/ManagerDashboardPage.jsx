@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Activity,
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   Building2,
   CheckCircle2,
@@ -12,159 +11,60 @@ import {
   HeartHandshake,
   MessageSquareWarning,
   RefreshCw,
-  Search,
+  RotateCcw,
   ShieldAlert,
   ShieldCheck,
-  Users,
-  X,
 } from 'lucide-react';
-import AppShell from '../../components/AppShell';
-import { useAuth } from '../../context/AuthContext';
-import { extractApiError } from '../../services/api';
-import { managerDashboardService } from '../../services/managerDashboardService';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import AppShell from '@/components/AppShell';
+import { useAuth } from '@/context/AuthContext';
+import { getInitials } from '@/lib/navigation';
+import { extractApiError } from '@/services/api';
+import { managerDashboardService } from '@/services/managerDashboardService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  DataTable,
+  DecentWorkDonutChart,
+  FormSheet,
+  KpiStatCard,
+  StatusBadge,
+} from '@/components/workbalance';
 
-const RISK_FILTER_PILLS = [
-  { value: '', label: 'Semua' },
-  { value: 'high', label: 'Risiko Tinggi' },
-  { value: 'medium', label: 'Sedang' },
-  { value: 'low', label: 'Rendah' },
-];
+const ALL_DEPARTMENTS_VALUE = '__all__';
 
-const RISK_STYLES = {
-  low: {
-    label: 'Risiko Rendah',
-    shortLabel: 'Rendah',
-    badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-    barClass: 'bg-[#10B981]',
-    strokeColor: '#10B981',
-  },
-  medium: {
-    label: 'Risiko Sedang',
-    shortLabel: 'Sedang',
-    badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-    barClass: 'bg-[#F59E0B]',
-    strokeColor: '#F59E0B',
-  },
-  high: {
-    label: 'Risiko Tinggi',
-    shortLabel: 'Tinggi',
-    badgeClass: 'bg-[#FEE2E2] text-[#B91C1C]',
-    barClass: 'bg-[#EF4444]',
-    strokeColor: '#EF4444',
-  },
+const SEVERITY_TONES = {
+  high: { tone: 'danger', label: 'Prioritas Tinggi' },
+  medium: { tone: 'warning', label: 'Perlu Perhatian' },
+  info: { tone: 'info', label: 'Fokus Perbaikan' },
+  low: { tone: 'success', label: 'Seimbang' },
 };
 
-const DECENT_WORK_STYLES = {
-  good: {
-    label: 'Baik',
-    badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-    textClass: 'text-[#047857]',
-    barClass: 'bg-[#10B981]',
-    strokeColor: '#10B981',
-  },
-  needs_attention: {
-    label: 'Perlu Perhatian',
-    badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-    textClass: 'text-[#B45309]',
-    barClass: 'bg-[#F59E0B]',
-    strokeColor: '#F59E0B',
-  },
-  action_priority: {
-    label: 'Prioritas Tindakan',
-    badgeClass: 'bg-[#FEE2E2] text-[#B91C1C]',
-    textClass: 'text-[#B91C1C]',
-    barClass: 'bg-[#EF4444]',
-    strokeColor: '#EF4444',
-  },
+const DEPT_CHART_CONFIG = {
+  decent_work_score: { label: 'Decent Work Score', color: 'var(--chart-2)' },
+  avg_workload_risk_score: { label: 'Workload Risk', color: 'var(--chart-1)' },
 };
-
-const ISSUE_STATUS_STYLES = {
-  open: { label: 'Menunggu', badgeClass: 'bg-[#E0F2FE] text-[#0369A1]' },
-  in_progress: { label: 'Ditangani', badgeClass: 'bg-[#FEF3C7] text-[#B45309]' },
-  resolved: { label: 'Selesai', badgeClass: 'bg-[#D1FAE5] text-[#047857]' },
-};
-
-const HIGHLIGHT_STYLES = {
-  high: {
-    cardClass: 'border-red-200/80 bg-[#FEE2E2]/35',
-    badgeClass: 'bg-[#FEE2E2] text-[#B91C1C]',
-    badgeLabel: 'Prioritas Tinggi',
-  },
-  medium: {
-    cardClass: 'border-amber-200/80 bg-[#FEF3C7]/35',
-    badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-    badgeLabel: 'Perlu Perhatian',
-  },
-  info: {
-    cardClass: 'border-sky-200/80 bg-[#E0F2FE]/45',
-    badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-    badgeLabel: 'Fokus Perbaikan',
-  },
-  low: {
-    cardClass: 'border-emerald-200/80 bg-[#D1FAE5]/35',
-    badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-    badgeLabel: 'Seimbang',
-  },
-};
-
-function getInitials(name) {
-  const source = name || 'PG';
-  const parts = source.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return source.slice(0, 2).toUpperCase();
-}
 
 function formatScore(val, digits = 1) {
   return Number(val || 0).toFixed(digits);
-}
-
-function DecentWorkGauge({ score, category }) {
-  const numericScore = Math.min(100, Math.max(0, Number(score || 0)));
-  const meta = DECENT_WORK_STYLES[category] || DECENT_WORK_STYLES.needs_attention;
-  const radius = 64;
-  const strokeWidth = 14;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (numericScore / 100) * circumference;
-
-  return (
-    <div className="flex flex-col items-center justify-center py-2">
-      <div className="relative w-44 h-44 flex items-center justify-center">
-        <svg className="w-44 h-44 -rotate-90" viewBox="0 0 160 160" aria-hidden="true">
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#F1F5F9"
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke={meta.strokeColor}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            className="transition-all duration-500"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-3xl font-bold text-[#1E293B] tabular-nums leading-none">
-            {numericScore.toFixed(1)}
-          </span>
-          <span className="text-[11px] text-slate-400 mt-1">dari 100</span>
-          <span className={`mt-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${meta.badgeClass}`}>
-            {meta.label}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function ManagerDashboardPage() {
@@ -179,9 +79,9 @@ export default function ManagerDashboardPage() {
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [periodMonth, setPeriodMonth] = useState('');
   const [search, setSearch] = useState('');
-  const [riskFilter, setRiskFilter] = useState('');
+  const [riskFilter, setRiskFilter] = useState('all');
 
-  // Detail modal for inspecting a single employee's 4 sub-indicators
+  // Slide-over detail sheet for single employee 4 sub-indicators
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   const loadDashboard = useCallback(async () => {
@@ -197,7 +97,10 @@ export default function ManagerDashboardPage() {
       setDashboard(data);
     } catch (err) {
       setErrorMsg(
-        extractApiError(err, 'Gagal memuat ringkasan indikator kondisi kerja dan beban kerja tim.').message
+        extractApiError(
+          err,
+          'Gagal memuat ringkasan indikator kondisi kerja dan beban kerja tim.'
+        ).message
       );
     } finally {
       setLoading(false);
@@ -223,182 +126,269 @@ export default function ManagerDashboardPage() {
   const activeFiltersMeta = dashboard?.filters || {};
 
   const filteredEmployeePriorities = useMemo(() => {
-    if (!riskFilter) return employeePrioritiesAll;
+    if (!riskFilter || riskFilter === 'all') return employeePrioritiesAll;
     return employeePrioritiesAll.filter((emp) => emp.risk_category === riskFilter);
   }, [employeePrioritiesAll, riskFilter]);
 
-  const hasActiveFilters = Boolean(departmentFilter || periodMonth || search.trim() || riskFilter);
+  const deptChartData = useMemo(
+    () =>
+      departmentComparison.map((dept) => ({
+        code: dept.code,
+        name: dept.name,
+        decent_work_score: Number(Number(dept.decent_work_score || 0).toFixed(1)),
+        avg_workload_risk_score: Number(Number(dept.avg_workload_risk_score || 0).toFixed(1)),
+      })),
+    [departmentComparison]
+  );
+
+  const hasActiveFilters = Boolean(
+    departmentFilter || periodMonth || search.trim() || (riskFilter && riskFilter !== 'all')
+  );
 
   const resetFilters = () => {
     setDepartmentFilter('');
     setPeriodMonth('');
     setSearch('');
-    setRiskFilter('');
+    setRiskFilter('all');
   };
 
   const resolveContextualRoute = (managerRoute) => {
-    if (user?.role === 'admin' && managerRoute.startsWith('/manager/')) {
+    if (user?.role === 'admin' && managerRoute?.startsWith('/manager/')) {
       return managerRoute.replace('/manager/', '/admin/');
     }
-    return managerRoute;
+    return managerRoute || `${routePrefix}/workload-risk`;
   };
 
-  const overallRiskMeta = RISK_STYLES[kpi.workload_risk_category] || RISK_STYLES.low;
-  const decentWorkMeta = DECENT_WORK_STYLES[kpi.decent_work_category] || DECENT_WORK_STYLES.needs_attention;
-  const pendingIssuesTotal = (kpi.open_issues_count ?? 0) + (kpi.in_progress_issues_count ?? 0);
+  const pendingIssuesTotal =
+    (kpi.open_issues_count ?? 0) + (kpi.in_progress_issues_count ?? 0);
 
-  const kpiCards = [
-    {
-      label: 'Rata-rata Workload Risk Tim',
-      value: formatScore(kpi.avg_workload_risk_score, 1),
-      badge: `${overallRiskMeta.label} (${kpi.active_employees_count ?? 0} pegawai aktif)`,
-      badgeClass: overallRiskMeta.badgeClass,
-      icon: Activity,
-      iconBg: overallRiskMeta.badgeClass,
-    },
-    {
-      label: 'Pegawai Prioritas Perhatian',
-      value: kpi.high_risk_employees_count ?? 0,
-      badge: `Sedang: ${kpi.medium_risk_employees_count ?? 0} · Override PP 35/2021: ${kpi.overridden_employees_count ?? 0}`,
-      badgeClass:
-        (kpi.high_risk_employees_count ?? 0) > 0
-          ? 'bg-[#FEE2E2] text-[#B91C1C]'
-          : 'bg-[#D1FAE5] text-[#047857]',
-      icon: ShieldAlert,
-      iconBg:
-        (kpi.high_risk_employees_count ?? 0) > 0
-          ? 'bg-[#FEE2E2] text-[#EF4444]'
-          : 'bg-[#D1FAE5] text-[#10B981]',
-    },
-    {
-      label: 'Decent Work Score Tim',
-      value: formatScore(kpi.decent_work_score, 1),
-      badge: `Kategori: ${decentWorkMeta.label} (Skala 0–100)`,
-      badgeClass: decentWorkMeta.badgeClass,
-      icon: ShieldCheck,
-      iconBg: decentWorkMeta.badgeClass,
-    },
-    {
-      label: 'Masalah Kerja & Tenggat Dekat',
-      value: pendingIssuesTotal,
-      badge: `${kpi.open_issues_count ?? 0} isu menunggu · ${kpi.urgent_assignments_count ?? 0} tugas tenggat ≤7h`,
-      badgeClass:
-        (kpi.open_issues_count ?? 0) > 0 || (kpi.overdue_assignments_count ?? 0) > 0
-          ? 'bg-[#FEF3C7] text-[#B45309]'
-          : 'bg-[#E0F2FE] text-[#0369A1]',
-      icon: MessageSquareWarning,
-      iconBg:
-        (kpi.open_issues_count ?? 0) > 0
-          ? 'bg-[#FEF3C7] text-[#F59E0B]'
-          : 'bg-[#E0F2FE] text-[#0284C7]',
-    },
-  ];
+  const employeeColumns = useMemo(
+    () => [
+      {
+        accessorKey: 'full_name',
+        header: 'Pegawai',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex items-center gap-2.5">
+              <Avatar className="size-8 border border-border">
+                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+                  {getInitials(emp.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-xs font-medium text-foreground">
+                  {emp.full_name}
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {emp.position_title || '-'} ·{' '}
+                  <span className="font-mono">{emp.department?.code || '-'}</span>
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'weekly_hours_total',
+        header: 'Jam Kerja',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex flex-col font-mono text-xs whitespace-nowrap tabular-nums">
+              <span className="font-medium text-foreground">
+                {formatScore(emp.weekly_hours_total, 1)} /{' '}
+                {formatScore(emp.normal_weekly_hours, 0)}j
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Lembur {formatScore(emp.overtime_hours_total, 1)}j
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'active_assignments_count',
+        header: 'Beban & Tenggat',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex flex-col text-xs whitespace-nowrap tabular-nums">
+              <span className="font-medium text-foreground">
+                {emp.active_assignments_count} tugas (
+                <span className="font-mono">{formatScore(emp.active_estimated_hours, 1)}j</span>)
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Lewat: {emp.overdue_assignments_count} · ≤7h: {emp.due_soon_assignments_count}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'final_score',
+        header: 'Workload Risk',
+        cell: ({ row }) => {
+          const emp = row.original;
+          return (
+            <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
+              <StatusBadge
+                status={emp.risk_category}
+                label={`${formatScore(emp.final_score, 1)} · ${
+                  emp.risk_category === 'high'
+                    ? 'Tinggi'
+                    : emp.risk_category === 'medium'
+                      ? 'Sedang'
+                      : 'Rendah'
+                }`}
+              />
+              {emp.is_overridden && (
+                <StatusBadge status="override" label="PP 35" showDot={false} />
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'priority_reason',
+        header: 'Catatan Prioritas',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <p className="max-w-sm line-clamp-2 text-xs leading-relaxed text-muted-foreground whitespace-normal">
+            {row.original.priority_reason}
+          </p>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedEmployee(row.original);
+              }}
+            >
+              <Eye data-icon="inline-start" />
+              Detail
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <AppShell
       title="Dasbor Kondisi Kerja & Beban Tim"
-      breadcrumb={`Analitik & Pengelolaan Tim / Ringkasan Indikator (PBI-10)${
-        activeFiltersMeta.period_week ? ` · Minggu ${activeFiltersMeta.period_week}` : ''
+      breadcrumb={`Analitik Tim / Ringkasan Indikator${
+        activeFiltersMeta.period_week ? ` · ${activeFiltersMeta.period_week}` : ''
       }`}
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Cari nama pegawai, jabatan, atau isu..."
     >
-      <div className="space-y-6">
-        {/* Filter Toolbar */}
-        <section className="bg-white rounded-xl border border-slate-200/80 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E0F2FE] text-[#0369A1] font-semibold">
-              <Clock className="w-3.5 h-3.5" />
-              <span>
-                Periode Minggu: {activeFiltersMeta.week_start || '-'} s.d.{' '}
-                {activeFiltersMeta.week_end || '-'}
+      <div className="flex flex-col gap-6">
+        {/* Compact Unified Filter Bar */}
+        <section className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 xl:flex-row xl:items-center">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+              <Clock className="size-3.5 text-primary" />
+              <span className="font-mono tabular-nums">
+                {activeFiltersMeta.week_start || '-'} s.d. {activeFiltersMeta.week_end || '-'}
               </span>
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium tabular-nums">
-              Total Jam Tercatat Minggu Ini: {formatScore(kpi.weekly_logged_hours_total, 1)}j · Tugas Aktif:{' '}
-              {formatScore(kpi.active_estimated_hours_total, 1)}j
+            <span className="hidden text-border sm:inline" aria-hidden="true">·</span>
+            <span className="tabular-nums">
+              Jam tercatat:{' '}
+              <span className="font-mono font-medium text-foreground">
+                {formatScore(kpi.weekly_logged_hours_total, 1)}j
+              </span>{' '}
+              · Tugas aktif:{' '}
+              <span className="font-mono font-medium text-foreground">
+                {formatScore(kpi.active_estimated_hours_total, 1)}j
+              </span>
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-              aria-label="Filter departemen"
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={departmentFilter || ALL_DEPARTMENTS_VALUE}
+              onValueChange={(val) =>
+                setDepartmentFilter(val === ALL_DEPARTMENTS_VALUE ? '' : val)
+              }
             >
-              <option value="">Semua Departemen</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.code} — {dept.name} ({dept.active_employees_count})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger size="sm" className="w-52 bg-background text-xs">
+                <SelectValue placeholder="Semua Departemen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={ALL_DEPARTMENTS_VALUE}>Semua Departemen</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={String(dept.id)}>
+                      {dept.code} — {dept.name} ({dept.active_employees_count})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
 
             <input
+              id="mgr-period-month"
+              name="period_month"
               type="month"
               value={periodMonth || activeFiltersMeta.period_month || ''}
               onChange={(e) => setPeriodMonth(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:bg-white focus:border-[#0284C7] focus:outline-none"
               aria-label="Filter periode bulan"
+              className="h-8 rounded-lg border border-input bg-background px-2.5 font-mono text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
             />
 
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Reset Filter
-              </button>
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                <RotateCcw data-icon="inline-start" />
+                Reset
+              </Button>
             )}
 
-            <button
-              type="button"
-              onClick={loadDashboard}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Muat Ulang</span>
-            </button>
+            <Button variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
+              <RefreshCw data-icon="inline-start" className={loading ? 'animate-spin' : ''} />
+              Muat Ulang
+            </Button>
           </div>
         </section>
 
         {/* Error State */}
         {errorMsg && (
-          <div className="bg-white rounded-xl border border-red-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col items-start justify-between gap-4 rounded-xl border border-destructive/30 bg-card p-5 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#1E293B]">Gagal Memuat Dasbor Kondisi Kerja</h2>
-                <p className="text-sm text-slate-600 mt-0.5">{errorMsg}</p>
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Gagal Memuat Dasbor Kondisi Kerja
+                </h2>
+                <p className="text-xs text-muted-foreground">{errorMsg}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadDashboard}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-sm font-semibold transition cursor-pointer shrink-0"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Lagi</span>
-            </button>
+            <Button variant="outline" size="sm" onClick={loadDashboard}>
+              <RefreshCw data-icon="inline-start" />
+              Coba Lagi
+            </Button>
           </div>
         )}
 
         {/* Loading State */}
         {loading && !errorMsg && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {[1, 2, 3, 4].map((card) => (
-                <div key={card} className="h-32 bg-white rounded-xl border border-slate-200/80 animate-pulse" />
+                <Skeleton key={card} className="h-32 rounded-xl" />
               ))}
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <div className="xl:col-span-8 h-80 bg-white rounded-xl border border-slate-200/80 animate-pulse" />
-              <div className="xl:col-span-4 h-80 bg-white rounded-xl border border-slate-200/80 animate-pulse" />
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+              <Skeleton className="h-80 rounded-xl xl:col-span-8" />
+              <Skeleton className="h-80 rounded-xl xl:col-span-4" />
             </div>
           </div>
         )}
@@ -406,256 +396,405 @@ export default function ManagerDashboardPage() {
         {/* Success State */}
         {!loading && !errorMsg && dashboard && (
           <>
-            {/* Row 1: 4 KPI Summary Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-              {kpiCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div
-                    key={card.label}
-                    className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs hover:border-slate-300 transition"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-500">{card.label}</span>
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                        <Icon className="w-[18px] h-[18px]" />
-                      </div>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-bold text-[#1E293B] tabular-nums mt-2">
-                      {card.value}
-                    </p>
-                    <span
-                      className={`inline-block mt-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${card.badgeClass}`}
-                    >
-                      {card.badge}
-                    </span>
-                  </div>
-                );
-              })}
+            {/* Row 1: 4 Executive KPI Cards */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiStatCard
+                label="Rata-rata Workload Risk Tim"
+                value={formatScore(kpi.avg_workload_risk_score, 1)}
+                unit="/ 100"
+                icon={Activity}
+                status={kpi.workload_risk_category || 'low'}
+                hint={`${kpi.active_employees_count ?? 0} pegawai aktif`}
+              />
+
+              <KpiStatCard
+                label="Pegawai Prioritas Perhatian"
+                value={kpi.high_risk_employees_count ?? 0}
+                unit="pegawai"
+                icon={ShieldAlert}
+                status={(kpi.high_risk_employees_count ?? 0) > 0 ? 'high' : 'low'}
+                statusLabel={
+                  (kpi.high_risk_employees_count ?? 0) > 0
+                    ? `Override PP 35: ${kpi.overridden_employees_count ?? 0}`
+                    : 'Tidak ada risiko tinggi'
+                }
+                hint={`Sedang: ${kpi.medium_risk_employees_count ?? 0}`}
+              />
+
+              <KpiStatCard
+                label="Decent Work Score Tim"
+                value={formatScore(kpi.decent_work_score, 1)}
+                unit="/ 100"
+                icon={ShieldCheck}
+                status={kpi.decent_work_category || 'needs_attention'}
+                hint={`Periode ${activeFiltersMeta.period_month || '-'}`}
+              />
+
+              <KpiStatCard
+                label="Masalah Kerja & Tenggat"
+                value={pendingIssuesTotal}
+                unit="aktif"
+                icon={MessageSquareWarning}
+                status={
+                  (kpi.open_issues_count ?? 0) > 0 || (kpi.overdue_assignments_count ?? 0) > 0
+                    ? 'warning'
+                    : 'info'
+                }
+                statusLabel={`${kpi.open_issues_count ?? 0} menunggu`}
+                hint={`${kpi.urgent_assignments_count ?? 0} tugas ≤7h`}
+              />
             </section>
 
-            {/* Row 2: Department Comparison + Priority Highlights (Left 65%) & Decent Work Gauge (Right 35%) */}
-            <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <div className="xl:col-span-8 space-y-6">
-                {/* Department Comparison Card */}
-                <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <Building2 className="w-4 h-4 text-[#0284C7]" />
-                      <h2 className="text-base font-semibold text-[#1E293B]">
-                        Perbandingan Indikator Antar-Departemen
-                      </h2>
+            {/* Row 2: Department Comparison + Priority Highlights (8 cols) | Decent Work Donut & Survey Aggregate (4 cols) */}
+            <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+              <div className="flex flex-col gap-6 xl:col-span-8">
+                {/* Interactive Recharts Department Comparison Card */}
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <Tabs defaultValue="chart" className="w-full">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="size-4 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                          Perbandingan Indikator Antar-Departemen
+                        </h2>
+                      </div>
+                      <TabsList className="h-8">
+                        <TabsTrigger value="chart" className="text-xs">
+                          Grafik
+                        </TabsTrigger>
+                        <TabsTrigger value="breakdown" className="text-xs">
+                          Rincian ({departmentComparison.length})
+                        </TabsTrigger>
+                      </TabsList>
                     </div>
-                    <span className="text-xs text-slate-500 tabular-nums">
-                      {departmentComparison.length} departemen ditampilkan
-                    </span>
-                  </div>
 
-                  {departmentComparison.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-slate-500">
-                      Belum ada data departemen pada cakupan filter saat ini.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {departmentComparison.map((dept) => {
-                        const dwMeta =
-                          DECENT_WORK_STYLES[dept.status_category] || DECENT_WORK_STYLES.needs_attention;
-                        return (
-                          <div key={dept.department_id} className="p-5 hover:bg-slate-50/60 transition">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-semibold">
-                                    {dept.code}
-                                  </span>
-                                  <h3 className="text-sm font-semibold text-[#1E293B]">{dept.name}</h3>
-                                  <span className="text-xs text-slate-400 tabular-nums">
-                                    ({dept.active_employees_count} pegawai)
-                                  </span>
-                                </div>
-                              </div>
+                    <TabsContent value="chart" className="m-0 p-5">
+                      {deptChartData.length === 0 ? (
+                        <p className="py-12 text-center text-xs text-muted-foreground">
+                          Belum ada data departemen pada cakupan filter saat ini.
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>Perbandingan skor rata-rata tiap departemen (skala 0–100)</span>
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="size-2 rounded-xs bg-[var(--chart-2)]" />
+                                Decent Work
+                              </span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
+                                Workload Risk
+                              </span>
+                            </div>
+                          </div>
 
+                          <ChartContainer
+                            config={DEPT_CHART_CONFIG}
+                            className="h-64 w-full aspect-auto"
+                          >
+                            <BarChart
+                              data={deptChartData}
+                              margin={{ top: 10, right: 12, left: -12, bottom: 0 }}
+                            >
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="code"
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                              />
+                              <YAxis
+                                domain={[0, 100]}
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                              />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <Bar
+                                dataKey="decent_work_score"
+                                fill="var(--color-decent_work_score)"
+                                radius={[6, 6, 0, 0]}
+                                maxBarSize={32}
+                              />
+                              <Bar
+                                dataKey="avg_workload_risk_score"
+                                fill="var(--color-avg_workload_risk_score)"
+                                radius={[6, 6, 0, 0]}
+                                maxBarSize={32}
+                              />
+                            </BarChart>
+                          </ChartContainer>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="breakdown" className="m-0 divide-y divide-border">
+                      {departmentComparison.length === 0 ? (
+                        <p className="p-8 text-center text-xs text-muted-foreground">
+                          Belum ada data departemen pada cakupan filter saat ini.
+                        </p>
+                      ) : (
+                        departmentComparison.map((dept) => (
+                          <div
+                            key={dept.department_id}
+                            className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/30"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tabular-nums ${dwMeta.badgeClass}`}>
-                                  Decent Work: {formatScore(dept.decent_work_score, 1)} ({dwMeta.label})
+                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground">
+                                  {dept.code}
+                                </span>
+                                <span className="text-sm font-medium text-foreground">
+                                  {dept.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                  · {dept.active_employees_count} pegawai
+                                </span>
+                              </div>
+                              <StatusBadge
+                                status={dept.status_category}
+                                label={`Decent Work ${formatScore(dept.decent_work_score, 1)}`}
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  Workload Risk
+                                </span>
+                                <span className="font-mono font-semibold text-foreground tabular-nums">
+                                  {formatScore(dept.avg_workload_risk_score, 1)} / 100
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  Jam Aktual / Tugas
+                                </span>
+                                <span className="font-mono font-medium text-foreground tabular-nums">
+                                  {formatScore(dept.weekly_hours_total, 1)}j /{' '}
+                                  {formatScore(dept.estimated_hours_total, 0)}j
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  Masalah Aktif
+                                </span>
+                                <span className="font-mono font-medium text-foreground tabular-nums">
+                                  {dept.open_issues_count + dept.in_progress_issues_count} isu
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  Survei WLB (Agregat)
+                                </span>
+                                <span className="font-mono font-medium text-foreground tabular-nums">
+                                  {dept.survey_avg_wlb !== null ? `${dept.survey_avg_wlb} / 5` : '-'}
                                 </span>
                               </div>
                             </div>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3.5">
-                              <div>
-                                <div className="flex items-center justify-between text-xs mb-1">
-                                  <span className="text-slate-500">Rata-rata Workload Risk</span>
-                                  <span className="font-semibold text-[#1E293B] tabular-nums">
-                                    {formatScore(dept.avg_workload_risk_score, 1)} / 100
-                                  </span>
-                                </div>
-                                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${
-                                      dept.avg_workload_risk_score >= 70
-                                        ? 'bg-[#EF4444]'
-                                        : dept.avg_workload_risk_score >= 40
-                                          ? 'bg-[#F59E0B]'
-                                          : 'bg-[#10B981]'
-                                    }`}
-                                    style={{ width: `${Math.min(100, dept.avg_workload_risk_score)}%` }}
-                                  />
-                                </div>
-                                <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
-                                  Tinggi: {dept.high_risk_count} · Sedang: {dept.medium_risk_count} · Rendah:{' '}
-                                  {dept.low_risk_count}
-                                </p>
-                              </div>
+                {/* Rule-Based Priority Highlights & Active Issues (Balanced 2-column sub-grid inside 8-col left rail) */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                  {/* Rule-Based Priority Highlights */}
+                  <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card lg:col-span-7">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3.5">
+                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                        Pemicu Prioritas Tim
+                      </h2>
+                      <span className="text-[11px] text-muted-foreground">
+                        Deterministik ambang indikator
+                      </span>
+                    </div>
 
-                              <div className="grid grid-cols-3 gap-2 text-xs">
-                                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                                  <p className="text-[11px] text-slate-400">Jam Aktual / Tugas</p>
-                                  <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5">
-                                    {formatScore(dept.weekly_hours_total, 1)}j /{' '}
-                                    {formatScore(dept.estimated_hours_total, 0)}j
-                                  </p>
-                                </div>
-                                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                                  <p className="text-[11px] text-slate-400">Masalah Aktif</p>
-                                  <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5">
-                                    {dept.open_issues_count + dept.in_progress_issues_count} isu
-                                  </p>
-                                </div>
-                                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                                  <p className="text-[11px] text-slate-400">Survei WLB (Agregat)</p>
-                                  <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5">
-                                    {dept.survey_avg_wlb !== null ? `${dept.survey_avg_wlb} / 5` : '-'}
-                                  </p>
-                                </div>
-                              </div>
+                    <div className="flex-1 divide-y divide-border">
+                      {priorityHighlights.map((item) => {
+                        const sev = SEVERITY_TONES[item.severity] || SEVERITY_TONES.info;
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex flex-col gap-2.5 px-5 py-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <StatusBadge tone={sev.tone} label={sev.label} />
+                              <Link
+                                to={resolveContextualRoute(item.action_route)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                              >
+                                <span>{item.action_label}</span>
+                                <ArrowRight className="size-3.5" />
+                              </Link>
                             </div>
+                            <h3 className="text-sm font-medium text-foreground">
+                              {item.title}
+                            </h3>
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {item.description}
+                            </p>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
-
-                {/* Rule-Based Priority Highlights */}
-                <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <AlertTriangle className="w-4 h-4 text-[#F59E0B]" />
-                      <h2 className="text-base font-semibold text-[#1E293B]">
-                        Pemicu Prioritas Pengelolaan Tim
-                      </h2>
-                    </div>
-                    <span className="text-xs text-slate-400">Deterministik berbasis ambang indikator</span>
                   </div>
 
-                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {priorityHighlights.map((item) => {
-                      const style = HIGHLIGHT_STYLES[item.severity] || HIGHLIGHT_STYLES.info;
-                      return (
-                        <div
-                          key={item.id}
-                          className={`rounded-xl border p-4 flex flex-col justify-between gap-3 ${style.cardClass}`}
-                        >
-                          <div>
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${style.badgeClass}`}>
-                              {style.badgeLabel}
-                            </span>
-                            <h3 className="text-sm font-semibold text-[#1E293B] mt-2">{item.title}</h3>
-                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.description}</p>
-                          </div>
+                  {/* Active Workplace Issues Panel */}
+                  <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card lg:col-span-5">
+                    <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3.5">
+                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                        Permasalahan Kerja
+                      </h2>
+                      <StatusBadge
+                        tone="success"
+                        label={`${formatScore(issuesSummary.counts.resolution_rate, 0)}% selesai`}
+                        showDot={false}
+                      />
+                    </div>
 
-                          <Link
-                            to={resolveContextualRoute(item.action_route)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0284C7] hover:text-[#0369A1]"
-                          >
-                            <span>{item.action_label}</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
+                    <div className="grid grid-cols-3 divide-x divide-border border-b border-border bg-muted/20 py-2.5 text-center">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Menunggu</p>
+                        <p className="mt-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                          {issuesSummary.counts.open}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Ditangani</p>
+                        <p className="mt-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                          {issuesSummary.counts.in_progress}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Selesai</p>
+                        <p className="mt-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                          {issuesSummary.counts.resolved}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 flex-1 divide-y divide-border overflow-y-auto">
+                      {issuesSummary.active_issues.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                          <CheckCircle2 className="size-7 text-emerald-600" />
+                          <p className="text-xs font-medium text-foreground">
+                            Tidak ada permasalahan aktif
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Seluruh laporan departemen telah ditangani.
+                          </p>
                         </div>
-                      );
-                    })}
+                      ) : (
+                        issuesSummary.active_issues.map((issue) => (
+                          <div key={issue.id} className="flex flex-col gap-1.5 px-4 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-medium text-foreground">
+                                {issue.category}
+                              </span>
+                              <StatusBadge status={issue.status} />
+                            </div>
+                            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                              {issue.description}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground/80">
+                              {issue.reporter?.full_name || '-'} ·{' '}
+                              <span className="font-mono">{issue.department?.code || '-'}</span>
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="border-t border-border bg-muted/20 p-3">
+                      <Button variant="outline" size="sm" className="w-full" asChild>
+                        <Link to={`${routePrefix}/workplace-issues`}>
+                          Kelola Permasalahan
+                          <ArrowRight data-icon="inline-end" />
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Right 35%: Decent Work Radial Gauge + 6 Dimensions + Survey Aggregate */}
-              <div className="xl:col-span-4 space-y-6">
-                <div className="bg-white rounded-xl border border-slate-200/80 p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-base font-semibold text-[#1E293B]">Decent Work Score</h2>
-                    <span className="text-[11px] font-medium text-slate-400 tabular-nums">
-                      Periode {activeFiltersMeta.period_month}
+              {/* Right Column: Recharts Decent Work Donut + 6 Dimensions + Survey Aggregate */}
+              <div className="flex flex-col gap-6 xl:col-span-4">
+                <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                      Decent Work Score
+                    </h2>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {activeFiltersMeta.period_month}
                     </span>
                   </div>
 
-                  <DecentWorkGauge
+                  <DecentWorkDonutChart
                     score={kpi.decent_work_score}
                     category={kpi.decent_work_category}
                   />
 
-                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
-                    {dimensions.map((dim) => {
-                      const meta =
-                        DECENT_WORK_STYLES[dim.status_category] || DECENT_WORK_STYLES.needs_attention;
-                      return (
-                        <div key={dim.key}>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium text-slate-700">{dim.label}</span>
-                            <span className={`font-bold tabular-nums ${meta.textClass}`}>
-                              {formatScore(dim.score, 1)}
-                            </span>
-                          </div>
-                          <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1">
-                            <div
-                              className={`h-full rounded-full ${meta.barClass}`}
-                              style={{ width: `${Math.min(100, Math.max(0, dim.score))}%` }}
-                            />
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{dim.description}</p>
+                  <Separator />
+
+                  <div className="flex flex-col gap-3">
+                    {dimensions.map((dim) => (
+                      <div key={dim.key} className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-foreground">{dim.label}</span>
+                          <span className="font-mono font-semibold text-foreground tabular-nums">
+                            {formatScore(dim.score, 1)}
+                          </span>
                         </div>
-                      );
-                    })}
+                        <Progress
+                          value={Math.min(100, Math.max(0, Number(dim.score || 0)))}
+                          className="h-1.5"
+                        />
+                        <p className="text-[11px] text-muted-foreground">{dim.description}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Aggregated Wellbeing Survey Card (NFR-02) */}
-                <div className="bg-white rounded-xl border border-slate-200/80 p-5">
-                  <div className="flex items-center justify-between">
+                {/* Aggregated Survey Card (Strict NFR-02 Privacy) */}
+                <div className="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <HeartHandshake className="w-4 h-4 text-[#10B981]" />
-                      <h2 className="text-sm font-semibold text-[#1E293B]">Survei Kondisi Kerja</h2>
+                      <HeartHandshake className="size-4 text-muted-foreground" />
+                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                        Survei Kondisi Kerja
+                      </h2>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E0F2FE] text-[#0369A1]">
-                      Agregat NFR-02
-                    </span>
+                    <StatusBadge tone="info" label="Agregat NFR-02" showDot={false} />
                   </div>
 
-                  <p className="text-xs text-slate-500 mt-2">
+                  <p className="text-xs text-muted-foreground">
                     {surveySummary.survey_title || `Periode ${activeFiltersMeta.period_month}`}
                   </p>
 
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-                    <div className="p-2.5 rounded-lg bg-slate-50">
-                      <p className="text-[11px] text-slate-400">Skor WLB</p>
-                      <p className="text-sm font-bold text-[#1E293B] tabular-nums mt-0.5">
-                        {surveySummary.avg_wlb_score !== null && surveySummary.avg_wlb_score !== undefined
+                  <div className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/30 py-3 text-center">
+                    <div className="px-2">
+                      <p className="text-[11px] text-muted-foreground">Skor WLB</p>
+                      <p className="mt-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                        {surveySummary.avg_wlb_score != null
                           ? `${surveySummary.avg_wlb_score}/5`
                           : '-'}
                       </p>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-slate-50">
-                      <p className="text-[11px] text-slate-400">Persepsi Beban</p>
-                      <p className="text-sm font-bold text-[#1E293B] tabular-nums mt-0.5">
-                        {surveySummary.avg_workload_perception_score !== null &&
-                        surveySummary.avg_workload_perception_score !== undefined
+                    <div className="px-2">
+                      <p className="text-[11px] text-muted-foreground">Beban</p>
+                      <p className="mt-0.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                        {surveySummary.avg_workload_perception_score != null
                           ? `${surveySummary.avg_workload_perception_score}/5`
                           : '-'}
                       </p>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-slate-50">
-                      <p className="text-[11px] text-slate-400">Partisipasi</p>
-                      <p className="text-sm font-bold text-[#047857] tabular-nums mt-0.5">
+                    <div className="px-2">
+                      <p className="text-[11px] text-muted-foreground">Partisipasi</p>
+                      <p className="mt-0.5 font-mono text-sm font-semibold text-emerald-700 tabular-nums">
                         {formatScore(surveySummary.participation_rate, 1)}%
                       </p>
                     </div>
@@ -664,359 +803,148 @@ export default function ManagerDashboardPage() {
               </div>
             </section>
 
-            {/* Row 3: Employee Priority List (8 cols) + Active Workplace Issues (4 cols) */}
-            <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              {/* Employee Workload Priorities Table */}
-              <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <Users className="w-4 h-4 text-[#0284C7]" />
-                    <h2 className="text-base font-semibold text-[#1E293B]">
-                      Daftar Pegawai Prioritas Perhatian
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                      {filteredEmployeePriorities.length}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative w-full sm:w-48">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari pegawai..."
-                        className="w-full pl-8 pr-3 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
-                      {RISK_FILTER_PILLS.map((pill) => (
-                        <button
-                          key={pill.label}
-                          type="button"
-                          onClick={() => setRiskFilter(pill.value)}
-                          className={`px-2.5 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
-                            riskFilter === pill.value
-                              ? 'bg-white text-[#1E293B] shadow-2xs'
-                              : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          {pill.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {filteredEmployeePriorities.length === 0 ? (
-                  <div className="p-10 text-center text-xs text-slate-500">
-                    Tidak ada pegawai yang sesuai dengan filter risiko atau pencarian saat ini.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          <th className="py-3 px-4">Pegawai</th>
-                          <th className="py-3 px-4">Jam Kerja</th>
-                          <th className="py-3 px-4">Beban & Tenggat</th>
-                          <th className="py-3 px-4">Workload Risk</th>
-                          <th className="py-3 px-4">Catatan Prioritas</th>
-                          <th className="py-3 px-4 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm">
-                        {filteredEmployeePriorities.map((emp) => {
-                          const riskMeta = RISK_STYLES[emp.risk_category] || RISK_STYLES.low;
-                          return (
-                            <tr key={emp.employee_id} className="hover:bg-slate-50/70 transition align-top">
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-[#E0F2FE] text-[#0369A1] text-xs font-bold flex items-center justify-center shrink-0">
-                                    {getInitials(emp.full_name)}
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-semibold text-[#1E293B]">{emp.full_name}</p>
-                                    <p className="text-[11px] text-slate-500">
-                                      {emp.position_title || '-'} · {emp.department?.code || '-'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className="py-3.5 px-4 whitespace-nowrap text-xs tabular-nums">
-                                <p className="font-semibold text-[#1E293B]">
-                                  {formatScore(emp.weekly_hours_total, 1)} /{' '}
-                                  {formatScore(emp.normal_weekly_hours, 0)} jam
-                                </p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                  Lembur: {formatScore(emp.overtime_hours_total, 1)}j
-                                </p>
-                              </td>
-
-                              <td className="py-3.5 px-4 whitespace-nowrap text-xs tabular-nums">
-                                <p className="font-medium text-[#1E293B]">
-                                  {emp.active_assignments_count} tugas ({formatScore(emp.active_estimated_hours, 1)}j)
-                                </p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                  Lewat tenggat: {emp.overdue_assignments_count} · ≤7h: {emp.due_soon_assignments_count}
-                                </p>
-                              </td>
-
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tabular-nums ${riskMeta.badgeClass}`}
-                                  >
-                                    {formatScore(emp.final_score, 1)} · {riskMeta.shortLabel}
-                                  </span>
-                                  {emp.is_overridden && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FEE2E2] text-[#B91C1C]">
-                                      Override PP 35/2021
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td className="py-3.5 px-4 max-w-xs">
-                                <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                                  {emp.priority_reason}
-                                </p>
-                              </td>
-
-                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedEmployee(emp)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>Detail</span>
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Active Workplace Issues Summary Panel */}
-              <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquareWarning className="w-4 h-4 text-[#0284C7]" />
-                    <h2 className="text-base font-semibold text-[#1E293B]">Permasalahan Kerja Tim</h2>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#D1FAE5] text-[#047857] tabular-nums">
-                    {formatScore(issuesSummary.counts.resolution_rate, 1)}% selesai
-                  </span>
-                </div>
-
-                <div className="p-4 border-b border-slate-100 grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 rounded-lg bg-[#E0F2FE]/60">
-                    <p className="text-[11px] text-[#0369A1] font-medium">Menunggu</p>
-                    <p className="text-base font-bold text-[#1E293B] tabular-nums">
-                      {issuesSummary.counts.open}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-[#FEF3C7]/60">
-                    <p className="text-[11px] text-[#B45309] font-medium">Ditangani</p>
-                    <p className="text-base font-bold text-[#1E293B] tabular-nums">
-                      {issuesSummary.counts.in_progress}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-[#D1FAE5]/60">
-                    <p className="text-[11px] text-[#047857] font-medium">Selesai</p>
-                    <p className="text-base font-bold text-[#1E293B] tabular-nums">
-                      {issuesSummary.counts.resolved}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-96">
-                  {issuesSummary.active_issues.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <CheckCircle2 className="w-8 h-8 text-[#10B981] mx-auto" />
-                      <p className="text-xs font-semibold text-[#1E293B] mt-2">
-                        Tidak Ada Permasalahan Aktif
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Seluruh laporan pada cakupan departemen telah ditangani.
-                      </p>
-                    </div>
-                  ) : (
-                    issuesSummary.active_issues.map((issue) => {
-                      const stMeta = ISSUE_STATUS_STYLES[issue.status] || ISSUE_STATUS_STYLES.open;
-                      return (
-                        <div
-                          key={issue.id}
-                          className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-1.5"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-semibold text-slate-700">
-                              {issue.category}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${stMeta.badgeClass}`}>
-                              {stMeta.label}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                            {issue.description}
-                          </p>
-                          <p className="text-[11px] text-slate-400">
-                            {issue.reporter?.full_name || '-'} · {issue.department?.code || '-'}
-                          </p>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="p-4 bg-slate-50 border-t border-slate-100">
-                  <Link
-                    to={`${routePrefix}/workplace-issues`}
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition"
+            {/* Row 3: Full-Width Employee Priority DataTable (Zero horizontal clipping at 1440px!) */}
+            <section>
+              <DataTable
+                title="Daftar Pegawai Prioritas Perhatian"
+                countLabel="pegawai"
+                columns={employeeColumns}
+                data={filteredEmployeePriorities}
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Cari nama pegawai atau jabatan..."
+                pageSize={8}
+                onRowClick={(emp) => setSelectedEmployee(emp)}
+                emptyTitle="Tidak ada pegawai sesuai filter"
+                emptyDescription="Ubah filter kategori risiko atau kata kunci untuk melihat pegawai lain."
+                filterSlot={
+                  <ToggleGroup
+                    type="single"
+                    value={riskFilter}
+                    onValueChange={(val) => val && setRiskFilter(val)}
+                    variant="outline"
+                    size="sm"
                   >
-                    <span>Kelola & Tindak Lanjuti Permasalahan</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
+                    <ToggleGroupItem value="all" className="text-xs">
+                      Semua
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="high" className="text-xs">
+                      Tinggi
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="medium" className="text-xs">
+                      Sedang
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="low" className="text-xs">
+                      Rendah
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                }
+              />
             </section>
           </>
         )}
       </div>
 
-      {/* Employee 4 Sub-Indicator Breakdown Modal */}
-      {selectedEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full shadow-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  Rincian 4 Sub-Indikator Beban Kerja
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedEmployee.full_name} ({selectedEmployee.employee_code}) ·{' '}
-                  {selectedEmployee.department?.name || '-'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedEmployee(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-                aria-label="Tutup detail indikator"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                <div>
-                  <p className="text-xs text-slate-500">Skor Akhir Workload Risk</p>
-                  <p className="text-2xl font-bold text-[#1E293B] tabular-nums mt-0.5">
-                    {formatScore(selectedEmployee.final_score, 2)} / 100
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span
-                    className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      (RISK_STYLES[selectedEmployee.risk_category] || RISK_STYLES.low).badgeClass
-                    }`}
-                  >
-                    {(RISK_STYLES[selectedEmployee.risk_category] || RISK_STYLES.low).label}
-                  </span>
-                  {selectedEmployee.is_overridden && (
-                    <p className="text-[11px] font-semibold text-[#B91C1C] mt-1">
-                      Override Wajib PP No. 35/2021
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  {
-                    label: '1. Waktu Kerja Mingguan',
-                    score: selectedEmployee.weekly_hours_score,
-                    note: `${formatScore(selectedEmployee.weekly_hours_total, 1)} jam aktual minggu ini (batas sehat <= 40j, kritis >= 55j).`,
-                  },
-                  {
-                    label: '2. Lembur',
-                    score: selectedEmployee.overtime_score,
-                    note: `${selectedEmployee.overtime_days_count} hari lembur · total ${formatScore(
-                      selectedEmployee.overtime_hours_total,
-                      1
-                    )}j (maks harian ${formatScore(selectedEmployee.max_daily_overtime_hours, 1)}j).`,
-                  },
-                  {
-                    label: '3. Beban Tugas vs Kapasitas Efektif',
-                    score: selectedEmployee.task_load_score,
-                    note: `Tugas aktif ${formatScore(selectedEmployee.active_estimated_hours, 1)}j · kapasitas tersedia ${formatScore(
-                      selectedEmployee.available_capacity_hours,
-                      1
-                    )}j (cuti disetujui: ${formatScore(selectedEmployee.approved_leave_hours, 1)}j).`,
-                  },
-                  {
-                    label: '4. Tekanan Tenggat',
-                    score: selectedEmployee.deadline_pressure_score,
-                    note: `${selectedEmployee.urgent_assignments_count} dari ${selectedEmployee.active_assignments_count} tugas aktif lewat tenggat / <= 7 hari.`,
-                  },
-                ].map((sub) => (
-                  <div key={sub.label}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-[#1E293B]">{sub.label}</span>
-                      <span className="font-bold text-[#1E293B] tabular-nums">
-                        {formatScore(sub.score, 1)}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1">
-                      <div
-                        className={`h-full rounded-full ${
-                          sub.score >= 70
-                            ? 'bg-[#EF4444]'
-                            : sub.score >= 40
-                              ? 'bg-[#F59E0B]'
-                              : 'bg-[#10B981]'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(0, sub.score))}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{sub.note}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#E0F2FE]/60 border border-sky-200/70 text-xs text-[#0369A1]">
-                <span className="font-semibold">Rekomendasi Prioritas:</span>{' '}
-                {selectedEmployee.priority_reason}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-              <Link
-                to={`${routePrefix}/task-assignments`}
-                className="px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition"
-              >
+      {/* Employee 360° Workload Sub-Indicators Slide-Over Sheet */}
+      <FormSheet
+        open={Boolean(selectedEmployee)}
+        onOpenChange={(open) => !open && setSelectedEmployee(null)}
+        title="Rincian 4 Sub-Indikator Beban Kerja"
+        description={
+          selectedEmployee
+            ? `${selectedEmployee.full_name} (${selectedEmployee.employee_code}) · ${
+                selectedEmployee.department?.name || '-'
+              }`
+            : undefined
+        }
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setSelectedEmployee(null)}>
+              Tutup
+            </Button>
+            <Button asChild>
+              <Link to={`${routePrefix}/task-assignments`}>
                 Kelola Penugasan Pegawai
+                <ArrowRight data-icon="inline-end" />
               </Link>
-              <button
-                type="button"
-                onClick={() => setSelectedEmployee(null)}
-                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                Tutup
-              </button>
+            </Button>
+          </>
+        }
+      >
+        {selectedEmployee && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Skor Akhir Workload Risk</span>
+                <span className="font-mono text-2xl font-semibold text-foreground tabular-nums">
+                  {formatScore(selectedEmployee.final_score, 2)}{' '}
+                  <span className="text-xs font-normal text-muted-foreground">/ 100</span>
+                </span>
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                <StatusBadge status={selectedEmployee.risk_category} />
+                {selectedEmployee.is_overridden && (
+                  <StatusBadge status="override" showDot={false} />
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {[
+                {
+                  label: '1. Waktu Kerja Mingguan',
+                  score: selectedEmployee.weekly_hours_score,
+                  note: `${formatScore(selectedEmployee.weekly_hours_total, 1)} jam aktual minggu ini (batas sehat ≤ 40j, kritis ≥ 55j).`,
+                },
+                {
+                  label: '2. Lembur',
+                  score: selectedEmployee.overtime_score,
+                  note: `${selectedEmployee.overtime_days_count} hari lembur · total ${formatScore(
+                    selectedEmployee.overtime_hours_total,
+                    1
+                  )}j (maks harian ${formatScore(selectedEmployee.max_daily_overtime_hours, 1)}j).`,
+                },
+                {
+                  label: '3. Beban Tugas vs Kapasitas Efektif',
+                  score: selectedEmployee.task_load_score,
+                  note: `Tugas aktif ${formatScore(
+                    selectedEmployee.active_estimated_hours,
+                    1
+                  )}j · kapasitas tersedia ${formatScore(
+                    selectedEmployee.available_capacity_hours,
+                    1
+                  )}j (cuti disetujui: ${formatScore(selectedEmployee.approved_leave_hours, 1)}j).`,
+                },
+                {
+                  label: '4. Tekanan Tenggat',
+                  score: selectedEmployee.deadline_pressure_score,
+                  note: `${selectedEmployee.urgent_assignments_count} dari ${selectedEmployee.active_assignments_count} tugas aktif lewat tenggat / ≤ 7 hari.`,
+                },
+              ].map((sub) => (
+                <div key={sub.label} className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">{sub.label}</span>
+                    <span className="font-mono font-semibold text-foreground tabular-nums">
+                      {formatScore(sub.score, 1)}
+                    </span>
+                  </div>
+                  <Progress
+                    value={Math.min(100, Math.max(0, Number(sub.score || 0)))}
+                    className="h-1.5"
+                  />
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">{sub.note}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">Catatan Non-Punitif: </span>
+              {selectedEmployee.priority_reason}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </FormSheet>
     </AppShell>
   );
 }

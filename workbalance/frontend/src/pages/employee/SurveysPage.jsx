@@ -10,22 +10,45 @@ import {
   MessageSquareHeart,
   Plus,
   RefreshCw,
-  Search,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   Users,
-  X,
 } from 'lucide-react';
-import AppShell from '../../components/AppShell';
-import { useAuth } from '../../context/AuthContext';
-import { extractApiError } from '../../services/api';
-import { surveyService } from '../../services/surveyService';
-
-const ACTIVE_PILLS = [
-  { value: '', label: 'Semua' },
-  { value: '1', label: 'Dibuka' },
-  { value: '0', label: 'Ditutup' },
-];
+import { toast } from 'sonner';
+import AppShell from '@/components/AppShell';
+import { useAuth } from '@/context/AuthContext';
+import { extractApiError } from '@/services/api';
+import { surveyService } from '@/services/surveyService';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ConfirmDialog,
+  DataTable,
+  FormSheet,
+  KpiStatCard,
+  StatusBadge,
+} from '@/components/workbalance';
 
 const WLB_LIKERT_LABELS = {
   1: '1 — Sangat Buruk',
@@ -43,18 +66,26 @@ const WORKLOAD_LIKERT_LABELS = {
   5: '5 — Sangat Berat',
 };
 
-function getDimensionBadge(score) {
+function getDimensionBadgeMeta(score) {
   if (score === null || score === undefined) {
-    return { label: 'Belum ada data', badgeClass: 'bg-slate-100 text-slate-600' };
+    return { status: 'inactive', tone: 'neutral', label: 'Belum ada data' };
   }
   const num = Number(score);
   if (num >= 75) {
-    return { label: `${num.toFixed(1)} (Baik)`, badgeClass: 'bg-[#D1FAE5] text-[#047857]' };
+    return { status: 'good', tone: 'success', label: `${num.toFixed(1)} · Baik` };
   }
   if (num >= 50) {
-    return { label: `${num.toFixed(1)} (Perlu Perhatian)`, badgeClass: 'bg-[#FEF3C7] text-[#B45309]' };
+    return {
+      status: 'needs_attention',
+      tone: 'warning',
+      label: `${num.toFixed(1)} · Perlu Perhatian`,
+    };
   }
-  return { label: `${num.toFixed(1)} (Prioritas)`, badgeClass: 'bg-[#FEE2E2] text-[#B91C1C]' };
+  return {
+    status: 'action_priority',
+    tone: 'danger',
+    label: `${num.toFixed(1)} · Prioritas`,
+  };
 }
 
 function emptySurveyForm() {
@@ -89,39 +120,29 @@ export default function SurveysPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
 
-  // Toast feedback
-  const [toast, setToast] = useState(null);
-
-  // Aggregate Detail Modal (Manager / Admin)
-  const [aggregateModalOpen, setAggregateModalOpen] = useState(false);
+  // Aggregate Detail Sheet (Manager / Admin — STRICTLY DEPARTMENT AGGREGATES ONLY)
+  const [aggregateSheetOpen, setAggregateSheetOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState(null);
 
-  // Create / Edit Survey Questionnaire Modal (Manager / Admin)
-  const [surveyModalOpen, setSurveyModalOpen] = useState(false);
+  // Create / Edit Survey Questionnaire Sheet (Manager / Admin)
+  const [surveySheetOpen, setSurveySheetOpen] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState(null);
-  const [surveyForm, setSurveyForm] = useState(emptySurveyForm());
+  const [surveyForm, setSurveyForm] = useState(emptySurveyForm);
   const [surveyFormError, setSurveyFormError] = useState('');
   const [surveySubmitting, setSurveySubmitting] = useState(false);
 
-  // Delete Survey Modal
+  // Delete Survey Dialog
   const [deletingSurvey, setDeletingSurvey] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Employee Survey Response Modal
-  const [responseModalOpen, setResponseModalOpen] = useState(false);
+  // Employee Survey Response Sheet
+  const [responseSheetOpen, setResponseSheetOpen] = useState(false);
   const [respondingSurvey, setRespondingSurvey] = useState(null);
-  const [responseForm, setResponseForm] = useState(emptyResponseForm());
+  const [responseForm, setResponseForm] = useState(emptyResponseForm);
   const [responseFormError, setResponseFormError] = useState('');
   const [responseSubmitting, setResponseSubmitting] = useState(false);
-
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message });
-    setTimeout(() => {
-      setToast((current) => (current?.message === message ? null : current));
-    }, 4500);
-  }, []);
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -130,13 +151,15 @@ export default function SurveysPage() {
     try {
       const data = await surveyService.getSurveys({
         search: search.trim(),
-        is_active: activeFilter,
+        is_active: activeFilter === 'all' ? '' : activeFilter,
       });
 
       setSurveys(data?.surveys || []);
       setSummary(data?.summary || {});
     } catch (err) {
-      setErrorMsg(extractApiError(err, 'Gagal memuat data survei kondisi kerja.').message);
+      setErrorMsg(
+        extractApiError(err, 'Gagal memuat data survei kondisi kerja.').message
+      );
     } finally {
       setLoading(false);
     }
@@ -147,24 +170,24 @@ export default function SurveysPage() {
   }, [loadAllData]);
 
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || activeFilter !== ''),
+    () => Boolean(search.trim() || activeFilter !== 'all'),
     [search, activeFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setActiveFilter('');
+    setActiveFilter('all');
   };
 
   // --- Questionnaire CRUD (Admin & Manager) ---
-  const openCreateSurveyModal = () => {
+  const openCreateSurveySheet = useCallback(() => {
     setEditingSurvey(null);
     setSurveyForm(emptySurveyForm());
     setSurveyFormError('');
-    setSurveyModalOpen(true);
-  };
+    setSurveySheetOpen(true);
+  }, []);
 
-  const openEditSurveyModal = (survey) => {
+  const openEditSurveySheet = useCallback((survey) => {
     setEditingSurvey(survey);
     setSurveyForm({
       title: survey.title || '',
@@ -173,8 +196,13 @@ export default function SurveysPage() {
       is_active: Boolean(survey.is_active),
     });
     setSurveyFormError('');
-    setSurveyModalOpen(true);
-  };
+    setSurveySheetOpen(true);
+  }, []);
+
+  const openAggregateSheet = useCallback((survey) => {
+    setSelectedSurvey(survey);
+    setAggregateSheetOpen(true);
+  }, []);
 
   const handleSurveySubmit = async (e) => {
     e.preventDefault();
@@ -191,15 +219,17 @@ export default function SurveysPage() {
     try {
       if (editingSurvey) {
         const res = await surveyService.updateSurvey(editingSurvey.id, payload);
-        showToast('success', res.message || 'Survei kondisi kerja berhasil diperbarui.');
+        toast.success(res.message || 'Survei kondisi kerja berhasil diperbarui.');
       } else {
         const res = await surveyService.createSurvey(payload);
-        showToast('success', res.message || 'Periode survei kondisi kerja berhasil dibuat.');
+        toast.success(res.message || 'Periode survei kondisi kerja berhasil dibuat.');
       }
-      setSurveyModalOpen(false);
+      setSurveySheetOpen(false);
       await loadAllData();
     } catch (err) {
-      setSurveyFormError(extractApiError(err, 'Gagal menyimpan survei kondisi kerja.').message);
+      setSurveyFormError(
+        extractApiError(err, 'Gagal menyimpan survei kondisi kerja.').message
+      );
     } finally {
       setSurveySubmitting(false);
     }
@@ -211,11 +241,11 @@ export default function SurveysPage() {
 
     try {
       const res = await surveyService.deleteSurvey(deletingSurvey.id);
-      showToast('success', res.message || 'Survei kondisi kerja berhasil dihapus.');
+      toast.success(res.message || 'Survei kondisi kerja berhasil dihapus.');
       setDeletingSurvey(null);
       await loadAllData();
     } catch (err) {
-      showToast('error', extractApiError(err, 'Survei tidak dapat dihapus.').message);
+      toast.error(extractApiError(err, 'Survei tidak dapat dihapus.').message);
       setDeletingSurvey(null);
     } finally {
       setDeleteLoading(false);
@@ -223,20 +253,22 @@ export default function SurveysPage() {
   };
 
   // --- Employee Response Handlers ---
-  const openResponseModal = (survey) => {
+  const openResponseSheet = useCallback((survey) => {
     setRespondingSurvey(survey);
     if (survey.my_response) {
       setResponseForm({
         work_life_balance_score: Number(survey.my_response.work_life_balance_score || 4),
-        workload_perception_score: Number(survey.my_response.workload_perception_score || 3),
+        workload_perception_score: Number(
+          survey.my_response.workload_perception_score || 3
+        ),
         comments: survey.my_response.comments || '',
       });
     } else {
       setResponseForm(emptyResponseForm());
     }
     setResponseFormError('');
-    setResponseModalOpen(true);
-  };
+    setResponseSheetOpen(true);
+  }, []);
 
   const handleResponseSubmit = async (e) => {
     e.preventDefault();
@@ -254,859 +286,1021 @@ export default function SurveysPage() {
     try {
       if (respondingSurvey.my_response) {
         const res = await surveyService.updateResponse(respondingSurvey.id, payload);
-        showToast('success', res.message || 'Respons survei Anda berhasil diperbarui.');
+        toast.success(res.message || 'Respons survei Anda berhasil diperbarui.');
       } else {
         const res = await surveyService.submitResponse(respondingSurvey.id, payload);
-        showToast('success', res.message || 'Respons survei Anda berhasil dikirim.');
+        toast.success(res.message || 'Respons survei Anda berhasil dikirim.');
       }
-      setResponseModalOpen(false);
+      setResponseSheetOpen(false);
       await loadAllData();
     } catch (err) {
-      setResponseFormError(extractApiError(err, 'Gagal mengirim respons survei.').message);
+      setResponseFormError(
+        extractApiError(err, 'Gagal mengirim respons survei.').message
+      );
     } finally {
       setResponseSubmitting(false);
     }
   };
 
-  const kpiCards = isEmployee
-    ? [
+  // --- Department Aggregate Columns (NFR-02: Department-level aggregated metrics ONLY) ---
+  const departmentAggregateColumns = useMemo(
+    () => [
+      {
+        accessorKey: 'department_name',
+        header: 'Departemen',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <Badge variant="outline" className="font-mono text-[11px]">
+              {row.original.department_code}
+            </Badge>
+            <span className="text-xs font-medium text-foreground">
+              {row.original.department_name}
+            </span>
+          </div>
+        ),
+      },
+      {
+        accessorFn: (row) => Number(row.participation_rate || 0),
+        id: 'participation',
+        header: 'Partisipasi',
+        cell: ({ row }) => {
+          const rate = Number(row.original.participation_rate || 0);
+          return (
+            <div className="flex flex-col gap-1 whitespace-nowrap">
+              <div className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums">
+                <span className="font-medium text-foreground">
+                  {row.original.respondents_count} / {row.original.active_employees_count}
+                </span>
+                <span className="text-muted-foreground">{rate.toFixed(1)}%</span>
+              </div>
+              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-28" />
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.avg_wlb_score !== null && row.avg_wlb_score !== undefined
+            ? Number(row.avg_wlb_score)
+            : -1,
+        id: 'avg_wlb',
+        header: 'Skor & Dimensi WLB',
+        cell: ({ row }) => {
+          const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
+          return (
+            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+                {row.original.avg_wlb_score !== null && row.original.avg_wlb_score !== undefined
+                  ? `${Number(row.original.avg_wlb_score).toFixed(2)} / 5`
+                  : '-'}
+              </span>
+              <StatusBadge status={meta.status} tone={meta.tone} label={meta.label} />
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.avg_workload_perception_score !== null &&
+          row.avg_workload_perception_score !== undefined
+            ? Number(row.avg_workload_perception_score)
+            : -1,
+        id: 'workload_perception',
+        header: 'Persepsi Beban',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.avg_workload_perception_score !== null &&
+            row.original.avg_workload_perception_score !== undefined
+              ? `${Number(row.original.avg_workload_perception_score).toFixed(2)} / 5`
+              : '-'}
+          </span>
+        ),
+      },
+    ],
+    []
+  );
+
+  // --- Main Survey Table Columns ---
+  const columns = useMemo(() => {
+    const baseCols = [
+      {
+        accessorKey: 'title',
+        header: 'Judul & Deskripsi Survei',
+        cell: ({ row }) => (
+          <div className="flex max-w-[260px] flex-col gap-0.5 whitespace-normal">
+            <span className="line-clamp-1 text-xs font-medium text-foreground">
+              {row.original.title}
+            </span>
+            <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+              {row.original.description || 'Survei berkala keseimbangan kehidupan kerja'}
+            </span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'period_month',
+        header: 'Periode',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.period_month}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => (row.is_active ? 1 : 0),
+        id: 'status',
+        header: 'Status Periode',
+        cell: ({ row }) => (
+          <div className="whitespace-nowrap">
+            <StatusBadge
+              status={row.original.is_active ? 'active' : 'inactive'}
+              label={row.original.is_active ? 'Dibuka' : 'Ditutup'}
+            />
+          </div>
+        ),
+      },
+    ];
+
+    if (isEmployee) {
+      return [
+        ...baseCols,
         {
-          label: 'Survei Periode Dibuka',
-          value: summary.active_surveys_count ?? 0,
-          badge: `Dari ${summary.total_surveys ?? 0} total periode`,
-          badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-          icon: HeartHandshake,
-          iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
+          accessorFn: (row) => (row.my_response ? 1 : 0),
+          id: 'my_participation',
+          header: 'Partisipasi Saya',
+          cell: ({ row }) => {
+            const resp = row.original.my_response;
+            if (!resp) {
+              return (
+                <div className="whitespace-nowrap">
+                  <StatusBadge status="pending" label="Belum Diisi" />
+                </div>
+              );
+            }
+            return (
+              <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+                <StatusBadge status="completed" label="Sudah Diisi" />
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                  WLB: {resp.work_life_balance_score}/5 · Beban:{' '}
+                  {resp.workload_perception_score}/5
+                </span>
+              </div>
+            );
+          },
         },
         {
-          label: 'Survei Sudah Diisi',
-          value: summary.my_submitted_count ?? 0,
-          badge: 'Terima kasih atas partisipasi Anda',
-          badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-          icon: CheckCircle2,
-          iconBg: 'bg-[#D1FAE5] text-[#10B981]',
-        },
-        {
-          label: 'Menunggu Pengisian',
-          value: summary.my_pending_count ?? 0,
-          badge:
-            Number(summary.my_pending_count || 0) > 0
-              ? 'Mohon lengkapi survei aktif'
-              : 'Semua survei aktif terisi',
-          badgeClass:
-            Number(summary.my_pending_count || 0) > 0
-              ? 'bg-[#FEF3C7] text-[#B45309]'
-              : 'bg-[#D1FAE5] text-[#047857]',
-          icon: ClipboardCheck,
-          iconBg:
-            Number(summary.my_pending_count || 0) > 0
-              ? 'bg-[#FEF3C7] text-[#F59E0B]'
-              : 'bg-[#D1FAE5] text-[#10B981]',
-        },
-        {
-          label: 'Rata-rata Skor WLB Saya',
-          value:
-            summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
-              ? `${Number(summary.my_avg_wlb).toFixed(1)} / 5`
-              : '-',
-          badge: 'Skala Likert 1–5 pribadi',
-          badgeClass: 'bg-slate-100 text-slate-600',
-          icon: MessageSquareHeart,
-          iconBg: 'bg-slate-100 text-[#1E293B]',
-        },
-      ]
-    : [
-        {
-          label: 'Total Periode Survei',
-          value: summary.total_surveys ?? 0,
-          badge: `${summary.active_surveys_count ?? 0} periode dibuka`,
-          badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-          icon: HeartHandshake,
-          iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
-        },
-        {
-          label: 'Rata-rata Skor WLB (Agregat)',
-          value:
-            summary.overall_avg_wlb !== null && summary.overall_avg_wlb !== undefined
-              ? `${Number(summary.overall_avg_wlb).toFixed(2)} / 5`
-              : '-',
-          badge: `Dimensi WLB: ${summary.overall_wlb_dimension_score ?? 0} / 100`,
-          badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-          icon: BarChart3,
-          iconBg: 'bg-[#D1FAE5] text-[#10B981]',
-        },
-        {
-          label: 'Persepsi Beban Kerja',
-          value:
-            summary.overall_avg_workload_perception !== null &&
-            summary.overall_avg_workload_perception !== undefined
-              ? `${Number(summary.overall_avg_workload_perception).toFixed(2)} / 5`
-              : '-',
-          badge: 'Rata-rata agregat persepsi tim',
-          badgeClass: 'bg-[#FEF3C7] text-[#B45309]',
-          icon: MessageSquareHeart,
-          iconBg: 'bg-[#FEF3C7] text-[#F59E0B]',
-        },
-        {
-          label: 'Tingkat Partisipasi',
-          value: `${Number(summary.overall_participation_rate || 0).toFixed(1)}%`,
-          badge: `${summary.total_responses ?? 0} respons agregat`,
-          badgeClass: 'bg-slate-100 text-slate-600',
-          icon: Users,
-          iconBg: 'bg-slate-100 text-[#1E293B]',
+          id: 'actions',
+          header: () => <span className="sr-only">Aksi</span>,
+          enableSorting: false,
+          cell: ({ row }) => {
+            const survey = row.original;
+            return (
+              <div className="flex justify-end whitespace-nowrap">
+                {survey.is_active ? (
+                  <Button
+                    size="xs"
+                    variant={survey.my_response ? 'outline' : 'default'}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openResponseSheet(survey);
+                    }}
+                  >
+                    <Edit3 data-icon="inline-start" />
+                    {survey.my_response ? 'Ubah Jawaban' : 'Isi Survei'}
+                  </Button>
+                ) : survey.my_response ? (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Terkirim
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Periode ditutup</span>
+                )}
+              </div>
+            );
+          },
         },
       ];
+    }
+
+    // Manager & Admin view: STRICTLY AGGREGATED METRICS (NFR-02)
+    return [
+      ...baseCols,
+      {
+        accessorFn: (row) => Number(row.responses_count || 0),
+        id: 'responses',
+        header: 'Responden',
+        cell: ({ row }) => {
+          const rate = Number(row.original.participation_rate || 0);
+          return (
+            <div className="flex flex-col gap-1 whitespace-nowrap">
+              <div className="flex items-center gap-1.5 font-mono text-xs tabular-nums">
+                <span className="font-medium text-foreground">
+                  {row.original.responses_count ?? 0}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  ({rate.toFixed(1)}%)
+                </span>
+              </div>
+              <Progress value={Math.min(100, Math.max(0, rate))} className="h-1.5 w-24" />
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.converted_wlb_dimension_score !== null &&
+          row.converted_wlb_dimension_score !== undefined
+            ? Number(row.converted_wlb_dimension_score)
+            : -1,
+        id: 'wlb_score',
+        header: 'Skor WLB (Dimensi 2)',
+        cell: ({ row }) => {
+          const survey = row.original;
+          const dimMeta = getDimensionBadgeMeta(survey.converted_wlb_dimension_score);
+          return (
+            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+                {survey.avg_wlb_score !== null && survey.avg_wlb_score !== undefined
+                  ? `${Number(survey.avg_wlb_score).toFixed(2)} / 5`
+                  : '-'}
+              </span>
+              <StatusBadge
+                status={dimMeta.status}
+                tone={dimMeta.tone}
+                label={dimMeta.label}
+              />
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.avg_workload_perception_score !== null &&
+          row.avg_workload_perception_score !== undefined
+            ? Number(row.avg_workload_perception_score)
+            : -1,
+        id: 'workload_perception',
+        header: 'Persepsi Beban',
+        cell: ({ row }) => {
+          const score = row.original.avg_workload_perception_score;
+          if (score === null || score === undefined) {
+            return <span className="font-mono text-xs text-muted-foreground">-</span>;
+          }
+          const num = Number(score);
+          return (
+            <div className="flex flex-col gap-1 whitespace-nowrap">
+              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+                {num.toFixed(2)} / 5
+              </span>
+              <Progress value={Math.min(100, Math.max(0, (num / 5) * 100))} className="h-1.5 w-20" />
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const survey = row.original;
+          const hasResponses = Number(survey.responses_count || 0) > 0;
+          return (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openAggregateSheet(survey);
+                }}
+              >
+                <BarChart3 data-icon="inline-start" />
+                Agregat
+              </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Ubah survei"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEditSurveySheet(survey);
+                    }}
+                  >
+                    <Edit3 className="size-4 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Ubah periode survei</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Hapus survei"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDeletingSurvey(survey);
+                    }}
+                  >
+                    <Trash2
+                      className={
+                        hasResponses
+                          ? 'size-4 text-muted-foreground/60'
+                          : 'size-4 text-destructive'
+                      }
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {hasResponses
+                    ? 'Sudah memiliki respons (penghapusan dilindungi sistem)'
+                    : 'Hapus survei'}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [isEmployee, openAggregateSheet, openEditSurveySheet, openResponseSheet]);
+
+  const overallWlbMeta = getDimensionBadgeMeta(summary.overall_wlb_dimension_score);
+  const overallParticipation = Number(summary.overall_participation_rate || 0);
 
   return (
     <AppShell
       title="Survei Kondisi Kerja"
       breadcrumb={
         isEmployee
-          ? 'Kesejahteraan / Pengisian Survei Kondisi Kerja'
-          : 'Kesejahteraan / Survei & Agregasi Departemen / PBI-07'
+          ? 'Kesejahteraan & Pelatihan / Pengisian Survei Kondisi Kerja'
+          : 'Kesejahteraan & Kompetensi / Survei & Agregasi Departemen'
       }
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Cari judul survei atau periode (YYYY-MM)..."
+      actions={
+        canManage ? (
+          <Button size="sm" onClick={openCreateSurveySheet}>
+            <Plus data-icon="inline-start" />
+            Buat Survei Baru
+          </Button>
+        ) : undefined
+      }
     >
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          role="status"
-          className={`fixed top-5 right-5 z-50 max-w-md flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg border ${
-            toast.type === 'success'
-              ? 'bg-white border-emerald-200 text-[#047857]'
-              : 'bg-white border-red-200 text-[#B91C1C]'
-          }`}
-        >
-          {toast.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm font-medium text-[#1E293B] flex-1">{toast.message}</p>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600"
-            aria-label="Tutup notifikasi"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <div className="flex flex-col gap-6">
+        {/* Row 1: 4 KPI Cards */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <Skeleton key={n} className="h-32 rounded-xl" />
+            ))}
+          </div>
+        ) : isEmployee ? (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiStatCard
+              label="Survei Periode Dibuka"
+              value={summary.active_surveys_count ?? 0}
+              unit="periode"
+              icon={HeartHandshake}
+              statusTone="info"
+              statusLabel={`Dari ${summary.total_surveys ?? 0} total periode`}
+            />
 
-      <div className="space-y-6">
-        {/* 4 KPI Summary Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          {kpiCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.label}
-                className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs hover:border-slate-300 transition"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">{card.label}</span>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                    <Icon className="w-[18px] h-[18px]" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-bold text-[#1E293B] tabular-nums mt-2">
-                  {card.value}
-                </p>
-                <span
-                  className={`inline-block mt-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${card.badgeClass}`}
-                >
-                  {card.badge}
-                </span>
-              </div>
-            );
-          })}
-        </section>
+            <KpiStatCard
+              label="Survei Sudah Diisi"
+              value={summary.my_submitted_count ?? 0}
+              unit="survei"
+              icon={CheckCircle2}
+              status="completed"
+              statusLabel="Partisipasi tercatat"
+            />
+
+            <KpiStatCard
+              label="Menunggu Pengisian"
+              value={summary.my_pending_count ?? 0}
+              unit="survei"
+              icon={ClipboardCheck}
+              statusTone={Number(summary.my_pending_count || 0) > 0 ? 'warning' : 'success'}
+              statusLabel={
+                Number(summary.my_pending_count || 0) > 0
+                  ? 'Mohon lengkapi survei aktif'
+                  : 'Semua survei aktif terisi'
+              }
+            />
+
+            <KpiStatCard
+              label="Rata-rata Skor WLB Saya"
+              value={
+                summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
+                  ? Number(summary.my_avg_wlb).toFixed(1)
+                  : '-'
+              }
+              unit={
+                summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
+                  ? '/ 5'
+                  : undefined
+              }
+              icon={MessageSquareHeart}
+              progress={
+                summary.my_avg_wlb !== null && summary.my_avg_wlb !== undefined
+                  ? (Number(summary.my_avg_wlb) / 5) * 100
+                  : undefined
+              }
+              hint="Skala Likert 1–5 pribadi"
+            />
+          </section>
+        ) : (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiStatCard
+              label="Total Periode Survei"
+              value={summary.total_surveys ?? 0}
+              unit="periode"
+              icon={HeartHandshake}
+              statusTone="info"
+              statusLabel={`${summary.active_surveys_count ?? 0} periode dibuka`}
+            />
+
+            <KpiStatCard
+              label="Rata-rata Skor WLB (Agregat)"
+              value={
+                summary.overall_avg_wlb !== null && summary.overall_avg_wlb !== undefined
+                  ? Number(summary.overall_avg_wlb).toFixed(2)
+                  : '-'
+              }
+              unit={
+                summary.overall_avg_wlb !== null && summary.overall_avg_wlb !== undefined
+                  ? '/ 5'
+                  : undefined
+              }
+              icon={BarChart3}
+              progress={
+                summary.overall_wlb_dimension_score !== null &&
+                summary.overall_wlb_dimension_score !== undefined
+                  ? Number(summary.overall_wlb_dimension_score)
+                  : undefined
+              }
+              status={overallWlbMeta.status}
+              statusTone={overallWlbMeta.tone}
+              statusLabel={`Dimensi WLB: ${summary.overall_wlb_dimension_score ?? 0} / 100`}
+            />
+
+            <KpiStatCard
+              label="Persepsi Beban Kerja"
+              value={
+                summary.overall_avg_workload_perception !== null &&
+                summary.overall_avg_workload_perception !== undefined
+                  ? Number(summary.overall_avg_workload_perception).toFixed(2)
+                  : '-'
+              }
+              unit={
+                summary.overall_avg_workload_perception !== null &&
+                summary.overall_avg_workload_perception !== undefined
+                  ? '/ 5'
+                  : undefined
+              }
+              icon={MessageSquareHeart}
+              progress={
+                summary.overall_avg_workload_perception !== null &&
+                summary.overall_avg_workload_perception !== undefined
+                  ? (Number(summary.overall_avg_workload_perception) / 5) * 100
+                  : undefined
+              }
+              hint="Rata-rata agregat persepsi tim"
+            />
+
+            <KpiStatCard
+              label="Tingkat Partisipasi"
+              value={`${overallParticipation.toFixed(1)}%`}
+              icon={Users}
+              progress={overallParticipation}
+              statusTone={overallParticipation >= 75 ? 'success' : 'warning'}
+              statusLabel={`${summary.total_responses ?? 0} respons agregat`}
+            />
+          </section>
+        )}
 
         {/* NFR-02 Privacy Callout */}
-        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-[#E0F2FE] border border-sky-200/80 text-xs text-[#0369A1]">
-          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#0284C7]" />
-          <p className="leading-relaxed">
-            <span className="font-semibold">Jaminan Privasi Survei (NFR-02):</span>{' '}
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+          <p>
+            <span className="font-medium text-foreground">
+              Jaminan Privasi Survei (NFR-02):
+            </span>{' '}
             {isEmployee
               ? 'Jawaban dan komentar Anda bersifat rahasia. Manajer hanya melihat skor rata-rata dan tingkat partisipasi secara agregat per departemen.'
-              : 'Identitas responden maupun komentar individu tidak pernah ditampilkan pada antarmuka manajemen. Seluruh hasil survei disajikan dalam bentuk metrik agregat departemen.'}
+              : 'Identitas responden maupun komentar individu tidak pernah ditampilkan pada antarmuka manajemen. Seluruh hasil survei disajikan eksklusif dalam bentuk metrik agregat departemen.'}
           </p>
         </div>
 
-        {/* Error State */}
-        {errorMsg && (
-          <div className="bg-white rounded-xl border border-red-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#1E293B]">Gagal Memuat Survei</h2>
-                <p className="text-sm text-slate-600 mt-0.5">{errorMsg}</p>
-              </div>
+        {/* Row 2: Surveys DataTable */}
+        <DataTable
+          title="Daftar Periode Survei Kondisi Kerja"
+          countLabel="periode"
+          columns={columns}
+          data={surveys}
+          loading={loading}
+          error={errorMsg}
+          onRetry={loadAllData}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Cari judul survei atau YYYY-MM..."
+          pageSize={10}
+          onRowClick={(row) => {
+            if (isEmployee) {
+              if (row.is_active) openResponseSheet(row);
+            } else {
+              openAggregateSheet(row);
+            }
+          }}
+          emptyTitle={
+            hasActiveFilters
+              ? 'Tidak ada survei yang sesuai filter'
+              : 'Belum ada periode survei kondisi kerja'
+          }
+          emptyDescription={
+            hasActiveFilters
+              ? 'Coba ubah kata kunci pencarian atau setel ulang filter.'
+              : canManage
+                ? 'Buat periode survei baru untuk mulai mengumpulkan umpan balik keseimbangan kerja pegawai.'
+                : 'Belum ada kuesioner survei yang dibuka untuk periode ini.'
+          }
+          emptyAction={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Reset Filter
+                </Button>
+              )}
+              {canManage && (
+                <Button size="sm" onClick={openCreateSurveySheet}>
+                  <Plus data-icon="inline-start" />
+                  Buat Survei Baru
+                </Button>
+              )}
             </div>
-            <button
-              type="button"
+          }
+          filterSlot={
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={activeFilter}
+                onValueChange={(val) => val && setActiveFilter(val)}
+                variant="outline"
+                size="sm"
+              >
+                <ToggleGroupItem value="all" className="text-xs">
+                  Semua
+                </ToggleGroupItem>
+                <ToggleGroupItem value="1" className="text-xs">
+                  Dibuka
+                </ToggleGroupItem>
+                <ToggleGroupItem value="0" className="text-xs">
+                  Ditutup
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          }
+          actionsSlot={
+            <Button
+              variant="outline"
+              size="icon-sm"
               onClick={loadAllData}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-sm font-semibold transition cursor-pointer shrink-0"
+              aria-label="Muat ulang data"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Lagi</span>
-            </button>
-          </div>
-        )}
-
-        {/* Surveys Table Card */}
-        {!errorMsg && (
-          <section className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-            {/* Toolbar */}
-            <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-semibold text-[#1E293B]">
-                  Daftar Periode Survei Kondisi Kerja
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                  {surveys.length}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative w-full sm:w-56">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari survei / YYYY-MM..."
-                    className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  />
-                </div>
-
-                {/* Status Filter Pills */}
-                <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
-                  {ACTIVE_PILLS.map((pill) => (
-                    <button
-                      key={pill.label}
-                      type="button"
-                      onClick={() => setActiveFilter(pill.value)}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
-                        activeFilter === pill.value
-                          ? 'bg-white text-[#1E293B] shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={openCreateSurveyModal}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Buat Survei Baru</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Loading State */}
-            {loading ? (
-              <div className="p-6 space-y-3" aria-busy="true">
-                {[1, 2, 3].map((row) => (
-                  <div key={row} className="h-14 bg-slate-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : surveys.length === 0 ? (
-              /* Empty State */
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center mx-auto mb-3">
-                  <HeartHandshake className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#1E293B]">
-                  {hasActiveFilters
-                    ? 'Tidak ada survei yang sesuai filter'
-                    : 'Belum ada periode survei kondisi kerja'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  {hasActiveFilters
-                    ? 'Coba ubah kata kunci pencarian atau setel ulang filter.'
-                    : canManage
-                      ? 'Buat periode survei baru untuk mulai mengumpulkan umpan balik keseimbangan kerja pegawai.'
-                      : 'Belum ada kuesioner survei yang dibuka untuk periode ini.'}
-                </p>
-                <div className="mt-4 flex justify-center gap-2">
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
-                    >
-                      Setel Ulang Filter
-                    </button>
-                  )}
-                  {canManage && (
-                    <button
-                      type="button"
-                      onClick={openCreateSurveyModal}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Buat Survei Baru</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Success State Table */
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/80 text-[#64748B] text-xs uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4 font-semibold">Judul & Deskripsi Survei</th>
-                      <th className="py-3 px-4 font-semibold">Periode</th>
-                      <th className="py-3 px-4 font-semibold">Status Periode</th>
-                      {isEmployee ? (
-                        <>
-                          <th className="py-3 px-4 font-semibold">Partisipasi Saya</th>
-                          <th className="py-3 px-4 font-semibold text-right">Aksi</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="py-3 px-4 font-semibold">Responden</th>
-                          <th className="py-3 px-4 font-semibold">Skor WLB (Dimensi 2)</th>
-                          <th className="py-3 px-4 font-semibold">Persepsi Beban</th>
-                          <th className="py-3 px-4 font-semibold text-right">Aksi</th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-[#334155]">
-                    {surveys.map((survey) => {
-                      const dimBadge = getDimensionBadge(survey.converted_wlb_dimension_score);
-                      const hasResponses = Number(survey.responses_count || 0) > 0;
-
-                      return (
-                        <tr
-                          key={survey.id}
-                          className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors"
-                        >
-                          <td className="py-3.5 px-4 max-w-md">
-                            <p className="font-semibold text-[#1E293B]">{survey.title}</p>
-                            <p className="text-xs text-slate-500 truncate mt-0.5">
-                              {survey.description || 'Survei berkala keseimbangan kehidupan kerja'}
-                            </p>
-                          </td>
-
-                          <td className="py-3.5 px-4 tabular-nums font-semibold text-[#1E293B] whitespace-nowrap">
-                            {survey.period_month}
-                          </td>
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            {survey.is_active ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#D1FAE5] text-[#047857]">
-                                Dibuka
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                                Ditutup
-                              </span>
-                            )}
-                          </td>
-
-                          {isEmployee ? (
-                            <>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                {survey.my_response ? (
-                                  <div>
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#D1FAE5] text-[#047857]">
-                                      Sudah Diisi
-                                    </span>
-                                    <p className="text-xs text-slate-500 mt-1 tabular-nums">
-                                      WLB: {survey.my_response.work_life_balance_score}/5 • Beban:{' '}
-                                      {survey.my_response.workload_perception_score}/5
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF3C7] text-[#B45309]">
-                                    Belum Diisi
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                                {survey.is_active ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => openResponseModal(survey)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                    <span>{survey.my_response ? 'Ubah Jawaban' : 'Isi Survei'}</span>
-                                  </button>
-                                ) : survey.my_response ? (
-                                  <span className="text-xs text-slate-400 font-medium">
-                                    Terkirim
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">Periode ditutup</span>
-                                )}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="py-3.5 px-4 tabular-nums whitespace-nowrap">
-                                <span className="font-semibold text-[#1E293B]">
-                                  {survey.responses_count}
-                                </span>{' '}
-                                <span className="text-xs text-slate-500">
-                                  ({Number(survey.participation_rate || 0).toFixed(1)}%)
-                                </span>
-                              </td>
-
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex flex-col items-start gap-1">
-                                  <span className="text-xs font-semibold text-[#1E293B] tabular-nums">
-                                    {survey.avg_wlb_score !== null
-                                      ? `${Number(survey.avg_wlb_score).toFixed(2)} / 5`
-                                      : '-'}
-                                  </span>
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[11px] font-medium tabular-nums ${dimBadge.badgeClass}`}
-                                  >
-                                    {dimBadge.label}
-                                  </span>
-                                </div>
-                              </td>
-
-                              <td className="py-3.5 px-4 tabular-nums whitespace-nowrap font-medium text-[#1E293B]">
-                                {survey.avg_workload_perception_score !== null
-                                  ? `${Number(survey.avg_workload_perception_score).toFixed(2)} / 5`
-                                  : '-'}
-                              </td>
-
-                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedSurvey(survey);
-                                      setAggregateModalOpen(true);
-                                    }}
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                    title="Lihat Agregat per Departemen"
-                                  >
-                                    <BarChart3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditSurveyModal(survey)}
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                    title="Ubah Survei"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setDeletingSurvey(survey)}
-                                    className={`p-1.5 rounded-lg transition cursor-pointer ${
-                                      hasResponses
-                                        ? 'text-slate-400 hover:text-[#B45309] hover:bg-[#FEF3C7]/70'
-                                        : 'text-slate-500 hover:text-[#EF4444] hover:bg-[#FEE2E2]/70'
-                                    }`}
-                                    title={
-                                      hasResponses
-                                        ? 'Sudah memiliki respons (penghapusan ditolak sistem)'
-                                        : 'Hapus Survei'
-                                    }
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
+              <RefreshCw className={loading ? 'animate-spin' : ''} />
+            </Button>
+          }
+        />
       </div>
 
-      {/* Modal Agregat Departemen (Manager & Admin — NFR-02 Strict Aggregation) */}
-      {aggregateModalOpen && selectedSurvey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  Hasil Agregat Departemen — {selectedSurvey.period_month}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedSurvey.title}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAggregateModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-2 text-xs text-[#0369A1] bg-[#E0F2FE] px-3.5 py-2.5 rounded-lg">
-                <Lock className="w-4 h-4 shrink-0" />
+      {/* Sheet 1: Hasil Agregat Departemen (Manager & Admin — STRICT NFR-02 AGGREGATION ONLY) */}
+      {!isEmployee && (
+        <FormSheet
+          open={aggregateSheetOpen && Boolean(selectedSurvey)}
+          onOpenChange={setAggregateSheetOpen}
+          title={
+            selectedSurvey
+              ? `Hasil Agregat Departemen · ${selectedSurvey.period_month}`
+              : 'Hasil Agregat Departemen'
+          }
+          description={selectedSurvey?.title || undefined}
+          size="xl"
+          footer={
+            <Button variant="outline" onClick={() => setAggregateSheetOpen(false)}>
+              Tutup
+            </Button>
+          }
+        >
+          {selectedSurvey && (
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+                <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
                 <span>
-                  Privasi NFR-02: Hanya menampilkan statistik agregat (`AVG` & `COUNT`) per departemen tanpa identitas atau komentar individu.
+                  <span className="font-medium text-foreground">Privasi NFR-02:</span> Hanya
+                  menampilkan statistik agregat (AVG &amp; COUNT) per departemen tanpa
+                  identitas, skor per individu, maupun komentar responden.
                 </span>
               </div>
 
-              <div className="overflow-x-auto border border-slate-200/80 rounded-xl">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 text-[#64748B] text-xs uppercase border-b border-slate-200">
-                    <tr>
-                      <th className="py-2.5 px-3.5 font-semibold">Departemen</th>
-                      <th className="py-2.5 px-3.5 font-semibold">Partisipasi</th>
-                      <th className="py-2.5 px-3.5 font-semibold">Rata-rata WLB</th>
-                      <th className="py-2.5 px-3.5 font-semibold">Dimensi WLB (0–100)</th>
-                      <th className="py-2.5 px-3.5 font-semibold">Persepsi Beban</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-[#334155]">
-                    {(selectedSurvey.department_aggregates || []).map((dept) => {
-                      const deptDimBadge = getDimensionBadge(dept.converted_wlb_dimension_score);
-                      return (
-                        <tr key={dept.department_id} className="border-b border-slate-100 last:border-none">
-                          <td className="py-3 px-3.5">
-                            <span className="font-semibold text-[#1E293B]">
-                              {dept.department_name}
-                            </span>
-                            <span className="ml-1.5 text-xs text-slate-500">
-                              ({dept.department_code})
-                            </span>
-                          </td>
-                          <td className="py-3 px-3.5 tabular-nums text-xs">
-                            <span className="font-semibold text-[#1E293B]">
-                              {dept.respondents_count} / {dept.active_employees_count}
-                            </span>{' '}
-                            ({Number(dept.participation_rate || 0).toFixed(1)}%)
-                          </td>
-                          <td className="py-3 px-3.5 tabular-nums font-medium">
-                            {dept.avg_wlb_score !== null
-                              ? `${Number(dept.avg_wlb_score).toFixed(2)} / 5`
-                              : '-'}
-                          </td>
-                          <td className="py-3 px-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium tabular-nums ${deptDimBadge.badgeClass}`}
-                            >
-                              {deptDimBadge.label}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3.5 tabular-nums font-medium">
-                            {dept.avg_workload_perception_score !== null
-                              ? `${Number(dept.avg_workload_perception_score).toFixed(2)} / 5`
-                              : '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setAggregateModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Buat / Ubah Survei (Manager & Admin) */}
-      {surveyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#1E293B]">
-                {editingSurvey ? 'Ubah Periode Survei' : 'Buat Survei Kondisi Kerja Baru'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSurveyModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSurveySubmit} className="p-6 space-y-4">
-              {surveyFormError && (
-                <div className="flex items-start gap-2 rounded-lg bg-[#FEE2E2] px-3.5 py-2.5 text-xs text-[#B91C1C]">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{surveyFormError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Judul Survei
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={200}
-                  value={surveyForm.title}
-                  onChange={(e) => setSurveyForm({ ...surveyForm, title: e.target.value })}
-                  placeholder="Contoh: Survei Kondisi Kerja Desember 2026"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Periode Bulan (YYYY-MM)
-                  </label>
-                  <input
-                    type="month"
-                    required
-                    value={surveyForm.period_month}
-                    onChange={(e) => setSurveyForm({ ...surveyForm, period_month: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7] tabular-nums"
+              {/* Overall Period Aggregate Summary */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+                  <span className="text-xs text-muted-foreground">Partisipasi Periode</span>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
+                      {Number(selectedSurvey.participation_rate || 0).toFixed(1)}%
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                      {selectedSurvey.responses_count ?? 0} respons
+                    </span>
+                  </div>
+                  <Progress
+                    value={Math.min(100, Math.max(0, Number(selectedSurvey.participation_rate || 0)))}
+                    className="h-1.5"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Status Pengisian
-                  </label>
-                  <select
-                    value={surveyForm.is_active ? '1' : '0'}
-                    onChange={(e) =>
-                      setSurveyForm({ ...surveyForm, is_active: e.target.value === '1' })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="1">Dibuka (Aktif)</option>
-                    <option value="0">Ditutup</option>
-                  </select>
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+                  <span className="text-xs text-muted-foreground">Rata-rata WLB</span>
+                  <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
+                    {selectedSurvey.avg_wlb_score !== null &&
+                    selectedSurvey.avg_wlb_score !== undefined
+                      ? `${Number(selectedSurvey.avg_wlb_score).toFixed(2)}`
+                      : '-'}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ 5</span>
+                  </span>
+                  <div className="flex">
+                    <StatusBadge
+                      status={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).status}
+                      tone={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).tone}
+                      label={getDimensionBadgeMeta(selectedSurvey.converted_wlb_dimension_score).label}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3.5">
+                  <span className="text-xs text-muted-foreground">Persepsi Beban Kerja</span>
+                  <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
+                    {selectedSurvey.avg_workload_perception_score !== null &&
+                    selectedSurvey.avg_workload_perception_score !== undefined
+                      ? `${Number(selectedSurvey.avg_workload_perception_score).toFixed(2)}`
+                      : '-'}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ 5</span>
+                  </span>
+                  {selectedSurvey.avg_workload_perception_score !== null &&
+                    selectedSurvey.avg_workload_perception_score !== undefined && (
+                      <Progress
+                        value={Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            (Number(selectedSurvey.avg_workload_perception_score) / 5) * 100
+                          )
+                        )}
+                        className="h-1.5"
+                      />
+                    )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Deskripsi / Tujuan Survei (Opsional)
-                </label>
-                <textarea
-                  rows={3}
-                  maxLength={2000}
-                  value={surveyForm.description}
-                  onChange={(e) => setSurveyForm({ ...surveyForm, description: e.target.value })}
-                  placeholder="Penjelasan singkat mengenai tujuan pengisian survei periode ini..."
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
+              {/* Department Aggregates DataTable (strictly department-level aggregates) */}
+              <DataTable
+                title="Rincian Agregat per Departemen"
+                countLabel="departemen"
+                columns={departmentAggregateColumns}
+                data={selectedSurvey.department_aggregates || []}
+                searchable={false}
+                pageSize={20}
+                emptyTitle="Belum ada data agregat departemen"
+                emptyDescription="Statistik agregat akan muncul setelah pegawai mengirimkan respons pada periode survei ini."
+              />
+            </div>
+          )}
+        </FormSheet>
+      )}
+
+      {/* Sheet 2: Buat / Ubah Periode Survei (Manager & Admin) */}
+      {canManage && (
+        <FormSheet
+          open={surveySheetOpen}
+          onOpenChange={setSurveySheetOpen}
+          title={editingSurvey ? 'Ubah Periode Survei' : 'Buat Survei Kondisi Kerja Baru'}
+          description="Atur judul, periode bulan, status pembukaan, dan deskripsi survei."
+          size="md"
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSurveySheetOpen(false)}
+                disabled={surveySubmitting}
+              >
+                Batal
+              </Button>
+              <Button type="submit" form="survey-form" disabled={surveySubmitting}>
+                {surveySubmitting && <Spinner data-icon="inline-start" />}
+                {surveySubmitting
+                  ? 'Menyimpan...'
+                  : editingSurvey
+                    ? 'Simpan Perubahan'
+                    : 'Buat Survei'}
+              </Button>
+            </>
+          }
+        >
+          <form
+            id="survey-form"
+            onSubmit={handleSurveySubmit}
+            className="flex flex-col gap-4"
+          >
+            {surveyFormError && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{surveyFormError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="survey-title">Judul Survei</Label>
+              <Input
+                id="survey-title"
+                name="title"
+                type="text"
+                required
+                maxLength={200}
+                value={surveyForm.title}
+                onChange={(e) =>
+                  setSurveyForm((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="Contoh: Survei Kondisi Kerja Desember 2026"
+                className="bg-background"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="survey-period-month">Periode Bulan (YYYY-MM)</Label>
+                <Input
+                  id="survey-period-month"
+                  name="period_month"
+                  type="month"
+                  required
+                  value={surveyForm.period_month}
+                  onChange={(e) =>
+                    setSurveyForm((prev) => ({ ...prev, period_month: e.target.value }))
+                  }
+                  className="bg-background font-mono tabular-nums"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setSurveyModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="survey-is-active">Status Pengisian</Label>
+                <Select
+                  name="is_active"
+                  value={surveyForm.is_active ? '1' : '0'}
+                  onValueChange={(val) =>
+                    setSurveyForm((prev) => ({ ...prev, is_active: val === '1' }))
+                  }
                 >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={surveySubmitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 rounded-lg transition cursor-pointer"
-                >
-                  {surveySubmitting ? 'Menyimpan...' : editingSurvey ? 'Simpan Perubahan' : 'Buat Survei'}
-                </button>
+                  <SelectTrigger id="survey-is-active" className="w-full bg-background">
+                    <SelectValue placeholder="Pilih Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="1">Dibuka (Aktif)</SelectItem>
+                      <SelectItem value="0">Ditutup</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
-            </form>
-          </div>
-        </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="survey-description">
+                Deskripsi / Tujuan Survei (Opsional)
+              </Label>
+              <Textarea
+                id="survey-description"
+                name="description"
+                rows={4}
+                maxLength={2000}
+                value={surveyForm.description}
+                onChange={(e) =>
+                  setSurveyForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Penjelasan singkat mengenai tujuan pengisian survei periode ini..."
+                className="bg-background"
+              />
+            </div>
+          </form>
+        </FormSheet>
       )}
 
-      {/* Modal Konfirmasi Hapus Survei */}
-      {deletingSurvey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-md p-6">
-            <h3 className="text-base font-bold text-[#1E293B]">Hapus Periode Survei?</h3>
-            <p className="text-sm text-slate-600 mt-2">
-              Survei <span className="font-semibold text-[#1E293B]">{deletingSurvey.title}</span>{' '}
-              ({deletingSurvey.period_month}) akan dihapus.
-              {Number(deletingSurvey.responses_count || 0) > 0 && (
-                <span className="block mt-2 text-xs text-[#B45309] bg-[#FEF3C7] p-2.5 rounded-lg">
-                  Perhatian: Survei ini sudah memiliki {deletingSurvey.responses_count} respons pegawai. Penghapusan akan ditolak oleh sistem.
-                </span>
-              )}
-            </p>
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button
+      {/* Dialog Konfirmasi Hapus Survei */}
+      {canManage && (
+        <ConfirmDialog
+          open={Boolean(deletingSurvey)}
+          onOpenChange={(open) => {
+            if (!open) setDeletingSurvey(null);
+          }}
+          title="Hapus Periode Survei?"
+          description={
+            deletingSurvey ? (
+              <>
+                Survei{' '}
+                <span className="font-semibold text-foreground">
+                  {deletingSurvey.title}
+                </span>{' '}
+                (<span className="font-mono">{deletingSurvey.period_month}</span>) akan
+                dihapus.
+                {Number(deletingSurvey.responses_count || 0) > 0 && (
+                  <span className="mt-2 block rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground">
+                    Perhatian: Survei ini sudah memiliki {deletingSurvey.responses_count}{' '}
+                    respons pegawai. Penghapusan akan ditolak oleh sistem.
+                  </span>
+                )}
+              </>
+            ) : undefined
+          }
+          confirmLabel={deleteLoading ? 'Memproses...' : 'Hapus'}
+          loading={deleteLoading}
+          onConfirm={handleConfirmDeleteSurvey}
+        />
+      )}
+
+      {/* Sheet 3: Pengisian Survei Kondisi Kerja (Employee Likert 1–5) */}
+      {isEmployee && (
+        <FormSheet
+          open={responseSheetOpen && Boolean(respondingSurvey)}
+          onOpenChange={setResponseSheetOpen}
+          title={
+            respondingSurvey?.my_response
+              ? 'Perbarui Jawaban Survei'
+              : 'Isi Survei Kondisi Kerja'
+          }
+          description={
+            respondingSurvey
+              ? `${respondingSurvey.title} (${respondingSurvey.period_month})`
+              : undefined
+          }
+          size="md"
+          footer={
+            <>
+              <Button
                 type="button"
-                onClick={() => setDeletingSurvey(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+                variant="outline"
+                onClick={() => setResponseSheetOpen(false)}
+                disabled={responseSubmitting}
               >
                 Batal
-              </button>
-              <button
-                type="button"
-                disabled={deleteLoading}
-                onClick={handleConfirmDeleteSurvey}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#EF4444] hover:bg-red-600 disabled:opacity-60 rounded-lg cursor-pointer"
+              </Button>
+              <Button
+                type="submit"
+                form="survey-response-form"
+                disabled={responseSubmitting}
               >
-                {deleteLoading ? 'Memproses...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Pengisian Survei Kondisi Kerja (Employee Likert 1-5) */}
-      {responseModalOpen && respondingSurvey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1E293B]">
-                  {respondingSurvey.my_response ? 'Perbarui Jawaban Survei' : 'Isi Survei Kondisi Kerja'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {respondingSurvey.title} ({respondingSurvey.period_month})
-                </p>
+                {responseSubmitting && <Spinner data-icon="inline-start" />}
+                {responseSubmitting
+                  ? 'Mengirim...'
+                  : respondingSurvey?.my_response
+                    ? 'Perbarui Jawaban'
+                    : 'Kirim Jawaban'}
+              </Button>
+            </>
+          }
+        >
+          {respondingSurvey && (
+            <form
+              id="survey-response-form"
+              onSubmit={handleResponseSubmit}
+              className="flex flex-col gap-5"
+            >
+              <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                <Lock className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <span>
+                  Respons Anda bersifat rahasia dan hanya diproses sebagai rata-rata agregat
+                  departemen.
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setResponseModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleResponseSubmit} className="p-6 space-y-5">
               {responseFormError && (
-                <div className="flex items-start gap-2 rounded-lg bg-[#FEE2E2] px-3.5 py-2.5 text-xs text-[#B91C1C]">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
                   <span>{responseFormError}</span>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-[#1E293B] mb-2">
-                  1. Keseimbangan Kehidupan & Pekerjaan (Work-Life Balance)
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((score) => {
-                    const selected = Number(responseForm.work_life_balance_score) === score;
-                    return (
-                      <button
-                        key={score}
-                        type="button"
-                        onClick={() =>
-                          setResponseForm({ ...responseForm, work_life_balance_score: score })
-                        }
-                        className={`py-2.5 rounded-lg border text-sm font-bold tabular-nums transition cursor-pointer ${
-                          selected
-                            ? 'bg-[#0284C7] border-[#0284C7] text-white shadow-xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-[#0284C7]'
-                        }`}
-                      >
-                        {score}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-[#0284C7] font-medium mt-1.5">
+              {/* Question 1: Work-Life Balance */}
+              <div className="flex flex-col gap-2.5 rounded-xl border border-border p-4">
+                <Label id="survey-wlb-label" className="leading-snug">
+                  1. Keseimbangan Kehidupan &amp; Pekerjaan (Work-Life Balance)
+                </Label>
+                <ToggleGroup
+                  type="single"
+                  aria-labelledby="survey-wlb-label"
+                  value={String(responseForm.work_life_balance_score)}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setResponseForm((prev) => ({
+                        ...prev,
+                        work_life_balance_score: Number(val),
+                      }));
+                    }
+                  }}
+                  variant="outline"
+                  spacing={2}
+                  className="grid w-full grid-cols-5"
+                >
+                  {[1, 2, 3, 4, 5].map((score) => (
+                    <ToggleGroupItem
+                      key={score}
+                      value={String(score)}
+                      className="h-10 font-mono text-sm font-semibold tabular-nums data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    >
+                      {score}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                <Progress
+                  value={(Number(responseForm.work_life_balance_score) / 5) * 100}
+                  className="h-1.5"
+                />
+                <p className="text-xs font-medium text-primary">
                   {WLB_LIKERT_LABELS[responseForm.work_life_balance_score]}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#1E293B] mb-2">
+              {/* Question 2: Workload Perception */}
+              <div className="flex flex-col gap-2.5 rounded-xl border border-border p-4">
+                <Label id="survey-workload-label" className="leading-snug">
                   2. Persepsi Beban Kerja Saat Ini (Workload Perception)
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((score) => {
-                    const selected = Number(responseForm.workload_perception_score) === score;
-                    return (
-                      <button
-                        key={score}
-                        type="button"
-                        onClick={() =>
-                          setResponseForm({ ...responseForm, workload_perception_score: score })
-                        }
-                        className={`py-2.5 rounded-lg border text-sm font-bold tabular-nums transition cursor-pointer ${
-                          selected
-                            ? 'bg-[#10B981] border-[#10B981] text-white shadow-xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-[#10B981]'
-                        }`}
-                      >
-                        {score}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-[#047857] font-medium mt-1.5">
+                </Label>
+                <ToggleGroup
+                  type="single"
+                  aria-labelledby="survey-workload-label"
+                  value={String(responseForm.workload_perception_score)}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setResponseForm((prev) => ({
+                        ...prev,
+                        workload_perception_score: Number(val),
+                      }));
+                    }
+                  }}
+                  variant="outline"
+                  spacing={2}
+                  className="grid w-full grid-cols-5"
+                >
+                  {[1, 2, 3, 4, 5].map((score) => (
+                    <ToggleGroupItem
+                      key={score}
+                      value={String(score)}
+                      className="h-10 font-mono text-sm font-semibold tabular-nums data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    >
+                      {score}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                <Progress
+                  value={(Number(responseForm.workload_perception_score) / 5) * 100}
+                  className="h-1.5"
+                />
+                <p className="text-xs font-medium text-foreground">
                   {WORKLOAD_LIKERT_LABELS[responseForm.workload_perception_score]}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Catatan atau Masukan Tambahan (Opsional & Rahasia)
-                </label>
-                <textarea
-                  rows={3}
+              {/* Optional Comments */}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="survey-response-comments">
+                  Catatan atau Masukan Tambahan (Opsional &amp; Rahasia)
+                </Label>
+                <Textarea
+                  id="survey-response-comments"
+                  name="comments"
+                  rows={4}
                   maxLength={1000}
                   value={responseForm.comments}
-                  onChange={(e) => setResponseForm({ ...responseForm, comments: e.target.value })}
+                  onChange={(e) =>
+                    setResponseForm((prev) => ({ ...prev, comments: e.target.value }))
+                  }
                   placeholder="Bagikan pengalaman kerja, masukan distribusi tugas, atau kendala waktu istirahat..."
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
+                  className="bg-background"
                 />
               </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setResponseModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={responseSubmitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 rounded-lg transition cursor-pointer"
-                >
-                  {responseSubmitting
-                    ? 'Mengirim...'
-                    : respondingSurvey.my_response
-                      ? 'Perbarui Jawaban'
-                      : 'Kirim Jawaban'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+          )}
+        </FormSheet>
       )}
     </AppShell>
   );

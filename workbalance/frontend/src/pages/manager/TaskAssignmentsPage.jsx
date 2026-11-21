@@ -11,44 +11,62 @@ import {
   Lock,
   Plus,
   RefreshCw,
-  Search,
+  RotateCcw,
   Trash2,
-  X,
 } from 'lucide-react';
-import AppShell from '../../components/AppShell';
-import { extractApiError } from '../../services/api';
-import { departmentService } from '../../services/departmentService';
-import { employeeService } from '../../services/employeeService';
-import { taskAssignmentService } from '../../services/taskAssignmentService';
-import { taskService } from '../../services/taskService';
+import { toast } from 'sonner';
+import AppShell from '@/components/AppShell';
+import { getInitials } from '@/lib/navigation';
+import { extractApiError } from '@/services/api';
+import { departmentService } from '@/services/departmentService';
+import { employeeService } from '@/services/employeeService';
+import { taskAssignmentService } from '@/services/taskAssignmentService';
+import { taskService } from '@/services/taskService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  ConfirmDialog,
+  DataTable,
+  FormSheet,
+  KpiStatCard,
+  StatusBadge,
+} from '@/components/workbalance';
 
-const STATUS_PILLS = [
-  { value: '', label: 'Semua' },
+const ALL_VALUE = '__all__';
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'Semua' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
 ];
 
-const ASSIGNMENT_STATUS_STYLES = {
-  assigned: { label: 'Assigned', badgeClass: 'bg-[#E0F2FE] text-[#0369A1]' },
-  in_progress: { label: 'In Progress', badgeClass: 'bg-[#FEF3C7] text-[#B45309]' },
-  completed: { label: 'Completed', badgeClass: 'bg-[#D1FAE5] text-[#047857]' },
+const ASSIGNMENT_STATUS_META = {
+  assigned: { label: 'Assigned', tone: 'info' },
+  in_progress: { label: 'In Progress', tone: 'warning' },
+  completed: { label: 'Completed', tone: 'success' },
 };
 
-const PRIORITY_STYLES = {
-  critical: { label: 'Kritis', badgeClass: 'bg-[#FEE2E2] text-[#B91C1C]' },
-  high: { label: 'Tinggi', badgeClass: 'bg-[#FEF3C7] text-[#B45309]' },
-  medium: { label: 'Sedang', badgeClass: 'bg-[#E0F2FE] text-[#0369A1]' },
-  low: { label: 'Rendah', badgeClass: 'bg-slate-100 text-slate-700' },
+const PRIORITY_META = {
+  critical: { label: 'Kritis', tone: 'danger' },
+  high: { label: 'Tinggi', tone: 'warning' },
+  medium: { label: 'Sedang', tone: 'info' },
+  low: { label: 'Rendah', tone: 'neutral' },
 };
-
-function getInitials(name = '') {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return (name || 'PG').slice(0, 2).toUpperCase();
-}
 
 function getDeadlineIndicator(deadlineStr, status) {
   if (!deadlineStr || status === 'completed') {
@@ -58,26 +76,28 @@ function getDeadlineIndicator(deadlineStr, status) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(`${String(deadlineStr).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+
   const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
     return {
       text: `Lewat ${Math.abs(diffDays)} hari`,
-      className: 'bg-[#FEE2E2] text-[#B91C1C]',
+      tone: 'danger',
     };
   }
 
   if (diffDays === 0) {
     return {
       text: 'Jatuh tempo hari ini',
-      className: 'bg-[#FEF3C7] text-[#B45309]',
+      tone: 'warning',
     };
   }
 
   if (diffDays <= 7) {
     return {
       text: `H-${diffDays}`,
-      className: 'bg-[#FEF3C7] text-[#B45309]',
+      tone: 'warning',
     };
   }
 
@@ -101,6 +121,7 @@ function emptyAssignmentForm(tasks = [], employees = []) {
 
 export default function TaskAssignmentsPage({ readOnly = false }) {
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [assignments, setAssignments] = useState([]);
@@ -119,36 +140,26 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [deadlineFilter, setDeadlineFilter] = useState('');
 
-  // Toast feedback
-  const [toast, setToast] = useState(null);
-
-  // Detail Modal State
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  // Detail Sheet State
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
 
-  // Create / Edit Modal State
-  const [formModalOpen, setFormModalOpen] = useState(false);
+  // Create / Edit Sheet State
+  const [formSheetOpen, setFormSheetOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState(null);
-  const [form, setForm] = useState(emptyAssignmentForm([], []));
+  const [form, setForm] = useState(() => emptyAssignmentForm([], []));
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Delete Modal State
+  // Delete ConfirmDialog State
   const [deletingAssignment, setDeletingAssignment] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message });
-    setTimeout(() => {
-      setToast((current) => (current?.message === message ? null : current));
-    }, 4500);
-  }, []);
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -158,7 +169,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
       const [assignRes, tasksRes, empRes, deptRes] = await Promise.all([
         taskAssignmentService.getTaskAssignments({
           search: search.trim(),
-          status: statusFilter,
+          status: statusFilter === 'all' ? '' : statusFilter,
           employee_id: !readOnly ? employeeFilter : '',
           department_id: departmentFilter,
           deadline_filter: deadlineFilter,
@@ -199,6 +210,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
         });
       }
+      setHasLoadedOnce(true);
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Gagal memuat data penugasan pekerjaan.').message);
     } finally {
@@ -211,59 +223,84 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
   }, [loadAllData]);
 
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || statusFilter || employeeFilter || departmentFilter || deadlineFilter),
+    () =>
+      Boolean(
+        search.trim() ||
+          (statusFilter && statusFilter !== 'all') ||
+          employeeFilter ||
+          departmentFilter ||
+          deadlineFilter
+      ),
     [search, statusFilter, employeeFilter, departmentFilter, deadlineFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('');
+    setStatusFilter('all');
     setEmployeeFilter('');
     setDepartmentFilter('');
     setDeadlineFilter('');
   };
 
   const taskOptions = useMemo(() => {
-    return tasks.filter(
-      (task) => task.status !== 'cancelled' || (editingAssignment && editingAssignment.task_id === task.id)
+    const filtered = tasks.filter(
+      (task) =>
+        task.status !== 'cancelled' || (editingAssignment && editingAssignment.task_id === task.id)
     );
+    if (
+      editingAssignment?.task &&
+      !filtered.some((t) => String(t.id) === String(editingAssignment.task_id))
+    ) {
+      return [editingAssignment.task, ...filtered];
+    }
+    return filtered;
   }, [tasks, editingAssignment]);
 
+  const employeeOptions = useMemo(() => {
+    if (
+      editingAssignment?.employee &&
+      !employees.some((emp) => String(emp.id) === String(editingAssignment.employee_id))
+    ) {
+      return [editingAssignment.employee, ...employees];
+    }
+    return employees;
+  }, [employees, editingAssignment]);
+
   // --- Detail Handler ---
-  const openDetailModal = async (assignment) => {
+  const openDetailSheet = useCallback(async (assignment) => {
     setSelectedAssignment(assignment);
-    setDetailModalOpen(true);
+    setDetailSheetOpen(true);
     setDetailLoading(true);
 
     try {
       const detail = await taskAssignmentService.getTaskAssignment(assignment.id);
       setSelectedAssignment(detail);
     } catch (err) {
-      showToast('error', extractApiError(err, 'Gagal memuat detail penugasan.').message);
+      toast.error(extractApiError(err, 'Gagal memuat detail penugasan.').message);
     } finally {
       setDetailLoading(false);
     }
-  };
+  }, []);
 
   // --- Create / Edit Handlers ---
-  const openCreateModal = () => {
+  const openCreateSheet = useCallback(() => {
     setEditingAssignment(null);
     setForm(emptyAssignmentForm(tasks, employees));
     setFormError('');
-    setFormModalOpen(true);
-  };
+    setFormSheetOpen(true);
+  }, [tasks, employees]);
 
-  const openEditModal = (assignment) => {
+  const openEditSheet = useCallback((assignment) => {
     setEditingAssignment(assignment);
     setForm({
-      task_id: String(assignment.task_id || ''),
-      employee_id: String(assignment.employee_id || ''),
+      task_id: assignment.task_id ? String(assignment.task_id) : '',
+      employee_id: assignment.employee_id ? String(assignment.employee_id) : '',
       deadline: assignment.deadline ? String(assignment.deadline).slice(0, 10) : '',
       status: assignment.status || 'assigned',
     });
     setFormError('');
-    setFormModalOpen(true);
-  };
+    setFormSheetOpen(true);
+  }, []);
 
   const handleTaskSelectChange = (taskIdValue) => {
     const matchedTask = tasks.find((t) => String(t.id) === String(taskIdValue));
@@ -279,8 +316,22 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
     setFormError('');
+
+    if (!form.task_id) {
+      setFormError('Tugas yang ditugaskan wajib dipilih.');
+      return;
+    }
+    if (!form.employee_id) {
+      setFormError('Pegawai penerima wajib dipilih.');
+      return;
+    }
+    if (!form.deadline) {
+      setFormError('Tenggat penugasan wajib diisi.');
+      return;
+    }
+
+    setSubmitting(true);
 
     const payload = {
       task_id: Number(form.task_id),
@@ -292,12 +343,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
     try {
       if (editingAssignment) {
         const res = await taskAssignmentService.updateTaskAssignment(editingAssignment.id, payload);
-        showToast('success', res.message || 'Data penugasan berhasil diperbarui.');
+        toast.success(res.message || 'Data penugasan berhasil diperbarui.');
       } else {
         const res = await taskAssignmentService.createTaskAssignment(payload);
-        showToast('success', res.message || 'Penugasan pegawai berhasil ditambahkan.');
+        toast.success(res.message || 'Penugasan pegawai berhasil ditambahkan.');
       }
-      setFormModalOpen(false);
+      setFormSheetOpen(false);
       await loadAllData();
     } catch (err) {
       setFormError(extractApiError(err, 'Gagal menyimpan penugasan pegawai.').message);
@@ -313,739 +364,757 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
 
     try {
       const res = await taskAssignmentService.deleteTaskAssignment(deletingAssignment.id);
-      showToast('success', res.message || 'Data penugasan berhasil dihapus.');
+      toast.success(res.message || 'Data penugasan berhasil dihapus.');
       setDeletingAssignment(null);
       await loadAllData();
     } catch (err) {
-      showToast('error', extractApiError(err, 'Penugasan tidak dapat dihapus.').message);
+      toast.error(extractApiError(err, 'Penugasan tidak dapat dihapus.').message);
       setDeletingAssignment(null);
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const kpiCards = [
-    {
-      label: 'Penugasan Aktif',
-      value: summary.active,
-      badge: `Dari ${summary.total} total penugasan`,
-      badgeClass: 'bg-[#E0F2FE] text-[#0369A1]',
-      icon: ClipboardCheck,
-      iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
-    },
-    {
-      label: 'Total Jam Ditugaskan',
-      value: `${Number(summary.total_active_assigned_hours || 0).toFixed(1)} jam`,
-      badge:
-        !readOnly && Number(summary.overloaded_employees_count) > 0
-          ? `${summary.overloaded_employees_count} pegawai > 40 jam`
-          : 'Beban penugasan aktif',
-      badgeClass:
-        !readOnly && Number(summary.overloaded_employees_count) > 0
-          ? 'bg-[#FEF3C7] text-[#B45309]'
-          : 'bg-[#E0F2FE] text-[#0369A1]',
-      icon: Clock,
-      iconBg: 'bg-[#E0F2FE] text-[#0284C7]',
-    },
-    {
-      label: 'Tekanan Tenggat',
-      value: summary.deadline_pressure_count,
-      badge: 'Jatuh tempo ≤ 7 hari / lewat',
-      badgeClass:
-        Number(summary.deadline_pressure_count) > 0
-          ? 'bg-[#FEF3C7] text-[#B45309]'
-          : 'bg-[#D1FAE5] text-[#047857]',
-      icon: AlertTriangle,
-      iconBg:
-        Number(summary.deadline_pressure_count) > 0
-          ? 'bg-[#FEF3C7] text-[#F59E0B]'
-          : 'bg-[#D1FAE5] text-[#10B981]',
-    },
-    {
-      label: 'Penugasan Selesai',
-      value: summary.completed,
-      badge: 'Status completed',
-      badgeClass: 'bg-[#D1FAE5] text-[#047857]',
-      icon: CheckCircle2,
-      iconBg: 'bg-[#D1FAE5] text-[#10B981]',
-    },
-  ];
+  const columns = useMemo(
+    () => [
+      {
+        accessorFn: (row) => row.employee?.full_name || '-',
+        id: 'employee',
+        header: 'Pegawai Penerima',
+        cell: ({ row }) => {
+          const emp = row.original.employee || {};
+          return (
+            <div className="flex items-center gap-2.5">
+              <Avatar className="size-8 border border-border">
+                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+                  {getInitials(emp.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 max-w-[180px] flex-col">
+                <span className="truncate text-xs font-medium text-foreground">
+                  {emp.full_name || '-'}
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  <span className="font-mono">{emp.employee_code || '-'}</span>
+                  {emp.position?.title ? ` · ${emp.position.title}` : ''}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.task?.title || '-',
+        id: 'task',
+        header: 'Tugas & Prioritas',
+        cell: ({ row }) => {
+          const task = row.original.task;
+          const priorityMeta = PRIORITY_META[task?.priority] || PRIORITY_META.medium;
+          return (
+            <div className="flex max-w-[230px] flex-col gap-1 whitespace-normal">
+              <span className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
+                {task?.title || '-'}
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge
+                  tone={priorityMeta.tone}
+                  label={priorityMeta.label}
+                  className="px-2 py-0 text-[11px]"
+                />
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                  {task?.department?.code || '-'}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.task?.estimated_hours || 0),
+        id: 'estimated_hours',
+        header: 'Estimasi',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {Number(row.original.task?.estimated_hours || 0).toFixed(1)} jam
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'deadline',
+        header: 'Tenggat',
+        cell: ({ row }) => {
+          const item = row.original;
+          const deadlineHint = getDeadlineIndicator(item.deadline, item.status);
+          return (
+            <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+              <span className="font-mono text-xs font-medium text-foreground tabular-nums">
+                {item.deadline ? String(item.deadline).slice(0, 10) : '-'}
+              </span>
+              {deadlineHint && (
+                <StatusBadge
+                  tone={deadlineHint.tone}
+                  label={deadlineHint.text}
+                  showDot={false}
+                  className="px-2 py-0 text-[11px]"
+                />
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => {
+          const meta =
+            ASSIGNMENT_STATUS_META[row.original.status] || ASSIGNMENT_STATUS_META.assigned;
+          return (
+            <div className="whitespace-nowrap">
+              <StatusBadge tone={meta.tone} label={meta.label} />
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.assigner?.full_name || '-',
+        id: 'assigner',
+        header: 'Ditugaskan Oleh',
+        cell: ({ row }) => {
+          const item = row.original;
+          return (
+            <div className="flex flex-col whitespace-nowrap">
+              <span className="max-w-[130px] truncate text-xs font-medium text-foreground">
+                {item.assigner?.full_name || '-'}
+              </span>
+              <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                {item.assigned_at ? String(item.assigned_at).slice(0, 10) : '-'}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Aksi</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const item = row.original;
+          return (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openDetailSheet(item);
+                }}
+                title="Lihat Detail Penugasan"
+                aria-label="Lihat Detail Penugasan"
+              >
+                <Eye />
+              </Button>
+              {!readOnly && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEditSheet(item);
+                    }}
+                    title="Ubah Penugasan"
+                    aria-label="Ubah Penugasan"
+                  >
+                    <Edit3 />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDeletingAssignment(item);
+                    }}
+                    title="Hapus Penugasan"
+                    aria-label="Hapus Penugasan"
+                  >
+                    <Trash2 />
+                  </Button>
+                </>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [openDetailSheet, openEditSheet, readOnly]
+  );
+
+  const selectedStatusMeta = selectedAssignment
+    ? ASSIGNMENT_STATUS_META[selectedAssignment.status] || ASSIGNMENT_STATUS_META.assigned
+    : ASSIGNMENT_STATUS_META.assigned;
+  const selectedPriorityMeta = selectedAssignment
+    ? PRIORITY_META[selectedAssignment.task?.priority] || PRIORITY_META.medium
+    : PRIORITY_META.medium;
+  const selectedDeadlineHint = selectedAssignment
+    ? getDeadlineIndicator(selectedAssignment.deadline, selectedAssignment.status)
+    : null;
 
   return (
     <AppShell
       title={readOnly ? 'Penugasan Saya' : 'Manajemen Penugasan Kerja'}
       breadcrumb={
         readOnly
-          ? 'Pegawai / Daftar Penugasan & Tenggat Pribadi'
-          : 'Operasional / Distribusi Penugasan / PBI-04'
+          ? 'Aktivitas & Tugas / Daftar Penugasan & Tenggat Pribadi'
+          : 'Operasional Kerja / Distribusi Penugasan'
       }
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Cari judul tugas, nama pegawai, atau kode..."
+      actions={
+        !readOnly ? (
+          <Button size="sm" onClick={openCreateSheet}>
+            <Plus data-icon="inline-start" />
+            Tambah Penugasan
+          </Button>
+        ) : undefined
+      }
     >
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          role="status"
-          className={`fixed top-5 right-5 z-50 max-w-md flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg border ${
-            toast.type === 'success'
-              ? 'bg-white border-emerald-200 text-[#047857]'
-              : 'bg-white border-red-200 text-[#B91C1C]'
-          }`}
-        >
-          {toast.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
-          )}
-          <p className="text-sm font-medium text-[#1E293B] flex-1">{toast.message}</p>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600"
-            aria-label="Tutup notifikasi"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {/* 4 KPI Summary Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          {kpiCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.label}
-                className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs hover:border-slate-300 transition"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">{card.label}</span>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                    <Icon className="w-[18px] h-[18px]" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-bold text-[#1E293B] tabular-nums mt-2">
-                  {card.value}
-                </p>
-                <span
-                  className={`inline-block mt-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${card.badgeClass}`}
-                >
-                  {card.badge}
-                </span>
-              </div>
-            );
-          })}
-        </section>
-
-        {/* Read-only notice for Employee */}
-        {readOnly && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#E0F2FE] border border-sky-200/80 text-xs font-medium text-[#0369A1]">
-            <Lock className="w-4 h-4 shrink-0" />
-            <span>
-              Mode Baca Saja: Menampilkan daftar pekerjaan yang ditugaskan khusus kepada Anda beserta tenggat waktunya.
-            </span>
+        {loading && !hasLoadedOnce ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <Skeleton key={n} className="h-32 rounded-xl" />
+            ))}
           </div>
-        )}
+        ) : (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiStatCard
+              label="Penugasan Aktif"
+              value={summary.active ?? 0}
+              unit="tugas"
+              icon={ClipboardCheck}
+              statusTone="info"
+              statusLabel={`Dari ${summary.total ?? 0} total penugasan`}
+            />
 
-        {/* Error State */}
-        {errorMsg && (
-          <div className="bg-white rounded-xl border border-red-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#FEE2E2] text-[#EF4444] flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#1E293B]">Gagal Memuat Data Penugasan</h2>
-                <p className="text-sm text-slate-600 mt-0.5">{errorMsg}</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={loadAllData}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-sm font-semibold transition cursor-pointer shrink-0"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Lagi</span>
-            </button>
-          </div>
-        )}
+            <KpiStatCard
+              label="Total Jam Ditugaskan"
+              value={Number(summary.total_active_assigned_hours || 0).toFixed(1)}
+              unit="jam"
+              icon={Clock}
+              statusTone={
+                !readOnly && Number(summary.overloaded_employees_count || 0) > 0
+                  ? 'warning'
+                  : 'info'
+              }
+              statusLabel={
+                !readOnly && Number(summary.overloaded_employees_count || 0) > 0
+                  ? `${summary.overloaded_employees_count} pegawai > 40 jam`
+                  : 'Beban penugasan aktif'
+              }
+            />
 
-        {/* Assignments Table Card */}
-        {!errorMsg && (
-          <section className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
-            {/* Toolbar */}
-            <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-semibold text-[#1E293B]">Daftar Penugasan Kerja</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
-                  {assignments.length}
-                </span>
-              </div>
+            <KpiStatCard
+              label="Tekanan Tenggat"
+              value={summary.deadline_pressure_count ?? 0}
+              unit="tugas"
+              icon={AlertTriangle}
+              statusTone={Number(summary.deadline_pressure_count || 0) > 0 ? 'warning' : 'success'}
+              statusLabel={
+                Number(summary.deadline_pressure_count || 0) > 0 ? 'Perlu perhatian' : 'Terkendali'
+              }
+              hint="≤ 7 hari / lewat"
+            />
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative w-full sm:w-52">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari tugas atau pegawai..."
-                    className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-                  />
-                </div>
-
-                {/* Status Filter Pills */}
-                <div className="inline-flex flex-wrap rounded-lg bg-slate-100 p-0.5">
-                  {STATUS_PILLS.map((pill) => (
-                    <button
-                      key={pill.label}
-                      type="button"
-                      onClick={() => setStatusFilter(pill.value)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
-                        statusFilter === pill.value
-                          ? 'bg-white text-[#1E293B] shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-
-                {!readOnly && (
-                  <select
-                    value={employeeFilter}
-                    onChange={(e) => setEmployeeFilter(e.target.value)}
-                    aria-label="Filter Pegawai"
-                    className="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:border-[#0284C7] focus:outline-none"
-                  >
-                    <option value="">Semua Pegawai</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.full_name} ({emp.employee_code})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  aria-label="Filter Departemen"
-                  className="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:border-[#0284C7] focus:outline-none"
-                >
-                  <option value="">Semua Departemen</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={deadlineFilter}
-                  onChange={(e) => setDeadlineFilter(e.target.value)}
-                  aria-label="Filter Tenggat"
-                  className="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:border-[#0284C7] focus:outline-none"
-                >
-                  <option value="">Semua Tenggat</option>
-                  <option value="due_soon">Tenggat ≤ 7 Hari</option>
-                  <option value="overdue">Melewati Tenggat</option>
-                </select>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={openCreateModal}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Tambah Penugasan</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Loading State */}
-            {loading ? (
-              <div className="p-6 space-y-3" aria-busy="true">
-                {[1, 2, 3, 4].map((row) => (
-                  <div key={row} className="h-12 bg-slate-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : assignments.length === 0 ? (
-              /* Empty State */
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center mx-auto mb-3">
-                  <ClipboardCheck className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#1E293B]">
-                  {hasActiveFilters
-                    ? 'Tidak ada penugasan yang sesuai filter'
-                    : 'Belum ada penugasan pekerjaan'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  {hasActiveFilters
-                    ? 'Ubah kata kunci pencarian atau setel ulang filter untuk melihat distribusi penugasan.'
-                    : readOnly
-                      ? 'Belum ada tugas yang ditetapkan kepada Anda pada periode ini.'
-                      : 'Tetapkan tugas kepada pegawai lengkap dengan tenggat waktu untuk memulai distribusi beban kerja.'}
-                </p>
-                <div className="mt-4 flex justify-center gap-2">
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
-                    >
-                      Setel Ulang Filter
-                    </button>
-                  )}
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={openCreateModal}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Tambah Penugasan</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Success State Table */
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/80 text-[#64748B] text-xs uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4 font-semibold">Pegawai Penerima</th>
-                      <th className="py-3 px-4 font-semibold">Tugas & Prioritas</th>
-                      <th className="py-3 px-4 font-semibold">Estimasi Beban</th>
-                      <th className="py-3 px-4 font-semibold">Tenggat Penugasan</th>
-                      <th className="py-3 px-4 font-semibold">Status</th>
-                      <th className="py-3 px-4 font-semibold">Ditugaskan Oleh</th>
-                      <th className="py-3 px-4 font-semibold text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-[#334155]">
-                    {assignments.map((item) => {
-                      const statusMeta =
-                        ASSIGNMENT_STATUS_STYLES[item.status] || ASSIGNMENT_STATUS_STYLES.assigned;
-                      const priorityMeta =
-                        PRIORITY_STYLES[item.task?.priority] || PRIORITY_STYLES.medium;
-                      const deadlineHint = getDeadlineIndicator(item.deadline, item.status);
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors"
-                        >
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#E0F2FE] text-[#0369A1] text-xs font-bold flex items-center justify-center shrink-0">
-                                {getInitials(item.employee?.full_name)}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-semibold text-[#1E293B] truncate">
-                                  {item.employee?.full_name || '-'}
-                                </p>
-                                <p className="text-xs text-slate-500 truncate tabular-nums">
-                                  {item.employee?.employee_code || '-'} •{' '}
-                                  {item.employee?.position?.title || '-'}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-4 max-w-xs">
-                            <p className="font-semibold text-[#1E293B] truncate">
-                              {item.task?.title || '-'}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${priorityMeta.badgeClass}`}
-                              >
-                                {priorityMeta.label}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                                {item.task?.department?.code || '-'}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-4 tabular-nums font-semibold text-[#1E293B] whitespace-nowrap">
-                            {Number(item.task?.estimated_hours || 0).toFixed(1)} jam
-                          </td>
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="flex flex-col items-start gap-1">
-                              <span className="tabular-nums text-slate-700 font-medium">
-                                {item.deadline ? String(item.deadline).slice(0, 10) : '-'}
-                              </span>
-                              {deadlineHint && (
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium tabular-nums ${deadlineHint.className}`}
-                                >
-                                  {deadlineHint.text}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusMeta.badgeClass}`}
-                            >
-                              {statusMeta.label}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <p className="text-xs font-medium text-[#1E293B]">
-                              {item.assigner?.full_name || '-'}
-                            </p>
-                            <p className="text-[11px] text-slate-500 tabular-nums">
-                              {item.assigned_at ? String(item.assigned_at).slice(0, 10) : '-'}
-                            </p>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openDetailModal(item)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                title="Lihat Detail Penugasan"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              {!readOnly && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditModal(item)}
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#0284C7] hover:bg-[#E0F2FE]/60 transition cursor-pointer"
-                                    title="Ubah Penugasan"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setDeletingAssignment(item)}
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#EF4444] hover:bg-[#FEE2E2]/70 transition cursor-pointer"
-                                    title="Hapus Penugasan"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <KpiStatCard
+              label="Penugasan Selesai"
+              value={summary.completed ?? 0}
+              unit="tugas"
+              icon={CheckCircle2}
+              status="completed"
+              statusLabel="Status selesai"
+            />
           </section>
         )}
+
+        {/* Read-only Notice for Employee */}
+        {readOnly && (
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+            <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
+            <p>
+              <span className="font-medium text-foreground">Mode Baca Saja:</span> Menampilkan
+              daftar pekerjaan yang ditugaskan khusus kepada Anda beserta tenggat waktunya.
+            </p>
+          </div>
+        )}
+
+        {/* Task Assignments DataTable */}
+        <DataTable
+          title="Daftar Penugasan Kerja"
+          countLabel="penugasan"
+          columns={columns}
+          data={assignments}
+          loading={loading}
+          error={errorMsg}
+          onRetry={loadAllData}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Cari judul tugas, nama pegawai, atau kode..."
+          pageSize={10}
+          onRowClick={(item) => openDetailSheet(item)}
+          emptyTitle={
+            hasActiveFilters
+              ? 'Tidak ada penugasan yang sesuai filter'
+              : 'Belum ada penugasan pekerjaan'
+          }
+          emptyDescription={
+            hasActiveFilters
+              ? 'Ubah kata kunci pencarian atau setel ulang filter untuk melihat distribusi penugasan.'
+              : readOnly
+                ? 'Belum ada tugas yang ditetapkan kepada Anda pada periode ini.'
+                : 'Tetapkan tugas kepada pegawai lengkap dengan tenggat waktu untuk memulai distribusi beban kerja.'
+          }
+          emptyAction={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Setel Ulang Filter
+                </Button>
+              )}
+              {!readOnly && (
+                <Button size="sm" onClick={openCreateSheet}>
+                  <Plus data-icon="inline-start" />
+                  Tambah Penugasan
+                </Button>
+              )}
+            </div>
+          }
+          filterSlot={
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={statusFilter}
+                onValueChange={(val) => val && setStatusFilter(val)}
+                variant="outline"
+                size="sm"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <ToggleGroupItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+
+              {!readOnly && (
+                <Select
+                  name="employee_filter"
+                  value={employeeFilter || ALL_VALUE}
+                  onValueChange={(val) => setEmployeeFilter(val === ALL_VALUE ? '' : val)}
+                >
+                  <SelectTrigger
+                    id="assignments-filter-employee"
+                    size="sm"
+                    aria-label="Filter Pegawai"
+                    className="w-48 bg-background text-xs"
+                  >
+                    <SelectValue placeholder="Semua Pegawai" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value={ALL_VALUE}>Semua Pegawai</SelectItem>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={String(emp.id)}>
+                          {emp.full_name} ({emp.employee_code})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Select
+                name="department_filter"
+                value={departmentFilter || ALL_VALUE}
+                onValueChange={(val) => setDepartmentFilter(val === ALL_VALUE ? '' : val)}
+              >
+                <SelectTrigger
+                  id="assignments-filter-department"
+                  size="sm"
+                  aria-label="Filter Departemen"
+                  className="w-44 bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Departemen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={String(dept.id)}>
+                        {dept.code ? `${dept.code} — ${dept.name}` : dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+
+              <Select
+                name="deadline_filter"
+                value={deadlineFilter || ALL_VALUE}
+                onValueChange={(val) => setDeadlineFilter(val === ALL_VALUE ? '' : val)}
+              >
+                <SelectTrigger
+                  id="assignments-filter-deadline"
+                  size="sm"
+                  aria-label="Filter Tenggat"
+                  className="w-44 bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Tenggat" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Tenggat</SelectItem>
+                    <SelectItem value="due_soon">Tenggat ≤ 7 Hari</SelectItem>
+                    <SelectItem value="overdue">Melewati Tenggat</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                  <RotateCcw data-icon="inline-start" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          }
+          actionsSlot={
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={loadAllData}
+              aria-label="Muat ulang data"
+            >
+              <RefreshCw className={loading ? 'animate-spin' : ''} />
+            </Button>
+          }
+        />
       </div>
 
-      {/* Modal Detail Penugasan */}
-      {detailModalOpen && selectedAssignment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#1E293B]">Detail Penugasan Pekerjaan</h3>
-              <button
+      {/* Detail Slide-Over Sheet */}
+      <FormSheet
+        open={detailSheetOpen && Boolean(selectedAssignment)}
+        onOpenChange={setDetailSheetOpen}
+        title="Detail Penugasan Pekerjaan"
+        description={
+          selectedAssignment
+            ? `${selectedAssignment.employee?.full_name || '-'} (${
+                selectedAssignment.employee?.employee_code || '-'
+              }) · Tenggat ${
+                selectedAssignment.deadline ? String(selectedAssignment.deadline).slice(0, 10) : '-'
+              }`
+            : undefined
+        }
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setDetailSheetOpen(false)}>
+              Tutup
+            </Button>
+            {!readOnly && selectedAssignment && (
+              <Button
                 type="button"
-                onClick={() => setDetailModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                onClick={() => {
+                  const target = selectedAssignment;
+                  setDetailSheetOpen(false);
+                  openEditSheet(target);
+                }}
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {detailLoading ? (
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-5 bg-slate-100 rounded w-3/4" />
-                  <div className="h-16 bg-slate-100 rounded" />
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          (
-                            ASSIGNMENT_STATUS_STYLES[selectedAssignment.status] ||
-                            ASSIGNMENT_STATUS_STYLES.assigned
-                          ).badgeClass
-                        }`}
-                      >
-                        {
-                          (
-                            ASSIGNMENT_STATUS_STYLES[selectedAssignment.status] ||
-                            ASSIGNMENT_STATUS_STYLES.assigned
-                          ).label
-                        }
-                      </span>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          (
-                            PRIORITY_STYLES[selectedAssignment.task?.priority] ||
-                            PRIORITY_STYLES.medium
-                          ).badgeClass
-                        }`}
-                      >
-                        Prioritas{' '}
-                        {
-                          (
-                            PRIORITY_STYLES[selectedAssignment.task?.priority] ||
-                            PRIORITY_STYLES.medium
-                          ).label
-                        }
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold text-[#1E293B]">
-                      {selectedAssignment.task?.title || '-'}
-                    </h4>
-                    <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                      {selectedAssignment.task?.description || 'Tidak ada deskripsi tambahan.'}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-sm">
-                    <div>
-                      <p className="text-xs text-slate-500">Pegawai Penerima</p>
-                      <p className="font-semibold text-[#1E293B] mt-0.5">
-                        {selectedAssignment.employee?.full_name || '-'}
-                      </p>
-                      <p className="text-xs text-slate-500 tabular-nums">
-                        {selectedAssignment.employee?.employee_code || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Departemen</p>
-                      <p className="font-semibold text-[#1E293B] mt-0.5">
-                        {selectedAssignment.task?.department?.name || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Estimasi Beban</p>
-                      <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5">
-                        {Number(selectedAssignment.task?.estimated_hours || 0).toFixed(1)} jam
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Tenggat Penugasan</p>
-                      <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {selectedAssignment.deadline
-                          ? String(selectedAssignment.deadline).slice(0, 10)
-                          : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Ditugaskan Oleh</p>
-                      <p className="font-semibold text-[#1E293B] mt-0.5">
-                        {selectedAssignment.assigner?.full_name || '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Tanggal Penugasan</p>
-                      <p className="font-semibold text-[#1E293B] tabular-nums mt-0.5">
-                        {selectedAssignment.assigned_at
-                          ? String(selectedAssignment.assigned_at).slice(0, 10)
-                          : '-'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                      Riwayat Work Log ({selectedAssignment.work_logs_count ?? 0})
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {Number(selectedAssignment.work_logs_count || 0) > 0
-                        ? `Terdapat ${selectedAssignment.work_logs_count} catatan jam kerja aktual pada penugasan ini.`
-                        : 'Belum ada work log yang dicatat untuk penugasan ini.'}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setDetailModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Tambah / Ubah Penugasan */}
-      {formModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#1E293B]">
-                {editingAssignment ? 'Ubah Penugasan Pegawai' : 'Tambah Penugasan Baru'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setFormModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {formError && (
-                <div className="flex items-start gap-2 rounded-lg bg-[#FEE2E2] px-3.5 py-2.5 text-xs text-[#B91C1C]">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tugas yang Ditugaskan
-                </label>
-                <select
-                  required
-                  value={form.task_id}
-                  onChange={(e) => handleTaskSelectChange(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                >
-                  <option value="">Pilih Tugas</option>
-                  {taskOptions.map((task) => (
-                    <option key={task.id} value={task.id}>
-                      [{task.department?.code || '-'}] {task.title} ({Number(task.estimated_hours).toFixed(1)}j)
-                    </option>
-                  ))}
-                </select>
+                <Edit3 data-icon="inline-start" />
+                Ubah Penugasan
+              </Button>
+            )}
+          </>
+        }
+      >
+        {selectedAssignment && (
+          <div className="flex flex-col gap-5">
+            {detailLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Spinner />
+                <span>Memuat rincian penugasan dan riwayat work log...</span>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Pegawai Penerima
-                </label>
-                <select
-                  required
-                  value={form.employee_id}
-                  onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                >
-                  <option value="">Pilih Pegawai Aktif</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.full_name} ({emp.employee_code}) — {emp.department?.name || '-'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Tenggat Penugasan
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={form.deadline}
-                    onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7] tabular-nums"
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone={selectedStatusMeta.tone} label={selectedStatusMeta.label} />
+                <StatusBadge
+                  tone={selectedPriorityMeta.tone}
+                  label={`Prioritas ${selectedPriorityMeta.label}`}
+                />
+                {selectedDeadlineHint && (
+                  <StatusBadge
+                    tone={selectedDeadlineHint.tone}
+                    label={selectedDeadlineHint.text}
+                    showDot={false}
                   />
-                </div>
+                )}
+              </div>
+              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+                {selectedAssignment.task?.title || '-'}
+              </h4>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {selectedAssignment.task?.description || 'Tidak ada deskripsi tambahan.'}
+              </p>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Status Penugasan
-                  </label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0284C7]"
-                  >
-                    <option value="assigned">Assigned</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
+            <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
+              <div className="flex items-center gap-2.5 sm:col-span-2">
+                <Avatar className="size-9 border border-border">
+                  <AvatarFallback className="bg-card text-xs font-semibold text-foreground">
+                    {getInitials(selectedAssignment.employee?.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">Pegawai Penerima</span>
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {selectedAssignment.employee?.full_name || '-'}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                    {selectedAssignment.employee?.employee_code || '-'}
+                  </span>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setFormModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-60 rounded-lg transition cursor-pointer"
-                >
-                  {submitting
-                    ? 'Menyimpan...'
-                    : editingAssignment
-                      ? 'Simpan Perubahan'
-                      : 'Simpan Penugasan'}
-                </button>
+              <Separator className="sm:col-span-2" />
+
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Departemen</span>
+                <span className="text-sm font-medium text-foreground">
+                  {selectedAssignment.task?.department?.name || '-'}
+                </span>
               </div>
-            </form>
+
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Estimasi Beban</span>
+                <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+                  {Number(selectedAssignment.task?.estimated_hours || 0).toFixed(1)} jam
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Tenggat Penugasan</span>
+                <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-foreground tabular-nums">
+                  <Calendar className="size-3.5 text-muted-foreground" />
+                  {selectedAssignment.deadline
+                    ? String(selectedAssignment.deadline).slice(0, 10)
+                    : '-'}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Ditugaskan Oleh</span>
+                <span className="text-sm font-medium text-foreground">
+                  {selectedAssignment.assigner?.full_name || '-'}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-0.5 sm:col-span-2">
+                <span className="text-xs text-muted-foreground">Tanggal Penugasan</span>
+                <span className="font-mono text-sm font-medium text-foreground tabular-nums">
+                  {selectedAssignment.assigned_at
+                    ? String(selectedAssignment.assigned_at).slice(0, 10)
+                    : '-'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">Riwayat Work Log</span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                  {selectedAssignment.work_logs_count ?? 0} catatan
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {Number(selectedAssignment.work_logs_count || 0) > 0
+                  ? `Terdapat ${selectedAssignment.work_logs_count} catatan jam kerja aktual pada penugasan ini.`
+                  : 'Belum ada work log yang dicatat untuk penugasan ini.'}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </FormSheet>
 
-      {/* Modal Konfirmasi Hapus Penugasan */}
-      {deletingAssignment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-md p-6">
-            <h3 className="text-base font-bold text-[#1E293B]">Hapus Penugasan?</h3>
-            <p className="text-sm text-slate-600 mt-2">
-              Penugasan <span className="font-semibold text-[#1E293B]">{deletingAssignment.task?.title}</span> untuk{' '}
-              <span className="font-semibold text-[#1E293B]">{deletingAssignment.employee?.full_name}</span> akan dihapus.
-              {(deletingAssignment.status === 'completed' || Number(deletingAssignment.work_logs_count || 0) > 0) && (
-                <span className="block mt-2 text-xs text-[#B45309] bg-[#FEF3C7] p-2.5 rounded-lg">
-                  Perhatian: Penugasan yang sudah selesai atau memiliki riwayat work log akan ditolak oleh sistem untuk menjaga integritas data.
+      {/* Create / Edit Slide-Over Sheet */}
+      <FormSheet
+        open={formSheetOpen}
+        onOpenChange={(open) => {
+          if (!submitting) setFormSheetOpen(open);
+        }}
+        title={editingAssignment ? 'Ubah Penugasan Pegawai' : 'Tambah Penugasan Baru'}
+        description="Distribusikan tugas kepada pegawai aktif beserta tenggat dan status pelaksanaan."
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFormSheetOpen(false)}
+              disabled={submitting}
+            >
+              Batal
+            </Button>
+            <Button type="submit" form="assignment-form" disabled={submitting}>
+              {submitting && <Spinner data-icon="inline-start" />}
+              {submitting
+                ? 'Menyimpan...'
+                : editingAssignment
+                  ? 'Simpan Perubahan'
+                  : 'Simpan Penugasan'}
+            </Button>
+          </>
+        }
+      >
+        <form id="assignment-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {formError && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="assignment-task" className="text-xs">
+              Tugas yang Ditugaskan <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              name="task_id"
+              value={form.task_id || undefined}
+              onValueChange={handleTaskSelectChange}
+            >
+              <SelectTrigger id="assignment-task" className="w-full">
+                <SelectValue placeholder="Pilih Tugas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {taskOptions.map((task) => (
+                    <SelectItem key={task.id} value={String(task.id)}>
+                      [{task.department?.code || '-'}] {task.title} (
+                      {Number(task.estimated_hours || 0).toFixed(1)}j)
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="assignment-employee" className="text-xs">
+              Pegawai Penerima <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              name="employee_id"
+              value={form.employee_id || undefined}
+              onValueChange={(val) => setForm((prev) => ({ ...prev, employee_id: val }))}
+            >
+              <SelectTrigger id="assignment-employee" className="w-full">
+                <SelectValue placeholder="Pilih Pegawai Aktif" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {employeeOptions.map((emp) => (
+                    <SelectItem key={emp.id} value={String(emp.id)}>
+                      {emp.full_name} ({emp.employee_code}) — {emp.department?.name || '-'}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="assignment-deadline" className="text-xs">
+                Tenggat Penugasan <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="assignment-deadline"
+                name="deadline"
+                type="date"
+                required
+                value={form.deadline}
+                onChange={(e) => setForm((prev) => ({ ...prev, deadline: e.target.value }))}
+                className="font-mono tabular-nums"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="assignment-status" className="text-xs">
+                Status Penugasan
+              </Label>
+              <Select
+                name="status"
+                value={form.status}
+                onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
+              >
+                <SelectTrigger id="assignment-status" className="w-full">
+                  <SelectValue placeholder="Pilih Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="assigned">Assigned</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </form>
+      </FormSheet>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deletingAssignment)}
+        onOpenChange={(open) => {
+          if (!open && !deleteLoading) setDeletingAssignment(null);
+        }}
+        title="Hapus Penugasan?"
+        description={
+          deletingAssignment ? (
+            <>
+              Penugasan{' '}
+              <span className="font-medium text-foreground">{deletingAssignment.task?.title}</span>{' '}
+              untuk{' '}
+              <span className="font-medium text-foreground">
+                {deletingAssignment.employee?.full_name}
+              </span>{' '}
+              akan dihapus.
+              {(deletingAssignment.status === 'completed' ||
+                Number(deletingAssignment.work_logs_count || 0) > 0) && (
+                <span className="mt-2 block rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                  Perhatian: Penugasan yang sudah selesai atau memiliki riwayat work log akan
+                  ditolak oleh sistem untuk menjaga integritas data.
                 </span>
               )}
-            </p>
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeletingAssignment(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={deleteLoading}
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#EF4444] hover:bg-red-600 disabled:opacity-60 rounded-lg cursor-pointer"
-              >
-                {deleteLoading ? 'Menghapus...' : 'Hapus Penugasan'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          ) : undefined
+        }
+        confirmLabel="Hapus Penugasan"
+        cancelLabel="Batal"
+        variant="destructive"
+        loading={deleteLoading}
+        onConfirm={handleConfirmDelete}
+      />
     </AppShell>
   );
 }
