@@ -13,6 +13,7 @@ import WorkplaceIssuesPage from './pages/employee/WorkplaceIssuesPage';
 import ManagerDashboardPage from './pages/manager/ManagerDashboardPage';
 import TaskAssignmentsPage from './pages/manager/TaskAssignmentsPage';
 import TasksPage from './pages/manager/TasksPage';
+import WorkloadRiskPage from './pages/manager/WorkloadRiskPage';
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -127,6 +128,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/workload-risk"
+            element={
+              <RoleRouteGuard allowedRoles={['admin']}>
+                <WorkloadRiskPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/manager/employees"
             element={
               <RoleRouteGuard allowedRoles={['manager']}>
@@ -217,6 +227,15 @@ export default function App() {
           />
 
           <Route
+            path="/manager/workload-risk"
+            element={
+              <RoleRouteGuard allowedRoles={['manager']}>
+                <WorkloadRiskPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
             path="/employee/dashboard"
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
@@ -275,6 +294,15 @@ export default function App() {
             element={
               <RoleRouteGuard allowedRoles={['employee']}>
                 <WorkLogsPage />
+              </RoleRouteGuard>
+            }
+          />
+
+          <Route
+            path="/employee/workload-risk"
+            element={
+              <RoleRouteGuard allowedRoles={['employee']}>
+                <WorkloadRiskPage />
               </RoleRouteGuard>
             }
           />
