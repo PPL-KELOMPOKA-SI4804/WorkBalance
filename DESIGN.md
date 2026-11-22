@@ -1,142 +1,105 @@
 # UI/UX & Brand Identity Design System (DESIGN.md): WorkBalance
 
-**Versi Dokumen:** 2.0 (Calm Enterprise Precision — Anti-AI-Slop Edition)  
-**Tanggal:** 21 November 2026  
+**Versi Dokumen:** 2.2 (Composed Light/Dark Themes, Calm Rows & DD-MM-YYYY Date System)  
+**Tanggal:** 22 November 2026  
 **Mode Permukaan:** `Operate` (Enterprise Workforce & SDG 8 Decision Support System)  
 **Referensi Produk & Teknis:** `PRD.md` & `ARCHITECTURE.md`  
-**Tagline Merek:** _"Decent Work, Better Life"_
+**Tagline Merek:** "Decent Work, Better Life"
 
 ---
 
-## 1. Filosofi Visual & Batasan Mutlak (_Guardrails_)
+## 1. Filosofi Visual & Batasan Mutlak (Guardrails)
 
 Dokumen ini menjadi satu-satunya sumber kebenaran (*single source of truth*) untuk seluruh implementasi frontend **WorkBalance** dengan **React 19**, **Tailwind CSS v4 (OKLCH)**, **`shadcn/ui` (Radix Primitives)**, **Recharts**, dan **TanStack Table**.
 
 ### 1.1 Prinsip Estetika ("Calm Enterprise Precision")
-WorkBalance adalah alat kerja harian (*Operate mode*) bagi Pegawai, Manajer, dan Admin HR—bukan halaman brosur. Kualitas visual hadir lewat **presisi, ketenangan, konsistensi, dan hierarki yang jujur**, bukan dekorasi ramai:
+WorkBalance adalah alat kerja harian (*Operate mode*) bagi Pegawai, Manajer, dan Admin HR, bukan halaman brosur. Kualitas visual hadir lewat **presisi, ketenangan, konsistensi, dan hierarki yang jujur**:
 
 - **Aturan Distribusi Warna 90 / 10 (Anti-Slop):**
-  - **90% permukaan adalah lapisan netral terkalibrasi** (sidebar netral-sejuk, kanvas konten alabaster-terang, kartu putih bersih berbingkai hairline `1px`).
-  - **10% warna merek & semantik** digunakan **hanya** untuk aksi utama (CTA), item navigasi aktif, titik/badge indikator status, dan seri data grafik.
+  - **90% permukaan adalah lapisan netral terkalibrasi** (sidebar netral terpisah, kanvas konten utama, kartu berbingkai hairline `1px`).
+  - **10% warna merek & semantik** digunakan hanya untuk aksi utama (CTA), item navigasi aktif, titik/badge indikator status, dan seri data grafik.
   - **DILARANG** memenuhi kartu KPI dengan kotak ikon persegi pastel mencolok atau menumpuk kartu di dalam kartu (*nested cards*).
+- **Light & Composed Dark Themes:**
+  - Tema gelap disusun secara sadar lewat anak tangga kecerahan permukaan (`sidebar < background < card < popover`) tanpa inversi mekanis, dengan rasio kontras WCAG AA+ terverifikasi (`>= 4.5:1` teks, `>= 3:1` seri grafik).
+  - Kunjungan pertama mengikuti preferensi OS (`prefers-color-scheme`) tanpa FOUC (script inline blocking di `<head>` `index.html`), lalu persisten di `localStorage` (`wb_theme`) saat pengguna menekan `ThemeSwitch` di header atau halaman Login.
 - **Deklarasi Elevasi Tunggal:**
   - Permukaan statis (kartu, tabel, toolbar) memakai **`1px` hairline border (`border-border`) tanpa bayangan kabur lebar**.
-  - Bayangan (*shadow*) dicadangkan eksklusif untuk lapisan mengambang (*Popover*, *DropdownMenu*, *Tooltip*, *Sheet*, *Dialog*, *Command Palette*).
-- **Tanpa Kicker / Eyebrow Dekoratif:**
-  - Judul halaman (`H1`) dan judul seksi (`H2`) berdiri kuat sendiri—**dilarang** menaruh label uppercase mikro dekoratif di atas judul. Breadcrumb ditempatkan tenang di top bar, bukan di atas setiap kartu.
-- **Privasi Visual Survei (Mutlak):**
-  - Antarmuka `manager` **dilarang keras** merender tabel atau daftar komentar/skor survei per individu. Seluruh visualisasi survei Manajer wajib berupa metrik agregat departemen.
-- **Non-Punitive Visual Language:**
-  - Hindari terminologi penghakiman individu (*"Kinerja Buruk"*, *"Pegawai Bermasalah"*). Gunakan bahasa dukungan keputusan: *"Risiko Beban Tinggi — Perlu Redistribusi"*, *"Perlu Perhatian"*, *"Prioritas Tindakan"*.
-- **Interaksi & Permukaan Browser Terkurasi:**
-  - `::selection`, `caret-color`, `:focus-visible` ring, dan `tabular-nums` wajib mengikuti palet WorkBalance di `src/index.css`.
-  - Transisi interaksi cepat dan bertujuan (`150–220ms`, *ease-out*): hanya untuk perubahan state, buka/tutup drawer, dan umpan balik—**dilarang** menaruh animasi *stagger* panjang saat halaman operasional dimuat.
+  - Bayangan (*shadow*) dicadangkan eksklusif untuk lapisan mengambang di mode terang dan dimatikan (`dark:shadow-none`) di mode gelap (digantikan ring border).
+- **Privasi Visual Survei (Mutlak NFR-02):**
+  - Antarmuka `manager` dan `admin` **dilarang keras** merender tabel atau daftar komentar/skor survei per individu. Seluruh visualisasi survei wajib berupa agregat departemen (`AVG` & `COUNT`).
+- **Non-Punitive & Zero Em Dash Copy:**
+  - Hindari terminologi penghakiman individu (*"Kinerja Buruk"*, *"Pegawai Bermasalah"*). Gunakan bahasa pendukung keputusan: *"Risiko Beban Tinggi"*, *"Perlu Redistribusi Tugas"*, *"Perlu Perhatian"*, *"Prioritas Tindakan"*.
+  - **Zero Em Dash (`U+2014`):** Dilarang menggunakan em dash pada judul tab, label UI, opsi dropdown, komentar kode, maupun pesan rekomendasi backend. En dash (`–`, `U+2013`) tetap diperbolehkan pada rentang angka (mis. `1–5`, `1–10 dari 40`).
 
 ---
 
-## 2. Brand Identity & Aset Logo
+## 2. Brand Identity & Komponen `BrandLogo`
 
-### 2.1 Filosofi & Anatomi Logo
+### 2.1 Anatomi Logo
 Logo **WorkBalance** terdiri atas tiga pilar vertikal berujung membulat (*capsule bars*) yang disatukan satu garis lengkung (*arc*):
-- **Pilar Kiri (`#0284C7` — Primary Blue):** Struktur tugas dan profesionalisme kerja.
-- **Pilar Tengah (`#10B981` — Success Green, tertinggi):** Kesejahteraan, kesehatan, dan pertumbuhan berkelanjutan (SDG 8).
-- **Pilar Kanan (`#F59E0B` — Accent Orange):** Kewaspadaan dini dan dinamika beban kerja.
-- **Lengkungan Penyeimbang (`#1E293B` — Slate Dark):** Titik tumpu keseimbangan (*equilibrium*).
+- **Pilar Kiri (`var(--brand-blue)`):** Struktur tugas dan profesionalisme kerja.
+- **Pilar Tengah (`var(--chart-2)`, tertinggi):** Kesejahteraan, kesehatan, dan pertumbuhan berkelanjutan (SDG 8).
+- **Pilar Kanan (`var(--chart-3)`):** Kewaspadaan dini dan dinamika beban kerja.
+- **Lengkungan Penyeimbang (`currentColor` / `text-foreground`):** Titik tumpu keseimbangan yang otomatis beradaptasi pada mode terang dan gelap.
 
-### 2.2 Penempatan Aset (`frontend/public/assets/`)
+### 2.2 Varian `BrandLogo` (`src/components/workbalance/BrandLogo.jsx`)
 
-| Nama File | Varian | Ukuran | Lokasi Penggunaan |
+| Varian | Ukuran Simbol & Wordmark | Tagline | Lokasi Penggunaan |
 | :--- | :--- | :--- | :--- |
-| `workbalance_horizontal_logo_2.svg` | Horizontal Lockup | `h-8` (`32px`, auto width) | Header Sidebar (expanded), Login Panel, Kop Laporan. |
-| `workbalance_logo_2.svg` | Standalone Icon | `size-8` (`32px × 32px`) | Favicon, Header Sidebar (collapsed rail), Loading Brand Mark. |
+| `mark` | Simbol `28px` | Tidak ada | Sidebar ciut (collapsed), layar verifikasi sesi. |
+| `horizontal` | Simbol `32px` + wordmark `21px` bold | Tidak ada | Header Sidebar (expanded), Sheet navigasi mobile, Login mobile. |
+| `lockup` | Simbol `44px` + wordmark `28px` bold | `Decent Work, Better Life` (`12px`) | Panel kiri Login desktop. |
+
+Aset statis: [favicon.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/favicon.svg) (sadar `prefers-color-scheme`) dan [workbalance_horizontal_logo.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/workbalance_horizontal_logo.svg) (wordmark diperbesar proporsional untuk penggunaan luar aplikasi).
 
 ---
 
 ## 3. Design Tokens (Tailwind CSS v4 & OKLCH Semantic Palette)
 
-Seluruh komponen baru **WAJIB** menggunakan token semantik CSS (`bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, dst.)—**DILARANG** menulis warna hex hardcoded (`bg-[#...]`, `text-[#...]`) di dalam JSX.
+Seluruh komponen **WAJIB** menggunakan token semantik CSS (`bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `text-success`, `bg-warning-subtle`, `border-danger-border`, dst.). **DILARANG** menulis warna hex hardcoded atau kelas palet mentah (`emerald-*`, `amber-*`, `rose-*`, `sky-*`, `slate-*`) di halaman maupun komponen domain.
 
-### 3.1 Lapisan Permukaan & Warna Semantik (`src/index.css`)
+### 3.1 Lapisan Permukaan Light vs Dark (`src/index.css`)
 
-| Token Semantik | Nilai OKLCH | Peran Permukaan |
-| :--- | :--- | :--- |
-| `--background` | `oklch(0.988 0.003 247)` | Kanvas konten utama (terang, tenang, nyaris putih) |
-| `--sidebar` | `oklch(0.974 0.005 247)` | Lapisan netral kedua untuk Sidebar & rail navigasi |
-| `--card` | `oklch(1 0 0)` | Kartu data, tabel, panel formulir (putih bersih) |
-| `--muted` | `oklch(0.955 0.006 247)` | Hover baris, tab list, input search tenang |
-| `--border` | `oklch(0.905 0.008 247)` | Hairline `1px` pemisah kartu, sidebar, & tabel |
-| `--foreground` | `oklch(0.208 0.032 256)` | Teks utama (`#1E293B` equivalent, kontras > 11:1) |
-| `--muted-foreground` | `oklch(0.495 0.025 256)` | Teks sekunder, label kolom, metadata (kontras ≥ 4.6:1) |
-| `--primary` | `oklch(0.562 0.148 238)` | WorkBalance Primary Blue (`#0284C7` family) untuk CTA & aktif |
-| `--destructive` | `oklch(0.577 0.215 27)` | Aksi hapus & status Risiko Tinggi / Override PP 35/2021 |
+| Token Semantik | Light (OKLCH) | Dark (OKLCH) | Peran |
+| :--- | :--- | :--- | :--- |
+| `--sidebar` | `oklch(0.974 0.005 247)` | `oklch(0.142 0.013 256)` | Lapisan sidebar (tertanam di dark mode) |
+| `--background` | `oklch(0.988 0.003 247)` | `oklch(0.160 0.014 256)` | Kanvas konten utama |
+| `--card` | `oklch(1 0 0)` | `oklch(0.200 0.016 256)` | Kartu data, tabel, panel formulir |
+| `--popover` | `oklch(1 0 0)` | `oklch(0.228 0.017 256)` | Dropdown, popover kalender, sheet, dialog |
+| `--foreground` | `oklch(0.205 0.032 256)` | `oklch(0.945 0.006 247)` | Teks utama (`> 15:1` di kedua tema) |
+| `--muted-foreground` | `oklch(0.425 0.024 256)` | `oklch(0.730 0.018 256)` | Teks sekunder (`> 7.5:1` di kedua tema) |
+| `--primary` | `oklch(0.542 0.148 238)` | `oklch(0.705 0.135 237)` | Aksi utama & status aktif |
+| `--primary-foreground` | `oklch(0.994 0.002 247)` | `oklch(0.155 0.020 256)` | Teks tombol primer (`4.7:1` light, `7.6:1` dark) |
+| `--brand-blue` | `oklch(0.555 0.148 238)` | `oklch(0.740 0.130 237)` | Kata "Balance" & pilar biru `BrandLogo` |
+| `--border` | `oklch(0.902 0.008 247)` | `oklch(0.285 0.016 256)` | Garis pemisah `1px` |
 
-### 3.2 Pemetaan Status Bisnis (Dot-Indicator Pattern)
+### 3.2 Token Status Semantik & `<StatusBadge />`
 
-Gunakan komponen terpusat **`<StatusBadge />`** (`src/components/workbalance/StatusBadge.jsx`). Alih-alih pill pastel mencolok tanpa batas, badge memakai latar netral/tint sangat lembut dengan bingkai tipis dan **titik indikator 6px** berpresisi tinggi:
+Empat grup nada (`success`, `warning`, `danger`, `info`) masing-masing menyediakan `-foreground` (`text-*`), `-subtle` (`bg-*-subtle`), `-border` (`border-*-border`), dan `-solid` (`bg-*-solid`), seluruhnya terverifikasi `>= 4.8:1` WCAG AA+ di mode terang dan gelap:
+- **`success`:** `low`, `good`, `approved`, `completed`, `resolved`, `active`
+- **`warning`:** `medium`, `needs_attention`, `pending`, `in_progress`
+- **`danger`:** `high`, `override`, `action_priority`, `rejected`, `severe`
+- **`info`:** `open`, `enrolled`, `planned`, `todo`
+- **`neutral`:** `cancelled`, `inactive`
 
-| Domain | Kategori / Enum | Dot Color | Tone Semantik | Chart Token |
-| :--- | :--- | :--- | :--- | :--- |
-| **Workload Risk** | `low` (`< 40`) | `emerald-500` | Aman / Seimbang | `--chart-2` (`#10B981`) |
-| **Workload Risk** | `medium` (`40–69`) | `amber-500` | Perlu Perhatian | `--chart-3` (`#F59E0B`) |
-| **Workload Risk** | `high` (`≥ 70` / Override) | `rose-500` | Risiko Tinggi | `--chart-5` (`#EF4444`) |
-| **Decent Work Score** | `good` (`≥ 75`) | `emerald-500` | Baik | `--chart-2` (`#10B981`) |
-| **Decent Work Score** | `needs_attention` (`50–74`) | `amber-500` | Perlu Perhatian | `--chart-3` (`#F59E0B`) |
-| **Decent Work Score** | `action_priority` (`< 50`) | `rose-500` | Prioritas Tindakan | `--chart-5` (`#EF4444`) |
-| **Workflow & Approval** | `approved` / `completed` / `resolved` / `active` | `emerald-500` | Selesai / Aktif | `--chart-2` |
-| **Workflow & Approval** | `pending` / `in_progress` | `amber-500` | Diproses / Menunggu | `--chart-3` |
-| **Workflow & Approval** | `open` / `enrolled` / `planned` | `sky-500` | Terbuka / Terjadwal | `--chart-1` |
-| **Workflow & Approval** | `rejected` / `cancelled` / `severe` / `inactive` | `rose-500` / `slate-400` | Ditolak / Nonaktif | `--chart-5` |
+### 3.3 Tipografi Self-Hosted, Format Tanggal & Anggaran Baris
 
-### 3.3 Tipografi & Skala Ketat (`Operate Mode`)
-
-- **UI Sans:** `"Plus Jakarta Sans", "Inter", system-ui, sans-serif` — satu keluarga sans terkalibrasi untuk seluruh heading, label, dan isi tabel.
-- **Data Monospace:** `"JetBrains Mono", ui-monospace, monospace` — digunakan **hanya** untuk kode (`EMP-001`, `ENG`), periode ISO (`2026-W47`), dan durasi/rasio pengukuran (`42.5j / 40j`).
-- **Skala Tetap (`rem`, bukan `clamp` fluid):**
-  - **Page Title (`H1`):** `text-xl` (`20px`), `font-semibold`, `tracking-[-0.02em]`, `text-foreground`.
-  - **Section / Card Title (`H2`):** `text-sm`–`text-base` (`14px–16px`), `font-semibold`, `tracking-[-0.01em]`.
-  - **KPI Hero Number:** `text-2xl`–`text-[28px]`, `font-semibold`, `tracking-[-0.025em]`, `tabular-nums`.
-  - **Body & Table Cell:** `text-sm` (`14px`), `leading-5`.
-  - **Table Header & Meta:** `text-xs` (`12px`), `font-medium`, `text-muted-foreground`.
+- **UI Sans (`@fontsource-variable/plus-jakarta-sans`):** Dipakai untuk seluruh heading, label, isi tabel, dan angka metrik (`tabular-nums`).
+- **Slot Kode (`@fontsource-variable/dm-sans`, Regular `400`):** Menggantikan JetBrains Mono pada `--font-mono` khusus untuk kode pegawai (`EMP-001`), kode departemen (`ENG`, `OPS`, `HRD`), dan shortcut keycap (`Ctrl K`). Tanpa CDN Google Fonts.
+- **Lantai Tipografi & Aksesibilitas:** Minimal `text-xs` (`12px`), `0` `italic`, `leading-5` pada item menu sidebar agar descender (`g`, `p`, `y`) tidak terpotong, dan `text-wrap: balance` pada `h1–h4`.
+- **Judul Tab Dinamis (`useDocumentTitle`):** Setiap rute memperbarui `document.title` menjadi `{Judul Halaman} | WorkBalance` (default `WorkBalance`).
+- **Sistem Tanggal `DD-MM-YYYY` (`src/lib/format.js`):**
+  - Seluruh tanggal ditampilkan `DD-MM-YYYY` (timestamp `DD-MM-YYYY HH:mm`, bulan `MM-YYYY`, minggu `DD-MM-YYYY s.d. DD-MM-YYYY`) dengan `toISODateLocal()` untuk mencegah pergeseran tanggal UTC pukul `00.00–07.00` WIB.
+  - Seluruh input tanggal/bulan/minggu memakai `DatePicker`, `MonthPicker`, dan `WeekPicker` (shadcn `Calendar` + `Popover`, `react-day-picker` + `date-fns` locale `id`), sementara payload API tetap ISO (`YYYY-MM-DD`, `YYYY-MM`, `YYYY-Www`).
+- **Calm Rows & Penempatan Aksi:**
+  - Tombol **Create** (`Tambah ...`, `Buat Survei`, `Catat Work Log`, `Laporkan Masalah`, `Hitung Ulang`) ditempatkan di **pojok kanan atas `DataTable`** (`actionsSlot`), bukan di header `AppShell`.
+  - Seluruh tombol refresh manual (`RefreshCw`) dihapus; data disegarkan otomatis saat mutasi dan saat tab kembali aktif (`useRefetchOnFocus`). Tombol "Coba Lagi" pada state error tetap dipertahankan tanpa ikon refresh.
+  - Setiap tabel maksimal **4 kolom data 1 baris** + 1 kolom `RowActionsMenu` (`⋯` untuk Ubah/Hapus); klik atau tekan `Enter`/`Space` pada baris membuka sheet Detail (`FormSheet`).
 
 ---
 
-## 4. Arsitektur App Shell & Navigasi (`AppShell` v2)
+## 4. Arsitektur App Shell & Katalog Komponen
 
-- **Collapsible Left Sidebar (`w-64` expanded / `w-[68px]` collapsed):**
-  - Latar lapisan kedua `bg-sidebar border-r border-sidebar-border`.
-  - **Pengelompokan Semantik (maks. 4 grup — dilarang daftar datar 11 item):**
-    1. **Ikhtisar & Analitik:** Dasbor Kondisi Kerja / Beranda Pegawai, Analisis Workload Risk.
-    2. **Operasional Kerja:** Manajemen Tugas, Penugasan Kerja, Catatan Waktu Kerja.
-    3. **Kesejahteraan & Kompetensi:** Survei Kondisi Kerja, Permasalahan Kerja, Katalog Pelatihan, Keikutsertaan Pelatihan.
-    4. **Master Organisasi** *(Admin & Manajer)*: Pegawai & Kepegawaian / Direktori Tim, Data Departemen / Struktur Departemen.
-  - **Item Aktif:** Latar lembut `bg-primary/10 text-primary font-medium` (atau `bg-card text-foreground shadow-2xs ring-1 ring-border`), bukan blok biru penuh yang terlalu berat di semua baris.
-  - **Footer Sidebar:** Indikator ringkas regulasi **PP No. 35/2021** (`40j normal · maks 18j lembur`) tanpa teks artefak developer (`Sprint 0 / PBI-XX`).
-- **Sticky Top Header Bar (`h-14` / `56px`, `bg-background/90 backdrop-blur-sm border-b border-border`):**
-  - **Kiri:** Toggle collapse sidebar (desktop) / drawer trigger (mobile) + Breadcrumb & judul halaman ringkas.
-  - **Tengah/Kanan:** Tombol **Command Palette (`Ctrl+K`)** untuk pencarian modul cepat + input pencarian halaman (jika aktif) + **User DropdownMenu** (`Avatar` + nama + peran + aksi Keluar).
-
----
-
-## 5. Katalog Komponen Resmi (`src/components/ui/` & `src/components/workbalance/`)
-
-Seluruh halaman **WAJIB** mengomposisi primitif berikut (dilarang membuat `fixed inset-0` modal mentah, `<table>` mentah, atau `showToast` manual):
-
-1. **Primitif `shadcn/ui` (`src/components/ui/`):** `Button`, `Card`, `Badge`, `Input`, `Label`, `Textarea`, `Select`, `Separator`, `Sheet`, `Dialog`, `AlertDialog`, `Table`, `Tabs`, `Tooltip`, `DropdownMenu`, `Popover`, `Command`, `Skeleton`, `Avatar`, `Progress`, `Chart`, `Sonner`.
-2. **Komponen Domain WorkBalance (`src/components/workbalance/`):**
-   - `PageHeader` — Judul halaman, deskripsi singkat satu baris, dan slot tombol aksi utama.
-   - `KpiStatCard` — Kartu KPI bersih tanpa kotak ikon pastel besar; menampilkan label tenang, angka `tabular-nums`, status/delta ringkas, dan ambang batas opsional.
-   - `StatusBadge` — Badge status dot-indicator konsisten untuk seluruh enum WorkBalance.
-   - `DataTable` — Berbasis `@tanstack/react-table` + `shadcn/ui` `Table` (sorting, search toolbar, filter pills slot, skeleton rows, empty state, error retry, pagination).
-   - `FormSheet` — Slide-over drawer kanan (`Sheet`) untuk form Create/Edit & panel Detail 360° Pegawai agar pengguna tetap melihat konteks daftar di belakangnya.
-   - `ConfirmDialog` — `AlertDialog` terakses keyboard untuk konfirmasi hapus / tindakan destruktif.
-   - `CommandMenu` — Command Palette global (`Ctrl+K` / `Cmd+K`) berbasis `cmdk`.
-   - `Charts` — Grafik interaktif **Recharts** (`DecentWorkDonutChart`, `WorkHoursBarChart` dengan `<ReferenceLine y={8} />`, `WorkloadTrendAreaChart`) dibungkus `ChartContainer` berdimensi eksplisit.
-
----
-
-## 6. Blueprint Halaman Utama Berdasarkan Peran
-
-- **Autentikasi (`/login`):** Split-screen tenang dan berwibawa — panel kiri berstruktur editorial dengan ringkasan misi SDG 8 & data PP No. 35/2021 tanpa kartu kaca melayang klise; panel kanan form login bersih dengan akses cepat akun demo.
-- **Workspace Pegawai (`/employee/*`):** `EmployeeDashboardPage` lengkap (4 KPI pribadi, grafik batang Recharts jam kerja harian `Sen–Min` vs garis batas 8 jam, tabel tugas aktif dengan aksi cepat Catat Work Log, dan panel Aksi Cepat).
-- **Workspace Manajer (`/manager/*`):** `ManagerDashboardPage` & `WorkloadRiskPage` memakai Recharts interaktif (`DecentWorkDonutChart`, `WorkloadTrendAreaChart`, `WorkHoursBarChart`), `DataTable` prioritas perhatian, dan `FormSheet` 360° detail pegawai (tanpa kebocoran data survei individu).
-- **Workspace Admin (`/admin/*`):** Halaman CRUD Master Data (`Employees`, `Departments`, `Trainings`, `TrainingParticipations`) terstruktur rapi memakai `DataTable` + `FormSheet` + `ConfirmDialog` + `Sonner` toast.
+- **Sidebar (`w-60` expanded / `w-[68px]` collapsed):** `BrandLogo` (`horizontal` / `mark`), 4 grup semantik, indikator aktif `layoutId`, dan footer ringkas `PP 35/2021 · 40j + maks 18j`.
+- **Sticky Top Header (`h-14`):** Kiri berisi toggle sidebar + breadcrumb induk + `H1`; kanan berisi pencarian cepat `Ctrl K`, `ThemeSwitch` (mode terang/gelap), isyarat kontekstual (seperti `NFR-02` pada Survei), dan menu profil pengguna.
+- **Komponen Domain (`src/components/workbalance/`):** `BrandLogo`, `ThemeSwitch`, `AnimatedNumber`, `KpiStatCard`, `StatusBadge`, `DataTable`, `RowActionsMenu`, `DatePicker`, `MonthPicker`, `WeekPicker`, `FormSheet`, `ConfirmDialog`, `CommandMenu`, `Charts`.

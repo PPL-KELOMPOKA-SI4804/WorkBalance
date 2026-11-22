@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, getDefaultRouteForRole, useAuth } from './context/AuthContext';
 import RoleRouteGuard from './context/RoleRouteGuard';
 import LoginPage from './pages/LoginPage';
@@ -33,9 +34,10 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <TooltipProvider delayDuration={150}>
-      <AuthProvider>
-        <BrowserRouter>
+    <ThemeProvider>
+      <TooltipProvider delayDuration={150}>
+        <AuthProvider>
+          <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/login" element={<LoginPage />} />
@@ -316,5 +318,6 @@ export default function App() {
       <Toaster position="top-right" richColors closeButton />
     </AuthProvider>
     </TooltipProvider>
+    </ThemeProvider>
   );
 }

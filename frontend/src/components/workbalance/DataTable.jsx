@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   createFilteredRowModel,
   createPaginatedRowModel,
@@ -17,7 +18,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
-  RefreshCw,
   Search,
   X,
 } from 'lucide-react';
@@ -51,7 +51,7 @@ export function DataTable({
   error = '',
   onRetry,
   searchable = true,
-  searchPlaceholder = 'Cari data...',
+  searchPlaceholder = 'Cari...',
   searchValue,
   onSearchChange,
   filterSlot,
@@ -64,6 +64,7 @@ export function DataTable({
   className,
 }) {
   const searchInputId = useId();
+  const prefersReducedMotion = useReducedMotion();
   const [sorting, setSorting] = useState([]);
   const [internalSearch, setInternalSearch] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
@@ -117,11 +118,14 @@ export function DataTable({
   const rangeStart = totalFiltered === 0 ? 0 : pageIndex * currentPageSize + 1;
   const rangeEnd = Math.min(totalFiltered, (pageIndex + 1) * currentPageSize);
 
+  const isInitialLoading = loading && safeData.length === 0;
+  const isRefetching = loading && safeData.length > 0;
+
   return (
     <div
       data-slot="data-table"
       className={cn(
-        'flex flex-col overflow-hidden rounded-xl border border-border bg-card',
+        'relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card',
         className
       )}
     >
@@ -129,14 +133,15 @@ export function DataTable({
       {(title || searchable || filterSlot || actionsSlot) && (
         <div className="flex flex-col gap-3 border-b border-border px-4 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-baseline gap-2">
               {title && (
                 <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
                   {title}
                 </h3>
               )}
-              <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground tabular-nums">
-                {totalFiltered} {countLabel || 'baris'}
+              <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                {totalFiltered}
+                {countLabel ? ` ${countLabel}` : ''}
               </span>
             </div>
 
@@ -154,14 +159,14 @@ export function DataTable({
                     value={activeSearch}
                     onChange={(e) => handleSearch(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="h-8 bg-background pl-8 pr-7 text-xs"
+                    className="h-8 rounded-lg bg-background pl-8 pr-7 text-xs"
                   />
                   {activeSearch && (
                     <button
                       type="button"
                       onClick={() => handleSearch('')}
                       aria-label="Hapus pencarian"
-                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
                     </button>
@@ -175,7 +180,7 @@ export function DataTable({
           {filterSlot && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               {searchable && (
-                <div className="relative w-full sm:w-72">
+                <div className="relative w-full sm:w-64 lg:w-72">
                   <Search
                     aria-hidden="true"
                     className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -187,14 +192,14 @@ export function DataTable({
                     value={activeSearch}
                     onChange={(e) => handleSearch(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="h-8 bg-background pl-8 pr-7 text-xs"
+                    className="h-8 rounded-lg bg-background pl-8 pr-7 text-xs"
                   />
                   {activeSearch && (
                     <button
                       type="button"
                       onClick={() => handleSearch('')}
                       aria-label="Hapus pencarian"
-                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
                     </button>
@@ -209,7 +214,27 @@ export function DataTable({
         </div>
       )}
 
-      {/* Content states: Error | Loading | Empty | Table */}
+      {/* Non-destructive refetch loading progress indicator */}
+      {isRefetching && (
+        <div
+          aria-live="polite"
+          aria-label="Memperbarui data tabel"
+          className="relative h-0.5 w-full overflow-hidden bg-muted"
+        >
+          <motion.div
+            className="absolute inset-y-0 w-1/3 rounded-full bg-primary"
+            initial={{ x: '-100%' }}
+            animate={prefersReducedMotion ? { x: '0%', width: '100%' } : { x: '320%' }}
+            transition={
+              prefersReducedMotion
+                ? { duration: 0.15 }
+                : { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
+            }
+          />
+        </div>
+      )}
+
+      {/* Content states: Error | Initial Skeleton | Empty | Table */}
       {error ? (
         <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
           <div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -223,19 +248,18 @@ export function DataTable({
           </div>
           {onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw data-icon="inline-start" />
               Coba Lagi
             </Button>
           )}
         </div>
-      ) : loading ? (
+      ) : isInitialLoading ? (
         <div className="flex flex-col gap-2.5 p-4">
           {Array.from({ length: Math.min(pageSize, 6) }).map((_, idx) => (
             <div key={idx} className="flex items-center gap-4">
-              <Skeleton className="h-8 w-1/4" />
-              <Skeleton className="h-8 w-1/3" />
-              <Skeleton className="h-8 w-1/5" />
-              <Skeleton className="h-8 flex-1" />
+              <Skeleton className="h-8 w-1/4 rounded-lg" />
+              <Skeleton className="h-8 w-1/3 rounded-lg" />
+              <Skeleton className="h-8 w-1/5 rounded-lg" />
+              <Skeleton className="h-8 flex-1 rounded-lg" />
             </div>
           ))}
         </div>
@@ -243,7 +267,7 @@ export function DataTable({
         <Empty className="border-0 py-12">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <Inbox />
+              <Inbox className="size-5" />
             </EmptyMedia>
             <EmptyTitle>{emptyTitle}</EmptyTitle>
             <EmptyDescription>{emptyDescription}</EmptyDescription>
@@ -251,7 +275,12 @@ export function DataTable({
           {emptyAction && <EmptyContent>{emptyAction}</EmptyContent>}
         </Empty>
       ) : (
-        <div className="overflow-x-auto">
+        <div
+          className={cn(
+            'overflow-x-auto transition-opacity duration-150',
+            isRefetching && 'pointer-events-none opacity-60'
+          )}
+        >
           <Table>
             <TableHeader className="bg-muted/40">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -262,10 +291,14 @@ export function DataTable({
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort();
                     const sortDir = header.column.getIsSorted();
+                    const colMetaClass = header.column.columnDef.meta?.className;
                     return (
                       <TableHead
                         key={header.id}
-                        className="h-9 px-3.5 text-xs font-medium text-muted-foreground"
+                        className={cn(
+                          'h-9 px-4 text-xs font-medium text-muted-foreground',
+                          colMetaClass
+                        )}
                       >
                         {header.isPlaceholder ? null : canSort ? (
                           <button
@@ -282,7 +315,7 @@ export function DataTable({
                             ) : sortDir === 'desc' ? (
                               <ArrowDown className="size-3.5 text-primary" />
                             ) : (
-                              <ArrowUpDown className="size-3 opacity-40" />
+                              <ArrowUpDown className="size-3.5 text-muted-foreground" />
                             )}
                           </button>
                         ) : (
@@ -301,16 +334,35 @@ export function DataTable({
               {rows.map((row) => (
                 <TableRow
                   key={row.id}
+                  tabIndex={onRowClick ? 0 : undefined}
                   onClick={
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onRowClick(row.original);
+                          }
+                        }
+                      : undefined
+                  }
                   className={cn(
                     'transition-colors',
-                    onRowClick && 'cursor-pointer'
+                    onRowClick &&
+                      'cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-3.5 py-3 text-sm whitespace-normal">
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        'px-4 py-3 text-sm whitespace-normal',
+                        cell.column.columnDef.meta?.className
+                      )}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -325,11 +377,13 @@ export function DataTable({
       )}
 
       {/* Pagination Footer */}
-      {!loading && !error && totalFiltered > currentPageSize && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground">
+      {!isInitialLoading && !error && totalFiltered > currentPageSize && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
           <span className="tabular-nums">
-            Menampilkan <span className="font-medium text-foreground">{rangeStart}–{rangeEnd}</span>{' '}
-            dari <span className="font-medium text-foreground">{totalFiltered}</span> data
+            <span className="font-medium text-foreground">
+              {rangeStart}–{rangeEnd}
+            </span>{' '}
+            dari <span className="font-medium text-foreground">{totalFiltered}</span>
           </span>
           <div className="flex items-center gap-1.5">
             <Button
@@ -341,7 +395,7 @@ export function DataTable({
               <ChevronLeft data-icon="inline-start" />
               Sebelumnya
             </Button>
-            <span className="px-2 font-mono text-xs tabular-nums">
+            <span className="px-2 text-xs font-medium text-foreground tabular-nums">
               {pageIndex + 1} / {Math.max(1, pageCount)}
             </span>
             <Button

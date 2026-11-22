@@ -3,22 +3,22 @@ import {
   AlertCircle,
   Briefcase,
   Edit3,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   UserCheck,
   UserMinus,
   Users,
 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, toApiDate, toISODateLocal } from '@/lib/format';
 import { getInitials, ROLE_LABELS } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { employeeService } from '@/services/employeeService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,19 +30,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   ConfirmDialog,
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
-const ALL_FILTER_VALUE = '__all__';
+const ALL_VALUE = '__all__';
 
 function emptyEmployeeForm(departments, positions, employmentTypes) {
   return {
@@ -54,7 +56,7 @@ function emptyEmployeeForm(departments, positions, employmentTypes) {
     department_id: departments[0]?.id ? String(departments[0].id) : '',
     position_id: positions[0]?.id ? String(positions[0].id) : '',
     employment_type_id: employmentTypes[0]?.id ? String(employmentTypes[0].id) : '',
-    join_date: new Date().toISOString().slice(0, 10),
+    join_date: toISODateLocal(),
     status: 'active',
   };
 }
@@ -67,7 +69,16 @@ function emptyTypeForm() {
   };
 }
 
+function getDailyOvertimeThreshold(typeItem) {
+  if (typeItem?.max_daily_hours !== undefined && typeItem?.max_daily_hours !== null) {
+    return Number(typeItem.max_daily_hours);
+  }
+  return Number(typeItem?.work_days_per_week) === 6 ? 7 : 8;
+}
+
 export default function EmployeesPage({ readOnly = false }) {
+  const shouldReduceMotion = useReducedMotion();
+
   const [activeTab, setActiveTab] = useState('employees');
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -86,9 +97,13 @@ export default function EmployeesPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+
+  // Detail FormSheet State
+  const [detailEmployee, setDetailEmployee] = useState(null);
+  const [detailType, setDetailType] = useState(null);
 
   // Employee FormSheet State
   const [employeeSheetOpen, setEmployeeSheetOpen] = useState(false);
@@ -120,7 +135,7 @@ export default function EmployeesPage({ readOnly = false }) {
       const [empRes, typesRes, deptRes, posRes] = await Promise.all([
         employeeService.getEmployees({
           search,
-          status: statusFilter === 'all' ? '' : statusFilter,
+          status: statusFilter,
           department_id: departmentFilter,
           employment_type_id: typeFilter,
         }),
@@ -153,19 +168,21 @@ export default function EmployeesPage({ readOnly = false }) {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
-    () => Boolean(search.trim() || statusFilter !== 'all' || departmentFilter || typeFilter),
+    () => Boolean(search.trim() || statusFilter || departmentFilter || typeFilter),
     [search, statusFilter, departmentFilter, typeFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('all');
+    setStatusFilter('');
     setDepartmentFilter('');
     setTypeFilter('');
   };
 
-  // --- Employee CRUD Handlers ---
+  // Employee CRUD Handlers
   const openCreateEmployeeSheet = useCallback(() => {
     setEditingEmployee(null);
     setEmployeeForm(emptyEmployeeForm(departments, positions, employmentTypes));
@@ -184,7 +201,7 @@ export default function EmployeesPage({ readOnly = false }) {
       department_id: String(emp.department_id || ''),
       position_id: String(emp.position_id || ''),
       employment_type_id: String(emp.employment_type_id || ''),
-      join_date: emp.join_date ? String(emp.join_date).slice(0, 10) : '',
+      join_date: toApiDate(emp.join_date),
       status: emp.status || 'active',
     });
     setEmployeeFormError('');
@@ -204,6 +221,12 @@ export default function EmployeesPage({ readOnly = false }) {
       return;
     }
 
+    const joinDate = toApiDate(employeeForm.join_date);
+    if (!joinDate) {
+      setEmployeeFormError('Tanggal bergabung wajib dipilih.');
+      return;
+    }
+
     setEmployeeSubmitting(true);
 
     const payload = {
@@ -212,7 +235,7 @@ export default function EmployeesPage({ readOnly = false }) {
       department_id: Number(employeeForm.department_id),
       position_id: Number(employeeForm.position_id),
       employment_type_id: Number(employeeForm.employment_type_id),
-      join_date: employeeForm.join_date,
+      join_date: joinDate,
       status: employeeForm.status,
       role: employeeForm.role,
     };
@@ -247,9 +270,11 @@ export default function EmployeesPage({ readOnly = false }) {
     setDeleteEmployeeLoading(true);
 
     try {
-      const res = await employeeService.deleteEmployee(deletingEmployee.id);
+      const targetId = deletingEmployee.id;
+      const res = await employeeService.deleteEmployee(targetId);
       toast.success(res.message || 'Data pegawai berhasil dihapus.');
       setDeletingEmployee(null);
+      setDetailEmployee((prev) => (prev?.id === targetId ? null : prev));
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Gagal menghapus pegawai.').message);
@@ -259,7 +284,7 @@ export default function EmployeesPage({ readOnly = false }) {
     }
   };
 
-  // --- Employment Type CRUD Handlers ---
+  // Employment Type CRUD Handlers
   const openCreateTypeSheet = useCallback(() => {
     setEditingType(null);
     setTypeForm(emptyTypeForm());
@@ -311,9 +336,11 @@ export default function EmployeesPage({ readOnly = false }) {
     setDeleteTypeLoading(true);
 
     try {
-      const res = await employeeService.deleteEmploymentType(deletingType.id);
+      const targetId = deletingType.id;
+      const res = await employeeService.deleteEmploymentType(targetId);
       toast.success(res.message || 'Jenis kepegawaian berhasil dihapus.');
       setDeletingType(null);
+      setDetailType((prev) => (prev?.id === targetId ? null : prev));
       await loadAllData();
     } catch (err) {
       toast.error(extractApiError(err, 'Jenis kepegawaian tidak dapat dihapus.').message);
@@ -323,7 +350,7 @@ export default function EmployeesPage({ readOnly = false }) {
     }
   };
 
-  // --- DataTable Columns: Employees ---
+  // DataTable Columns: Employees
   const employeeColumns = useMemo(() => {
     const baseColumns = [
       {
@@ -332,27 +359,19 @@ export default function EmployeesPage({ readOnly = false }) {
         header: 'Pegawai',
         cell: ({ row }) => {
           const emp = row.original;
-          const role = emp.user_account?.role;
           return (
             <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+              <Avatar className="size-8 shrink-0 border border-border">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name, emp.user_account?.email)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 max-w-[230px] flex-col">
-                <span className="truncate text-xs font-medium text-foreground">
-                  {emp.full_name}
-                </span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {emp.user_account?.email || 'Tanpa akun login'}
-                  {role && (
-                    <span className="ml-1 font-medium text-primary">
-                      ({ROLE_LABELS[role] || role})
-                    </span>
-                  )}
-                </span>
-              </div>
+              <span
+                className="max-w-[200px] truncate text-sm font-medium text-foreground"
+                title={emp.full_name}
+              >
+                {emp.full_name}
+              </span>
             </div>
           );
         },
@@ -361,55 +380,27 @@ export default function EmployeesPage({ readOnly = false }) {
         accessorKey: 'employee_code',
         header: 'Kode',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+          <span className="font-mono text-xs font-normal text-foreground whitespace-nowrap tabular-nums">
             {row.original.employee_code}
           </span>
         ),
       },
       {
-        accessorFn: (row) => `${row.position?.title || ''} ${row.department?.name || ''}`,
-        id: 'department_position',
-        header: 'Departemen & Jabatan',
+        accessorFn: (row) => row.department?.name || '',
+        id: 'department',
+        header: 'Departemen',
+        meta: { className: 'hidden md:table-cell' },
         cell: ({ row }) => {
-          const emp = row.original;
+          const deptName = row.original.department?.name || '-';
           return (
-            <div className="flex max-w-[210px] flex-col gap-0.5 whitespace-normal">
-              <span className="line-clamp-1 text-xs font-medium text-foreground">
-                {emp.position?.title || '-'}
-              </span>
-              <span className="line-clamp-1 text-[11px] text-muted-foreground">
-                {emp.department?.name || '-'}
-              </span>
-            </div>
+            <span
+              className="block max-w-[200px] truncate text-sm text-muted-foreground"
+              title={deptName}
+            >
+              {deptName}
+            </span>
           );
         },
-      },
-      {
-        accessorFn: (row) => row.employment_type?.name || '',
-        id: 'employment_type',
-        header: 'Jenis Kepegawaian',
-        cell: ({ row }) => {
-          const empType = row.original.employment_type;
-          return (
-            <div className="flex flex-col gap-0.5 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground">{empType?.name || '-'}</span>
-              {empType && (
-                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                  {empType.work_days_per_week} hr · {empType.normal_weekly_hours}j/mg
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'join_date',
-        header: 'Tgl Bergabung',
-        cell: ({ row }) => (
-          <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {row.original.join_date ? String(row.original.join_date).slice(0, 10) : '-'}
-          </span>
-        ),
       },
       {
         accessorKey: 'status',
@@ -428,34 +419,25 @@ export default function EmployeesPage({ readOnly = false }) {
         cell: ({ row }) => {
           const emp = row.original;
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditEmployeeSheet(emp);
-                }}
-                aria-label={`Ubah ${emp.full_name}`}
-                title="Ubah Pegawai"
-                className="text-muted-foreground hover:text-primary"
-              >
-                <Edit3 />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingEmployee(emp);
-                }}
-                aria-label={`Hapus ${emp.full_name}`}
-                title="Hapus Pegawai"
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${emp.full_name}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditEmployeeSheet(emp),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  onSelect: () => setDeletingEmployee(emp),
+                },
+              ]}
+            />
           );
         },
       });
@@ -464,67 +446,50 @@ export default function EmployeesPage({ readOnly = false }) {
     return baseColumns;
   }, [readOnly, openEditEmployeeSheet]);
 
-  // --- DataTable Columns: Employment Types ---
+  // DataTable Columns: Employment Types
   const typeColumns = useMemo(() => {
     const baseColumns = [
       {
         accessorKey: 'name',
-        header: 'Nama Jenis Kepegawaian',
+        header: 'Nama',
         cell: ({ row }) => (
-          <span className="font-medium text-foreground">{row.original.name}</span>
+          <span
+            className="block max-w-[220px] truncate text-sm font-medium text-foreground"
+            title={row.original.name}
+          >
+            {row.original.name}
+          </span>
         ),
       },
       {
         accessorKey: 'work_days_per_week',
-        header: 'Hari Kerja / Minggu',
+        header: 'Hari/Minggu',
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-foreground whitespace-nowrap tabular-nums">
+          <span className="text-sm text-foreground whitespace-nowrap tabular-nums">
             {row.original.work_days_per_week} hari/minggu
           </span>
         ),
       },
       {
-        accessorFn: (row) => (Number(row.work_days_per_week) === 6 ? 7 : 8),
-        id: 'daily_overtime_limit',
-        header: 'Ambang Lembur Harian',
-        cell: ({ row }) => {
-          const dailyLimit = Number(row.original.work_days_per_week) === 6 ? 7 : 8;
-          return (
-            <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-              &gt; {dailyLimit} jam/hari (PP 35/2021)
-            </span>
-          );
-        },
-      },
-      {
         accessorKey: 'normal_weekly_hours',
-        header: 'Jam Normal / Minggu',
+        header: 'Jam Normal',
+        meta: { className: 'hidden sm:table-cell' },
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {row.original.normal_weekly_hours} jam
+          <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.normal_weekly_hours} jam/minggu
           </span>
         ),
       },
       {
         accessorFn: (row) => Number(row.employees_count || 0),
         id: 'employees_count',
-        header: 'Pegawai Terkait',
+        header: 'Pegawai',
         cell: ({ row }) => {
           const count = Number(row.original.employees_count || 0);
-          const inUse = count > 0;
           return (
-            <Badge
-              variant={inUse ? 'secondary' : 'outline'}
-              className="gap-1 font-mono text-xs font-medium whitespace-nowrap tabular-nums"
-              title={
-                inUse
-                  ? 'Tidak dapat dihapus karena masih direferensikan oleh data pegawai aktif'
-                  : 'Belum digunakan oleh pegawai'
-              }
-            >
-              {inUse && <Lock className="size-3 text-muted-foreground" />}
+            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
               {count} pegawai
-            </Badge>
+            </span>
           );
         },
       },
@@ -539,42 +504,28 @@ export default function EmployeesPage({ readOnly = false }) {
           const typeItem = row.original;
           const inUse = Number(typeItem.employees_count || 0) > 0;
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEditTypeSheet(typeItem);
-                }}
-                aria-label={`Ubah ${typeItem.name}`}
-                title="Ubah Jenis Kepegawaian"
-                className="text-muted-foreground hover:text-primary"
-              >
-                <Edit3 />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeletingType(typeItem);
-                }}
-                aria-label={`Hapus ${typeItem.name}`}
-                title={
-                  inUse
+            <RowActionsMenu
+              ariaLabel={`Aksi untuk ${typeItem.name}`}
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditTypeSheet(typeItem),
+                },
+                { type: 'separator' },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: inUse
                     ? 'Masih digunakan oleh pegawai (penghapusan ditolak sistem)'
-                    : 'Hapus Jenis Kepegawaian'
-                }
-                className={
-                  inUse
-                    ? 'text-muted-foreground/60 hover:text-amber-700'
-                    : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                }
-              >
-                <Trash2 />
-              </Button>
-            </div>
+                    : 'Hapus Jenis Kepegawaian',
+                  onSelect: () => setDeletingType(typeItem),
+                },
+              ]}
+            />
           );
         },
       });
@@ -588,37 +539,15 @@ export default function EmployeesPage({ readOnly = false }) {
 
   return (
     <AppShell
-      title={readOnly ? 'Direktori Pegawai Tim' : 'Manajemen Pegawai & Kepegawaian'}
-      breadcrumb={
-        readOnly
-          ? 'Organisasi & Tim / Direktori Tim'
-          : 'Master Organisasi / Pegawai & Kepegawaian'
-      }
-      actions={
-        readOnly ? (
-          <Badge variant="outline" className="gap-1.5 text-xs font-normal text-muted-foreground">
-            <Lock className="size-3" />
-            Mode Baca Saja
-          </Badge>
-        ) : activeTab === 'employees' ? (
-          <Button size="sm" onClick={openCreateEmployeeSheet}>
-            <Plus data-icon="inline-start" />
-            Tambah Pegawai
-          </Button>
-        ) : (
-          <Button size="sm" onClick={openCreateTypeSheet}>
-            <Plus data-icon="inline-start" />
-            Tambah Jenis Kepegawaian
-          </Button>
-        )
-      }
+      title={readOnly ? 'Direktori Pegawai' : 'Pegawai'}
+      breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
@@ -628,7 +557,7 @@ export default function EmployeesPage({ readOnly = false }) {
               value={summary.total}
               unit="pegawai"
               icon={Users}
-              hint="Seluruh unit organisasi"
+              hint="Seluruh unit"
             />
 
             <KpiStatCard
@@ -637,8 +566,7 @@ export default function EmployeesPage({ readOnly = false }) {
               unit="pegawai"
               icon={UserCheck}
               status="active"
-              statusLabel="Beroperasi"
-              hint={`${activePercent}% dari total`}
+              statusLabel={`${activePercent}% dari total`}
             />
 
             <KpiStatCard
@@ -647,9 +575,7 @@ export default function EmployeesPage({ readOnly = false }) {
               unit="pegawai"
               icon={UserMinus}
               status={Number(summary.inactive || 0) > 0 ? 'inactive' : 'active'}
-              statusLabel={
-                Number(summary.inactive || 0) > 0 ? 'Akses dinonaktifkan' : 'Semua aktif'
-              }
+              statusLabel={Number(summary.inactive || 0) > 0 ? 'Akses nonaktif' : 'Semua aktif'}
             />
 
             <KpiStatCard
@@ -657,17 +583,17 @@ export default function EmployeesPage({ readOnly = false }) {
               value={summary.employment_types_count}
               unit="kategori"
               icon={Briefcase}
-              hint="Acuan jam kerja normal"
+              hint="Standar jam kerja"
             />
           </section>
         )}
 
-        {/* Row 2: Tabs (Data Master Pegawai / Jenis Kepegawaian) */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-4">
+        {/* Row 2: Tabs (Pegawai / Jenis Kepegawaian) */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList>
               <TabsTrigger value="employees" className="px-3">
-                Data Master Pegawai
+                Pegawai
               </TabsTrigger>
               <TabsTrigger value="employment-types" className="px-3">
                 Jenis Kepegawaian
@@ -675,10 +601,10 @@ export default function EmployeesPage({ readOnly = false }) {
             </TabsList>
           </div>
 
-          {/* Tab 1: Data Master Pegawai */}
+          {/* Tab 1: Pegawai */}
           <TabsContent value="employees">
             <DataTable
-              title="Daftar Pegawai"
+              title="Pegawai"
               countLabel="pegawai"
               columns={employeeColumns}
               data={employees}
@@ -690,10 +616,11 @@ export default function EmployeesPage({ readOnly = false }) {
               onSearchChange={setSearch}
               searchPlaceholder="Cari nama, kode, atau email..."
               pageSize={10}
+              onRowClick={(emp) => setDetailEmployee(emp)}
               emptyTitle={
                 hasActiveFilters
                   ? 'Tidak ada pegawai yang sesuai filter'
-                  : 'Belum ada data pegawai'
+                  : 'Belum ada pegawai'
               }
               emptyDescription={
                 hasActiveFilters
@@ -703,14 +630,19 @@ export default function EmployeesPage({ readOnly = false }) {
               emptyAction={
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   {hasActiveFilters && (
-                    <Button variant="outline" size="sm" onClick={resetFilters}>
-                      <RotateCcw data-icon="inline-start" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="rounded-lg"
+                    >
+                      <RotateCcw data-icon="inline-start" className="size-4" />
                       Setel Ulang Filter
                     </Button>
                   )}
                   {!readOnly && (
-                    <Button size="sm" onClick={openCreateEmployeeSheet}>
-                      <Plus data-icon="inline-start" />
+                    <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
+                      <Plus data-icon="inline-start" className="size-4" />
                       Tambah Pegawai
                     </Button>
                   )}
@@ -718,42 +650,44 @@ export default function EmployeesPage({ readOnly = false }) {
               }
               filterSlot={
                 <div className="flex flex-wrap items-center gap-2">
-                  <ToggleGroup
-                    type="single"
-                    value={statusFilter}
-                    onValueChange={(val) => val && setStatusFilter(val)}
-                    variant="outline"
-                    size="sm"
+                  <Select
+                    name="filter_status"
+                    value={statusFilter || ALL_VALUE}
+                    onValueChange={(val) => setStatusFilter(val === ALL_VALUE ? '' : val)}
                   >
-                    <ToggleGroupItem value="all" className="text-xs">
-                      Semua
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="active" className="text-xs">
-                      Aktif
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="inactive" className="text-xs">
-                      Nonaktif
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                    <SelectTrigger
+                      id="emp-filter-status"
+                      size="sm"
+                      className="w-36 rounded-lg bg-background text-xs"
+                      aria-label="Filter Status Pegawai"
+                    >
+                      <SelectValue placeholder="Semua Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={ALL_VALUE}>Semua Status</SelectItem>
+                        <SelectItem value="active">Aktif</SelectItem>
+                        <SelectItem value="inactive">Nonaktif</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
 
                   <Select
                     name="filter_department"
-                    value={departmentFilter || ALL_FILTER_VALUE}
-                    onValueChange={(val) =>
-                      setDepartmentFilter(val === ALL_FILTER_VALUE ? '' : val)
-                    }
+                    value={departmentFilter || ALL_VALUE}
+                    onValueChange={(val) => setDepartmentFilter(val === ALL_VALUE ? '' : val)}
                   >
                     <SelectTrigger
                       id="emp-filter-department"
                       size="sm"
-                      className="w-44 bg-background text-xs"
+                      className="w-44 rounded-lg bg-background text-xs"
                       aria-label="Filter Departemen"
                     >
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value={ALL_FILTER_VALUE}>Semua Departemen</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Semua Departemen</SelectItem>
                         {departments.map((dept) => (
                           <SelectItem key={dept.id} value={String(dept.id)}>
                             {dept.name}
@@ -765,22 +699,20 @@ export default function EmployeesPage({ readOnly = false }) {
 
                   <Select
                     name="filter_employment_type"
-                    value={typeFilter || ALL_FILTER_VALUE}
-                    onValueChange={(val) =>
-                      setTypeFilter(val === ALL_FILTER_VALUE ? '' : val)
-                    }
+                    value={typeFilter || ALL_VALUE}
+                    onValueChange={(val) => setTypeFilter(val === ALL_VALUE ? '' : val)}
                   >
                     <SelectTrigger
                       id="emp-filter-type"
                       size="sm"
-                      className="w-44 bg-background text-xs"
+                      className="w-44 rounded-lg bg-background text-xs"
                       aria-label="Filter Jenis Kepegawaian"
                     >
                       <SelectValue placeholder="Semua Kepegawaian" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value={ALL_FILTER_VALUE}>Semua Kepegawaian</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Semua Kepegawaian</SelectItem>
                         {employmentTypes.map((typeItem) => (
                           <SelectItem key={typeItem.id} value={String(typeItem.id)}>
                             {typeItem.name}
@@ -790,23 +722,36 @@ export default function EmployeesPage({ readOnly = false }) {
                     </SelectContent>
                   </Select>
 
-                  {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={resetFilters}>
-                      <RotateCcw data-icon="inline-start" />
-                      Reset
-                    </Button>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {hasActiveFilters && (
+                      <motion.div
+                        key="emp-reset-filter"
+                        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="rounded-lg"
+                        >
+                          <RotateCcw data-icon="inline-start" className="size-4" />
+                          Reset
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               }
               actionsSlot={
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={loadAllData}
-                  aria-label="Muat ulang data"
-                >
-                  <RefreshCw className={loading ? 'animate-spin' : ''} />
-                </Button>
+                !readOnly ? (
+                  <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
+                    <Plus data-icon="inline-start" className="size-4" />
+                    Tambah Pegawai
+                  </Button>
+                ) : undefined
               }
             />
           </TabsContent>
@@ -814,7 +759,7 @@ export default function EmployeesPage({ readOnly = false }) {
           {/* Tab 2: Jenis Kepegawaian */}
           <TabsContent value="employment-types">
             <DataTable
-              title="Daftar Jenis Kepegawaian"
+              title="Jenis Kepegawaian"
               countLabel="kategori"
               columns={typeColumns}
               data={employmentTypes}
@@ -824,30 +769,230 @@ export default function EmployeesPage({ readOnly = false }) {
               searchable
               searchPlaceholder="Cari jenis kepegawaian..."
               pageSize={10}
+              onRowClick={(typeItem) => setDetailType(typeItem)}
               emptyTitle="Belum ada jenis kepegawaian"
               emptyDescription="Tambahkan kategori hubungan kerja untuk menetapkan standar hari dan jam kerja normal."
               emptyAction={
                 !readOnly ? (
-                  <Button size="sm" onClick={openCreateTypeSheet}>
-                    <Plus data-icon="inline-start" />
+                  <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
+                    <Plus data-icon="inline-start" className="size-4" />
                     Tambah Jenis Kepegawaian
                   </Button>
                 ) : undefined
               }
               actionsSlot={
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={loadAllData}
-                  aria-label="Muat ulang data"
-                >
-                  <RefreshCw className={loading ? 'animate-spin' : ''} />
-                </Button>
+                !readOnly ? (
+                  <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
+                    <Plus data-icon="inline-start" className="size-4" />
+                    Tambah Jenis Kepegawaian
+                  </Button>
+                ) : undefined
               }
             />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* FormSheet: Employee Detail */}
+      <FormSheet
+        open={Boolean(detailEmployee)}
+        onOpenChange={(open) => {
+          if (!open) setDetailEmployee(null);
+        }}
+        title="Detail Pegawai"
+        description={
+          detailEmployee ? `Profil kepegawaian dan informasi akun ${detailEmployee.full_name}.` : undefined
+        }
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailEmployee(null)}
+              className="rounded-lg"
+            >
+              Tutup
+            </Button>
+            {!readOnly && detailEmployee && (
+              <Button
+                type="button"
+                onClick={() => {
+                  const target = detailEmployee;
+                  setDetailEmployee(null);
+                  openEditEmployeeSheet(target);
+                }}
+                className="rounded-lg"
+              >
+                <Edit3 data-icon="inline-start" className="size-4" />
+                Ubah Pegawai
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailEmployee && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-3.5">
+              <Avatar className="size-11 shrink-0 border border-border">
+                <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
+                  {getInitials(detailEmployee.full_name, detailEmployee.user_account?.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="truncate text-base font-semibold tracking-[-0.01em] text-foreground">
+                    {detailEmployee.full_name}
+                  </h4>
+                  <StatusBadge
+                    status={detailEmployee.status === 'active' ? 'active' : 'inactive'}
+                  />
+                </div>
+                <span className="font-mono text-xs font-normal text-muted-foreground tabular-nums">
+                  {detailEmployee.employee_code}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Departemen</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.department?.name || '-'}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jabatan / Posisi</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.position?.title || '-'}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jenis Kepegawaian</dt>
+                <dd className="font-medium text-foreground">
+                  {detailEmployee.employment_type?.name || '-'}
+                  {detailEmployee.employment_type && (
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground tabular-nums">
+                      {detailEmployee.employment_type.work_days_per_week} hari/minggu ·{' '}
+                      {detailEmployee.employment_type.normal_weekly_hours} jam/minggu
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Tanggal Bergabung</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {formatDate(detailEmployee.join_date)}
+                </dd>
+              </div>
+            </dl>
+
+            <Separator />
+
+            <div className="flex flex-col gap-3">
+              <h5 className="text-xs font-semibold text-foreground">Akun &amp; Akses</h5>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-xs text-muted-foreground">Email Akun</dt>
+                  <dd className="break-all font-medium text-foreground">
+                    {detailEmployee.user_account?.email || 'Tanpa akun login'}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-xs text-muted-foreground">Status Akun / Peran</dt>
+                  <dd className="font-medium text-foreground">
+                    {detailEmployee.user_account?.role
+                      ? ROLE_LABELS[detailEmployee.user_account.role] ||
+                        detailEmployee.user_account.role
+                      : 'Belum memiliki akun'}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        )}
+      </FormSheet>
+
+      {/* FormSheet: Employment Type Detail */}
+      <FormSheet
+        open={Boolean(detailType)}
+        onOpenChange={(open) => {
+          if (!open) setDetailType(null);
+        }}
+        title="Detail Jenis Kepegawaian"
+        description="Standar hari kerja dan ambang lembur harian sesuai PP No. 35/2021."
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailType(null)}
+              className="rounded-lg"
+            >
+              Tutup
+            </Button>
+            {!readOnly && detailType && (
+              <Button
+                type="button"
+                onClick={() => {
+                  const target = detailType;
+                  setDetailType(null);
+                  openEditTypeSheet(target);
+                }}
+                className="rounded-lg"
+              >
+                <Edit3 data-icon="inline-start" className="size-4" />
+                Ubah Kategori
+              </Button>
+            )}
+          </>
+        }
+      >
+        {detailType && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1.5">
+              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+                {detailType.name}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Acuan standar waktu kerja untuk perhitungan kapasitas dan lembur pegawai.
+              </p>
+            </div>
+
+            <Separator />
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Hari Kerja / Minggu</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {detailType.work_days_per_week} hari/minggu
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Ambang Lembur Harian</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  &gt; {getDailyOvertimeThreshold(detailType)} jam/hari
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Jam Normal / Minggu</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {detailType.normal_weekly_hours} jam/minggu
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs text-muted-foreground">Pegawai Terkait</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {Number(detailType.employees_count || 0)} pegawai
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </FormSheet>
 
       {/* FormSheet: Create / Edit Employee */}
       <FormSheet
@@ -855,7 +1000,7 @@ export default function EmployeesPage({ readOnly = false }) {
         onOpenChange={(open) => {
           if (!employeeSubmitting) setEmployeeSheetOpen(open);
         }}
-        title={editingEmployee ? 'Ubah Data Pegawai' : 'Tambah Pegawai Baru'}
+        title={editingEmployee ? 'Ubah Pegawai' : 'Tambah Pegawai'}
         description={
           editingEmployee
             ? `Perbarui profil kepegawaian dan akses akun untuk ${editingEmployee.full_name}.`
@@ -869,10 +1014,16 @@ export default function EmployeesPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setEmployeeSheetOpen(false)}
               disabled={employeeSubmitting}
+              className="rounded-lg"
             >
               Batal
             </Button>
-            <Button type="submit" form="employee-form" disabled={employeeSubmitting}>
+            <Button
+              type="submit"
+              form="employee-form"
+              disabled={employeeSubmitting}
+              className="rounded-lg"
+            >
               {employeeSubmitting && <Spinner data-icon="inline-start" />}
               {employeeSubmitting
                 ? 'Menyimpan...'
@@ -883,219 +1034,239 @@ export default function EmployeesPage({ readOnly = false }) {
           </>
         }
       >
-        <form id="employee-form" onSubmit={handleEmployeeSubmit} className="flex flex-col gap-4">
-          {employeeFormError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{employeeFormError}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-code" className="text-xs font-medium">
-                Kode Pegawai
-              </Label>
-              <Input
-                id="emp-code"
-                name="employee_code"
-                type="text"
-                required
-                value={employeeForm.employee_code}
-                onChange={(e) =>
-                  setEmployeeForm({ ...employeeForm, employee_code: e.target.value })
-                }
-                placeholder="EMP-006"
-                className="font-mono tabular-nums"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-full-name" className="text-xs font-medium">
-                Nama Lengkap
-              </Label>
-              <Input
-                id="emp-full-name"
-                name="full_name"
-                type="text"
-                required
-                value={employeeForm.full_name}
-                onChange={(e) =>
-                  setEmployeeForm({ ...employeeForm, full_name: e.target.value })
-                }
-                placeholder="Nama lengkap pegawai"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-department" className="text-xs font-medium">
-                Departemen
-              </Label>
-              <Select
-                name="department_id"
-                value={employeeForm.department_id || undefined}
-                onValueChange={(val) =>
-                  setEmployeeForm({ ...employeeForm, department_id: val })
-                }
+        <form id="employee-form" onSubmit={handleEmployeeSubmit} className="flex flex-col gap-6">
+          <AnimatePresence initial={false}>
+            {employeeFormError && (
+              <motion.div
+                key="employee-form-error"
+                role="alert"
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={{ duration: 0.16 }}
+                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
               >
-                <SelectTrigger id="emp-department" className="w-full">
-                  <SelectValue placeholder="Pilih Departemen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={String(d.id)}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{employeeFormError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-position" className="text-xs font-medium">
-                Jabatan / Posisi
-              </Label>
-              <Select
-                name="position_id"
-                value={employeeForm.position_id || undefined}
-                onValueChange={(val) => setEmployeeForm({ ...employeeForm, position_id: val })}
-              >
-                <SelectTrigger id="emp-position" className="w-full">
-                  <SelectValue placeholder="Pilih Jabatan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {positions.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.title}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-xs font-semibold text-foreground">Identitas &amp; Penempatan</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-code" className="text-xs font-medium">
+                  Kode Pegawai
+                </Label>
+                <Input
+                  id="emp-code"
+                  name="employee_code"
+                  type="text"
+                  required
+                  value={employeeForm.employee_code}
+                  onChange={(e) =>
+                    setEmployeeForm({ ...employeeForm, employee_code: e.target.value })
+                  }
+                  placeholder="EMP-006"
+                  className="rounded-lg tabular-nums"
+                />
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-type" className="text-xs font-medium">
-                Jenis Kepegawaian
-              </Label>
-              <Select
-                name="employment_type_id"
-                value={employeeForm.employment_type_id || undefined}
-                onValueChange={(val) =>
-                  setEmployeeForm({ ...employeeForm, employment_type_id: val })
-                }
-              >
-                <SelectTrigger id="emp-type" className="w-full">
-                  <SelectValue placeholder="Pilih Jenis Kepegawaian" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {employmentTypes.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-full-name" className="text-xs font-medium">
+                  Nama Lengkap
+                </Label>
+                <Input
+                  id="emp-full-name"
+                  name="full_name"
+                  type="text"
+                  required
+                  value={employeeForm.full_name}
+                  onChange={(e) =>
+                    setEmployeeForm({ ...employeeForm, full_name: e.target.value })
+                  }
+                  placeholder="Nama lengkap pegawai"
+                  className="rounded-lg"
+                />
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-join-date" className="text-xs font-medium">
-                Tanggal Bergabung
-              </Label>
-              <Input
-                id="emp-join-date"
-                name="join_date"
-                type="date"
-                required
-                value={employeeForm.join_date}
-                onChange={(e) =>
-                  setEmployeeForm({ ...employeeForm, join_date: e.target.value })
-                }
-                className="font-mono tabular-nums"
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-department" className="text-xs font-medium">
+                  Departemen
+                </Label>
+                <Select
+                  name="department_id"
+                  value={employeeForm.department_id || undefined}
+                  onValueChange={(val) =>
+                    setEmployeeForm({ ...employeeForm, department_id: val })
+                  }
+                >
+                  <SelectTrigger id="emp-department" className="w-full rounded-lg">
+                    <SelectValue placeholder="Pilih Departemen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-email" className="text-xs font-medium">
-                Email Akun
-              </Label>
-              <Input
-                id="emp-email"
-                name="email"
-                type="email"
-                autoComplete="off"
-                value={employeeForm.email}
-                onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
-                placeholder="pegawai@workbalance.id"
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-position" className="text-xs font-medium">
+                  Jabatan / Posisi
+                </Label>
+                <Select
+                  name="position_id"
+                  value={employeeForm.position_id || undefined}
+                  onValueChange={(val) => setEmployeeForm({ ...employeeForm, position_id: val })}
+                >
+                  <SelectTrigger id="emp-position" className="w-full rounded-lg">
+                    <SelectValue placeholder="Pilih Jabatan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {positions.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-password" className="text-xs font-medium">
-                {editingEmployee ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Awal'}
-              </Label>
-              <Input
-                id="emp-password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                value={employeeForm.password}
-                onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
-                placeholder={
-                  editingEmployee
-                    ? 'Kosongkan jika tetap'
-                    : 'Min. 8 karakter (default password123)'
-                }
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-type" className="text-xs font-medium">
+                  Jenis Kepegawaian
+                </Label>
+                <Select
+                  name="employment_type_id"
+                  value={employeeForm.employment_type_id || undefined}
+                  onValueChange={(val) =>
+                    setEmployeeForm({ ...employeeForm, employment_type_id: val })
+                  }
+                >
+                  <SelectTrigger id="emp-type" className="w-full rounded-lg">
+                    <SelectValue placeholder="Pilih Jenis Kepegawaian" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {employmentTypes.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-role" className="text-xs font-medium">
-                Peran Akses (RBAC)
-              </Label>
-              <Select
-                name="role"
-                value={employeeForm.role}
-                onValueChange={(val) => setEmployeeForm({ ...employeeForm, role: val })}
-              >
-                <SelectTrigger id="emp-role" className="w-full">
-                  <SelectValue placeholder="Pilih Peran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="employee">Pegawai</SelectItem>
-                    <SelectItem value="manager">Manajer</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-join-date" className="text-xs font-medium">
+                  Tanggal Bergabung
+                </Label>
+                <DatePicker
+                  id="emp-join-date"
+                  value={employeeForm.join_date}
+                  onChange={(val) =>
+                    setEmployeeForm({ ...employeeForm, join_date: val })
+                  }
+                  ariaLabel="Tanggal Bergabung"
+                />
+              </div>
             </div>
+          </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emp-status" className="text-xs font-medium">
-                Status Keaktifan
-              </Label>
-              <Select
-                name="status"
-                value={employeeForm.status}
-                onValueChange={(val) => setEmployeeForm({ ...employeeForm, status: val })}
-              >
-                <SelectTrigger id="emp-status" className="w-full">
-                  <SelectValue placeholder="Pilih Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="active">Aktif</SelectItem>
-                    <SelectItem value="inactive">Nonaktif</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+          <Separator />
+
+          <div className="flex flex-col gap-4">
+            <p className="text-xs font-semibold text-foreground">Akun &amp; Akses</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-email" className="text-xs font-medium">
+                  Email Akun
+                </Label>
+                <Input
+                  id="emp-email"
+                  name="email"
+                  type="email"
+                  autoComplete="off"
+                  value={employeeForm.email}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+                  placeholder="pegawai@workbalance.id"
+                  className="rounded-lg"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-password" className="text-xs font-medium">
+                  {editingEmployee ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Awal'}
+                </Label>
+                <Input
+                  id="emp-password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={employeeForm.password}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                  placeholder={
+                    editingEmployee
+                      ? 'Kosongkan jika tetap'
+                      : 'Min. 8 karakter (default password123)'
+                  }
+                  className="rounded-lg"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-role" className="text-xs font-medium">
+                  Peran Akses (RBAC)
+                </Label>
+                <Select
+                  name="role"
+                  value={employeeForm.role}
+                  onValueChange={(val) => setEmployeeForm({ ...employeeForm, role: val })}
+                >
+                  <SelectTrigger id="emp-role" className="w-full rounded-lg">
+                    <SelectValue placeholder="Pilih Peran" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="employee">Pegawai</SelectItem>
+                      <SelectItem value="manager">Manajer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="emp-status" className="text-xs font-medium">
+                  Status Keaktifan
+                </Label>
+                <Select
+                  name="status"
+                  value={employeeForm.status}
+                  onValueChange={(val) => setEmployeeForm({ ...employeeForm, status: val })}
+                >
+                  <SelectTrigger id="emp-status" className="w-full rounded-lg">
+                    <SelectValue placeholder="Pilih Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="active">Aktif</SelectItem>
+                      <SelectItem value="inactive">Nonaktif</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </form>
@@ -1107,14 +1278,16 @@ export default function EmployeesPage({ readOnly = false }) {
         onOpenChange={(open) => {
           if (!open && !deleteEmployeeLoading) setDeletingEmployee(null);
         }}
-        title="Hapus Data Pegawai?"
+        title="Hapus Pegawai?"
         description={
           deletingEmployee ? (
             <>
               Data pegawai{' '}
               <span className="font-semibold text-foreground">{deletingEmployee.full_name}</span> (
-              <span className="font-mono tabular-nums">{deletingEmployee.employee_code}</span>)
-              beserta akun login terkait akan dihapus secara permanen.
+              <span className="font-mono font-normal tabular-nums">
+                {deletingEmployee.employee_code}
+              </span>
+              ) beserta akun login terkait akan dihapus secara permanen.
             </>
           ) : undefined
         }
@@ -1140,23 +1313,39 @@ export default function EmployeesPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setTypeSheetOpen(false)}
               disabled={typeSubmitting}
+              className="rounded-lg"
             >
               Batal
             </Button>
-            <Button type="submit" form="employment-type-form" disabled={typeSubmitting}>
+            <Button
+              type="submit"
+              form="employment-type-form"
+              disabled={typeSubmitting}
+              className="rounded-lg"
+            >
               {typeSubmitting && <Spinner data-icon="inline-start" />}
               {typeSubmitting ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </>
         }
       >
-        <form id="employment-type-form" onSubmit={handleTypeSubmit} className="flex flex-col gap-4">
-          {typeFormError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{typeFormError}</span>
-            </div>
-          )}
+        <form id="employment-type-form" onSubmit={handleTypeSubmit} className="flex flex-col gap-5">
+          <AnimatePresence initial={false}>
+            {typeFormError && (
+              <motion.div
+                key="type-form-error"
+                role="alert"
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={{ duration: 0.16 }}
+                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{typeFormError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="type-name" className="text-xs font-medium">
@@ -1170,6 +1359,7 @@ export default function EmployeesPage({ readOnly = false }) {
               value={typeForm.name}
               onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
               placeholder="Misal: Tetap (PKWTT)"
+              className="rounded-lg"
             />
           </div>
 
@@ -1183,7 +1373,7 @@ export default function EmployeesPage({ readOnly = false }) {
                 value={typeForm.work_days_per_week}
                 onValueChange={(val) => setTypeForm({ ...typeForm, work_days_per_week: val })}
               >
-                <SelectTrigger id="type-work-days" className="w-full">
+                <SelectTrigger id="type-work-days" className="w-full rounded-lg">
                   <SelectValue placeholder="Pilih Hari Kerja" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1210,7 +1400,7 @@ export default function EmployeesPage({ readOnly = false }) {
                 onChange={(e) =>
                   setTypeForm({ ...typeForm, normal_weekly_hours: e.target.value })
                 }
-                className="font-mono tabular-nums"
+                className="rounded-lg tabular-nums"
               />
             </div>
           </div>
@@ -1230,7 +1420,7 @@ export default function EmployeesPage({ readOnly = false }) {
               Anda akan menghapus kategori{' '}
               <span className="font-semibold text-foreground">{deletingType.name}</span>.
               {Number(deletingType.employees_count || 0) > 0 && (
-                <span className="mt-2.5 block rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                <span className="mt-2.5 block rounded-xl border border-warning-border bg-warning-subtle px-3.5 py-2.5 text-xs text-warning tabular-nums">
                   Perhatian: Jenis kepegawaian ini masih digunakan oleh{' '}
                   {deletingType.employees_count} pegawai. Sistem akan menolak penghapusan untuk
                   menjaga integritas data.

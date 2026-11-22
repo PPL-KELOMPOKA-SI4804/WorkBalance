@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { AnimatedNumber } from './AnimatedNumber';
 import { StatusBadge } from './StatusBadge';
 
 export function KpiStatCard({
@@ -12,40 +13,35 @@ export function KpiStatCard({
   statusLabel,
   hint,
   progress,
-  mono = false,
   className,
 }) {
   return (
     <div
       data-slot="kpi-stat-card"
       className={cn(
-        'flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-5 transition-colors hover:border-foreground/20',
+        'flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20',
         className
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground text-balance">
           {label}
         </span>
         {Icon && (
           <Icon
             aria-hidden="true"
-            className="size-4 shrink-0 text-muted-foreground/80"
+            className="size-4 shrink-0 text-muted-foreground"
           />
         )}
       </div>
 
       <div className="flex items-baseline gap-1.5">
-        <span
-          className={cn(
-            'text-[28px] leading-none font-semibold tracking-[-0.025em] text-foreground tabular-nums',
-            mono && 'font-mono'
-          )}
-        >
-          {value}
-        </span>
+        <AnimatedNumber
+          value={value}
+          className="text-[28px] leading-none font-semibold tracking-[-0.025em] text-foreground"
+        />
         {unit && (
-          <span className="font-mono text-xs font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground tabular-nums">
             {unit}
           </span>
         )}

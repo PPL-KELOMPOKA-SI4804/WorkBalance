@@ -7,17 +7,23 @@ import {
   Award,
   Briefcase,
   Building2,
-  Calendar,
   ClipboardCheck,
   Clock,
   HeartHandshake,
   MessageSquareWarning,
   Plus,
-  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import {
+  daysUntilDate,
+  formatDate,
+  formatWeek,
+  toApiDate,
+  toISODateLocal,
+} from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { surveyService } from '@/services/surveyService';
@@ -30,11 +36,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
   StatusBadge,
@@ -42,6 +57,7 @@ import {
 } from '@/components/workbalance';
 
 const DAY_NAMES_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const NO_ASSIGNMENT_VALUE = '__none__';
 
 function formatScore(val, digits = 1) {
   return Number(val || 0).toFixed(digits);
@@ -49,11 +65,8 @@ function formatScore(val, digits = 1) {
 
 function getDeadlineBadge(deadlineStr, status) {
   if (!deadlineStr || status === 'completed') return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(`${String(deadlineStr).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(due.getTime())) return null;
-  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = daysUntilDate(deadlineStr);
+  if (diffDays === null) return null;
   if (diffDays < 0) return { tone: 'danger', label: `Lewat ${Math.abs(diffDays)}h` };
   if (diffDays === 0) return { tone: 'warning', label: 'Hari ini' };
   if (diffDays <= 7) return { tone: 'warning', label: `H-${diffDays}` };
@@ -66,11 +79,8 @@ function buildRecentDailyChartData(workLogs = [], dailyLimit = 8) {
   today.setHours(0, 0, 0, 0);
 
   for (let offset = 6; offset >= 0; offset -= 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - offset);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate()
-    ).padStart(2, '0')}`;
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset);
+    const iso = toISODateLocal(d);
     buckets.push({
       iso,
       label: `${DAY_NAMES_ID[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}`,
@@ -80,7 +90,7 @@ function buildRecentDailyChartData(workLogs = [], dailyLimit = 8) {
 
   const byIso = new Map(buckets.map((b) => [b.iso, b]));
   for (const log of workLogs) {
-    const key = String(log.work_date || '').slice(0, 10);
+    const key = toApiDate(log.work_date);
     const bucket = byIso.get(key);
     if (bucket) {
       bucket.total += Number(log.hours_spent || 0);
@@ -99,36 +109,11 @@ function buildRecentDailyChartData(workLogs = [], dailyLimit = 8) {
 }
 
 const QUICK_LINKS = [
-  {
-    to: '/employee/work-logs',
-    icon: Clock,
-    title: 'Riwayat Catatan Waktu',
-    subtitle: 'Tinjau dan kelola seluruh log harian Anda',
-  },
-  {
-    to: '/employee/surveys',
-    icon: HeartHandshake,
-    title: 'Survei Kondisi Kerja',
-    subtitle: 'Sampaikan persepsi beban kerja secara anonim',
-  },
-  {
-    to: '/employee/workplace-issues',
-    icon: MessageSquareWarning,
-    title: 'Laporkan Permasalahan K3',
-    subtitle: 'Catat kendala operasional atau keselamatan kerja',
-  },
-  {
-    to: '/employee/workload-risk',
-    icon: Activity,
-    title: 'Analisis Workload Risk Saya',
-    subtitle: 'Lihat rincian 4 sub-indikator beban kerja',
-  },
-  {
-    to: '/employee/training-participations',
-    icon: Award,
-    title: 'Pelatihan & Kompetensi',
-    subtitle: 'Pantau keikutsertaan pelatihan aktif Anda',
-  },
+  { to: '/employee/work-logs', icon: Clock, title: 'Riwayat Log Kerja' },
+  { to: '/employee/surveys', icon: HeartHandshake, title: 'Survei Kondisi Kerja' },
+  { to: '/employee/workplace-issues', icon: MessageSquareWarning, title: 'Lapor Masalah & K3' },
+  { to: '/employee/workload-risk', icon: Activity, title: 'Detail Risiko Saya' },
+  { to: '/employee/training-participations', icon: Award, title: 'Pelatihan Saya' },
 ];
 
 export default function EmployeeDashboardPage() {
@@ -155,7 +140,7 @@ export default function EmployeeDashboardPage() {
   const [logFormError, setLogFormError] = useState('');
   const [logForm, setLogForm] = useState({
     task_assignment_id: '',
-    work_date: new Date().toISOString().slice(0, 10),
+    work_date: toISODateLocal(),
     hours_spent: '2',
     activity_description: '',
   });
@@ -205,7 +190,11 @@ export default function EmployeeDashboardPage() {
 
       if (surveyRes.status === 'fulfilled' && surveyRes.value) {
         const surveys = surveyRes.value.surveys || [];
-        const pending = surveys.filter((s) => s.status === 'open' && !s.has_responded).length;
+        const summaryPending = surveyRes.value.summary?.my_pending_count;
+        const pending =
+          typeof summaryPending === 'number'
+            ? summaryPending
+            : surveys.filter((s) => s.is_active && !s.my_response).length;
         setPendingSurveysCount(pending);
       }
     } finally {
@@ -217,14 +206,15 @@ export default function EmployeeDashboardPage() {
     loadWorkspace();
   }, [loadWorkspace]);
 
+  useRefetchOnFocus(loadWorkspace);
+
   const activeAssignments = useMemo(
     () => assignments.filter((a) => a.status !== 'completed' && a.status !== 'cancelled'),
     [assignments]
   );
 
   const urgentAssignmentsCount = useMemo(
-    () =>
-      activeAssignments.filter((a) => Boolean(getDeadlineBadge(a.deadline, a.status))).length,
+    () => activeAssignments.filter((a) => Boolean(getDeadlineBadge(a.deadline, a.status))).length,
     [activeAssignments]
   );
 
@@ -238,44 +228,51 @@ export default function EmployeeDashboardPage() {
   );
   const weeklyHoursPct = Math.min(100, Math.round((currentWeekHours / normalWeeklyHours) * 100));
 
-  const openQuickLogSheet = (assignment = null) => {
+  const openQuickLogSheet = useCallback((assignment = null) => {
     setLogFormError('');
     setLogForm({
       task_assignment_id: assignment?.id ? String(assignment.id) : '',
-      work_date: new Date().toISOString().slice(0, 10),
+      work_date: toISODateLocal(),
       hours_spent: '2',
       activity_description: assignment?.task?.title
         ? `Pengerjaan: ${assignment.task.title}`
         : '',
     });
     setLogSheetOpen(true);
-  };
+  }, []);
 
   const handleQuickLogSubmit = async (event) => {
     event.preventDefault();
     setLogFormError('');
+
+    if (!logForm.work_date) {
+      setLogFormError('Tanggal kerja wajib diisi.');
+      return;
+    }
+
     setLogSubmitting(true);
 
     try {
       await workLogService.createWorkLog({
         employee_id: employee?.id,
         task_assignment_id: logForm.task_assignment_id ? Number(logForm.task_assignment_id) : null,
-        work_date: logForm.work_date,
+        work_date: toApiDate(logForm.work_date),
         hours_spent: Number(logForm.hours_spent),
         activity_description: logForm.activity_description.trim(),
       });
-      toast.success('Catatan waktu kerja berhasil disimpan.');
+      toast.success('Log kerja tersimpan.');
       setLogSheetOpen(false);
       await loadWorkspace();
     } catch (err) {
       setLogFormError(
-        extractApiError(err, 'Gagal menyimpan catatan waktu kerja. Periksa isian Anda.').message
+        extractApiError(err, 'Gagal menyimpan log kerja. Periksa isian Anda.').message
       );
     } finally {
       setLogSubmitting(false);
     }
   };
 
+  // Calm Rows: 3 single-line columns; clicking any row opens Catat Log prefilled with that task
   const assignmentColumns = useMemo(
     () => [
       {
@@ -283,72 +280,45 @@ export default function EmployeeDashboardPage() {
         id: 'title',
         header: 'Tugas',
         cell: ({ row }) => {
-          const item = row.original;
+          const title = row.original.task?.title || `Penugasan #${row.original.id}`;
           return (
-            <div className="flex max-w-[260px] flex-col gap-0.5 whitespace-normal">
-              <span className="font-medium leading-snug text-foreground">
-                {item.task?.title || `Penugasan #${item.id}`}
-              </span>
-              {item.task?.priority && (
-                <span className="text-xs text-muted-foreground capitalize">
-                  Prioritas {item.task.priority} · Estimasi{' '}
-                  <span className="font-mono">{formatScore(item.task?.estimated_hours, 1)}j</span>
-                </span>
-              )}
-            </div>
+            <span className="block max-w-[300px] truncate font-medium text-foreground" title={title}>
+              {title}
+            </span>
           );
         },
       },
       {
         accessorKey: 'deadline',
         header: 'Tenggat',
-        cell: ({ row }) => {
-          const item = row.original;
-          const urgency = getDeadlineBadge(item.deadline, item.status);
-          return (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-mono text-xs text-foreground tabular-nums">
-                {String(item.deadline || '-').slice(0, 10)}
-              </span>
-              {urgency && (
-                <StatusBadge tone={urgency.tone} label={urgency.label} showDot={false} />
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
+            {formatDate(row.original.deadline)}
+          </span>
+        ),
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status === 'assigned' ? 'open' : row.original.status}
-            label={
-              row.original.status === 'assigned'
-                ? 'Ditugaskan'
-                : row.original.status === 'in_progress'
-                  ? 'Dikerjakan'
-                  : undefined
-            }
-          />
-        ),
-      },
-      {
-        id: 'actions',
-        header: () => <span className="sr-only">Aksi</span>,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => openQuickLogSheet(row.original)}
-            >
-              <Clock data-icon="inline-start" />
-              Catat Log
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const item = row.original;
+          const urgency = getDeadlineBadge(item.deadline, item.status);
+          if (urgency) {
+            return <StatusBadge tone={urgency.tone} label={urgency.label} />;
+          }
+          return (
+            <StatusBadge
+              status={item.status === 'assigned' ? 'open' : item.status}
+              label={
+                item.status === 'assigned'
+                  ? 'Ditugaskan'
+                  : item.status === 'in_progress'
+                    ? 'Dikerjakan'
+                    : undefined
+              }
+            />
+          );
+        },
       },
     ],
     []
@@ -356,29 +326,20 @@ export default function EmployeeDashboardPage() {
 
   const subIndicators = riskRow
     ? [
-        { label: 'Waktu Kerja Mingguan', score: riskRow.weekly_hours_score },
+        { label: 'Waktu Kerja', score: riskRow.weekly_hours_score },
         { label: 'Lembur', score: riskRow.overtime_score },
-        { label: 'Beban Tugas vs Kapasitas', score: riskRow.task_load_score },
+        { label: 'Beban Tugas', score: riskRow.task_load_score },
         { label: 'Tekanan Tenggat', score: riskRow.deadline_pressure_score },
       ]
     : [];
 
   return (
-    <AppShell
-      title="Beranda Pegawai"
-      breadcrumb="Ruang Kerja Saya / Ringkasan Harian"
-      actions={
-        <Button size="sm" onClick={() => openQuickLogSheet(null)}>
-          <Plus data-icon="inline-start" />
-          Catat Work Log
-        </Button>
-      }
-    >
-      <div className="flex flex-col gap-6">
+    <AppShell title="Beranda" breadcrumb="Ruang Kerja">
+      <div className="flex flex-col gap-8">
         {/* Compact Identity Header Strip */}
-        <section className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-card p-5 lg:flex-row lg:items-center">
+        <section className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 lg:flex-row lg:items-center">
           <div className="flex items-center gap-3.5">
-            <Avatar className="size-11 border border-border">
+            <Avatar className="size-10 border border-border">
               <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
                 {getInitials(employee?.full_name, user?.email)}
               </AvatarFallback>
@@ -396,35 +357,29 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground lg:border-t-0 lg:pt-0">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground lg:border-t-0 lg:pt-0">
             <div className="flex items-center gap-1.5">
-              <Building2 className="size-3.5 text-muted-foreground/70" />
-              <span className="font-mono font-medium text-foreground">
+              <Building2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
+              <span className="font-mono text-foreground">
                 {employee?.employee_code || '-'}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Briefcase className="size-3.5 text-muted-foreground/70" />
+              <Briefcase aria-hidden="true" className="size-3.5 text-muted-foreground" />
               <span>{employee?.employment_type?.name || 'Tetap'}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="size-3.5 text-muted-foreground/70" />
-              <span className="font-mono tabular-nums">
-                {workDaysPerWeek}hk · {normalWeeklyHours}j/mgg
+            <div className="flex items-center gap-1.5 tabular-nums">
+              <Clock aria-hidden="true" className="size-3.5 text-muted-foreground" />
+              <span>
+                {workDaysPerWeek} hari · {normalWeeklyHours}j/minggu
               </span>
             </div>
-            {employee?.join_date && (
-              <div className="flex items-center gap-1.5">
-                <Calendar className="size-3.5 text-muted-foreground/70" />
-                <span className="font-mono tabular-nums">{employee.join_date}</span>
-              </div>
-            )}
           </div>
         </section>
 
         {/* Error State */}
         {errorMsg && (
-          <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-destructive/30 bg-card p-5 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-destructive/30 bg-card p-5 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
               <div className="flex flex-col gap-0.5">
@@ -433,7 +388,6 @@ export default function EmployeeDashboardPage() {
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={loadWorkspace}>
-              <RefreshCw data-icon="inline-start" />
               Coba Lagi
             </Button>
           </div>
@@ -443,13 +397,13 @@ export default function EmployeeDashboardPage() {
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard
-              label="Jam Kerja Minggu Ini"
+              label="Jam Minggu Ini"
               value={formatScore(currentWeekHours, 1)}
               unit={`/ ${normalWeeklyHours}j`}
               icon={Clock}
@@ -463,21 +417,20 @@ export default function EmployeeDashboardPage() {
               }
               statusLabel={
                 currentWeekHours >= 55
-                  ? 'Melebihi batas PP 35'
+                  ? 'Melebihi PP 35'
                   : currentWeekHours > normalWeeklyHours
                     ? 'Ada lembur'
-                    : 'Dalam batas sehat'
+                    : 'Batas sehat'
               }
             />
 
             <KpiStatCard
-              label="Skor Workload Risk Saya"
-              value={riskRow ? formatScore(riskRow.final_score, 1) : '—'}
+              label="Workload Risk Saya"
+              value={riskRow ? formatScore(riskRow.final_score, 1) : '-'}
               unit={riskRow ? '/ 100' : undefined}
               icon={Activity}
               status={riskRow?.risk_category || 'neutral'}
               statusLabel={riskRow ? undefined : 'Belum dihitung'}
-              hint={riskRow?.is_overridden ? 'Override PP 35/2021' : riskRow?.period_week}
             />
 
             <KpiStatCard
@@ -485,62 +438,65 @@ export default function EmployeeDashboardPage() {
               value={activeAssignments.length}
               unit="tugas"
               icon={ClipboardCheck}
-              status={urgentAssignmentsCount > 0 ? 'medium' : 'info'}
-              statusLabel={
+              hint={
                 urgentAssignmentsCount > 0
                   ? `${urgentAssignmentsCount} tenggat dekat`
                   : 'Tenggat terkendali'
               }
-              hint={`Total ${assignments.length} penugasan`}
             />
 
             <KpiStatCard
-              label="Pelatihan & Survei"
+              label="Pelatihan"
               value={trainingsCount}
-              unit="pelatihan"
+              unit="diikuti"
               icon={Award}
-              status={pendingSurveysCount > 0 ? 'warning' : 'success'}
-              statusLabel={
+              hint={
                 pendingSurveysCount > 0
                   ? `${pendingSurveysCount} survei belum diisi`
-                  : 'Survei terisi'
+                  : 'Semua survei terisi'
               }
             />
           </section>
         )}
 
-        {/* Row 2: Daily Hours Bar Chart + Active Tasks (8 cols) | Quick Actions & Risk Breakdown (4 cols) */}
+        {/* Row 2: Daily Hours Chart + Active Tasks (8 cols) | Risk Profile + Quick Links (4 cols) */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <div className="flex flex-col gap-6 xl:col-span-8">
-            {/* Recharts Daily Work Hours Chart */}
-            <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-col gap-0.5">
                   <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                    Catatan Jam Kerja 7 Hari Terakhir
+                    Jam Kerja 7 Hari Terakhir
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Perbandingan jam normal dan lembur terhadap garis batas{' '}
-                    <span className="font-mono font-medium text-foreground">
-                      {dailyLimit} jam/hari
-                    </span>{' '}
-                    (PP No. 35/2021).
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    Garis batas {dailyLimit} jam/hari (PP 35/2021)
                   </p>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
-                    Normal
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-xs bg-[var(--chart-3)]" />
-                    Lembur
-                  </span>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
+                      Normal
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-xs bg-[var(--chart-3)]" />
+                      Lembur
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={() => openQuickLogSheet(null)}
+                  >
+                    <Plus data-icon="inline-start" />
+                    Catat Log
+                  </Button>
                 </div>
               </div>
 
               {loading ? (
-                <Skeleton className="h-60 w-full rounded-lg" />
+                <Skeleton className="h-60 w-full rounded-xl" />
               ) : (
                 <WorkHoursBarChart
                   data={dailyChartData}
@@ -550,22 +506,22 @@ export default function EmployeeDashboardPage() {
               )}
             </div>
 
-            {/* Active Assigned Tasks Table */}
             <DataTable
-              title="Penugasan Aktif Anda"
+              title="Penugasan Aktif"
               countLabel="tugas"
               columns={assignmentColumns}
               data={activeAssignments}
               loading={loading}
               searchable={true}
-              searchPlaceholder="Cari judul tugas..."
+              searchPlaceholder="Cari tugas..."
               pageSize={6}
+              onRowClick={(row) => openQuickLogSheet(row)}
               emptyTitle="Tidak ada penugasan aktif"
-              emptyDescription="Semua penugasan Anda sudah selesai atau belum ada tugas baru dari manajer."
+              emptyDescription="Semua penugasan selesai atau belum ada tugas baru."
               actionsSlot={
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/employee/task-assignments">
-                    Lihat Semua
+                    Semua
                     <ArrowUpRight data-icon="inline-end" />
                   </Link>
                 </Button>
@@ -573,16 +529,16 @@ export default function EmployeeDashboardPage() {
             />
           </div>
 
-          {/* Right Rail: 4 Sub-Indicators + Quick Actions */}
+          {/* Right Rail: Personal 4 Sub-Indicators + Quick Links */}
           <div className="flex flex-col gap-6 xl:col-span-4">
-            <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                  Profil Beban Kerja Pribadi
+                  Profil Beban Kerja
                 </h3>
                 {riskRow?.period_week && (
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {riskRow.period_week}
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {formatWeek(riskRow.period_week)}
                   </span>
                 )}
               </div>
@@ -590,29 +546,31 @@ export default function EmployeeDashboardPage() {
               {loading ? (
                 <div className="flex flex-col gap-3">
                   {[1, 2, 3, 4].map((i) => (
-                    <Skeleton key={i} className="h-9 w-full" />
+                    <Skeleton key={i} className="h-9 w-full rounded-lg" />
                   ))}
                 </div>
               ) : subIndicators.length === 0 ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Indikator beban kerja periode ini belum dihitung oleh sistem. Catat aktivitas
-                  harian Anda agar pemantauan tetap akurat.
+                  Skor minggu ini belum dihitung. Catat log kerja harian Anda.
                 </p>
               ) : (
-                <div className="flex flex-col gap-3.5">
+                <div className="flex flex-col gap-4">
                   {subIndicators.map((sub) => (
                     <div key={sub.label} className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">{sub.label}</span>
-                        <span className="font-mono font-semibold text-foreground tabular-nums">
+                        <span className="font-semibold text-foreground tabular-nums">
                           {formatScore(sub.score, 1)}
                         </span>
                       </div>
-                      <Progress value={Math.min(100, Math.max(0, Number(sub.score || 0)))} className="h-1.5" />
+                      <Progress
+                        value={Math.min(100, Math.max(0, Number(sub.score || 0)))}
+                        className="h-1.5"
+                      />
                     </div>
                   ))}
                   {riskRow?.recommendation_note && (
-                    <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                    <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
                       {riskRow.recommendation_note}
                     </p>
                   )}
@@ -620,11 +578,10 @@ export default function EmployeeDashboardPage() {
               )}
             </div>
 
-            {/* Quick Navigation Actions */}
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
               <div className="border-b border-border px-5 py-3.5">
                 <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                  Aksi Cepat Pegawai
+                  Aksi Cepat
                 </h3>
               </div>
               <div className="divide-y divide-border">
@@ -634,20 +591,15 @@ export default function EmployeeDashboardPage() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="group flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                      className="group flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/40"
                     >
-                      <div className="flex min-w-0 items-start gap-3">
-                        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                          <span className="text-xs font-medium text-foreground">
-                            {item.title}
-                          </span>
-                          <span className="truncate text-[11px] text-muted-foreground">
-                            {item.subtitle}
-                          </span>
-                        </div>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {item.title}
+                        </span>
                       </div>
-                      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground" />
+                      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground" />
                     </Link>
                   );
                 })}
@@ -661,8 +613,8 @@ export default function EmployeeDashboardPage() {
       <FormSheet
         open={logSheetOpen}
         onOpenChange={setLogSheetOpen}
-        title="Catat Aktivitas & Jam Kerja"
-        description="Simpan log harian langsung dari beranda pegawai untuk memperbarui pemantauan beban kerja."
+        title="Catat Log Kerja"
+        description="Simpan durasi kerja harian untuk memperbarui beban kerja Anda."
         size="sm"
         footer={
           <>
@@ -676,7 +628,7 @@ export default function EmployeeDashboardPage() {
             </Button>
             <Button type="submit" form="quick-work-log-form" disabled={logSubmitting}>
               {logSubmitting && <Spinner data-icon="inline-start" />}
-              Simpan Work Log
+              Simpan
             </Button>
           </>
         }
@@ -689,7 +641,7 @@ export default function EmployeeDashboardPage() {
           {logFormError && (
             <div
               role="alert"
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
             >
               {logFormError}
             </div>
@@ -697,38 +649,45 @@ export default function EmployeeDashboardPage() {
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="quick-log-assignment" className="text-xs">
-              Penugasan Terkait (Opsional)
+              Penugasan (Opsional)
             </Label>
-            <select
-              id="quick-log-assignment"
-              value={logForm.task_assignment_id}
-              onChange={(e) =>
-                setLogForm((prev) => ({ ...prev, task_assignment_id: e.target.value }))
+            <Select
+              value={logForm.task_assignment_id || NO_ASSIGNMENT_VALUE}
+              onValueChange={(val) =>
+                setLogForm((prev) => ({
+                  ...prev,
+                  task_assignment_id: val === NO_ASSIGNMENT_VALUE ? '' : val,
+                }))
               }
-              className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Aktivitas umum (tanpa penugasan)</option>
-              {activeAssignments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.task?.title || `Penugasan #${a.id}`}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="quick-log-assignment" className="w-full rounded-lg bg-background">
+                <SelectValue placeholder="Aktivitas umum" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={NO_ASSIGNMENT_VALUE}>Aktivitas umum</SelectItem>
+                  {activeAssignments.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.task?.title || `Penugasan #${a.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="quick-log-date" className="text-xs">
-                Tanggal Kerja
+                Tanggal
               </Label>
-              <Input
+              <DatePicker
                 id="quick-log-date"
-                type="date"
-                required
                 value={logForm.work_date}
-                onChange={(e) =>
-                  setLogForm((prev) => ({ ...prev, work_date: e.target.value }))
+                onChange={(val) =>
+                  setLogForm((prev) => ({ ...prev, work_date: val }))
                 }
+                ariaLabel="Tanggal kerja"
               />
             </div>
 
@@ -738,6 +697,7 @@ export default function EmployeeDashboardPage() {
               </Label>
               <Input
                 id="quick-log-hours"
+                name="hours_spent"
                 type="number"
                 step="0.25"
                 min="0.25"
@@ -757,6 +717,7 @@ export default function EmployeeDashboardPage() {
             </Label>
             <Textarea
               id="quick-log-desc"
+              name="activity_description"
               rows={4}
               required
               placeholder="Ringkas pekerjaan yang diselesaikan hari ini..."

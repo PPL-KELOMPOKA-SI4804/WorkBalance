@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   ChevronDown,
   LogOut,
@@ -12,11 +13,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   getInitials,
   getNavGroupsForRole,
   ROLE_LABELS,
-  ROLE_TONES,
 } from '@/lib/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
   SheetContent,
@@ -38,12 +38,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CommandMenu, StatusBadge } from '@/components/workbalance';
+import { BrandLogo, CommandMenu, ThemeSwitch } from '@/components/workbalance';
 
 const SIDEBAR_STORAGE_KEY = 'wb_sidebar_collapsed';
 
@@ -55,13 +56,15 @@ function readInitialCollapsed() {
   }
 }
 
-function SidebarNav({ groups, pathname, collapsed, onNavigate }) {
+function SidebarNav({ groups, pathname, collapsed, onNavigate, layoutScope = 'desktop' }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
       {groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-1">
           {!collapsed && (
-            <p className="px-2.5 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground/80">
+            <p className="px-2.5 pb-0.5 text-xs font-medium text-muted-foreground">
               {group.label}
             </p>
           )}
@@ -76,23 +79,35 @@ function SidebarNav({ groups, pathname, collapsed, onNavigate }) {
                   onClick={onNavigate}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'group flex items-center gap-2.5 rounded-lg text-[13px] transition-colors',
+                    'group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors',
                     collapsed ? 'justify-center p-2' : 'px-2.5 py-2',
                     isActive
-                      ? 'bg-card font-medium text-foreground ring-1 ring-border'
+                      ? 'font-medium text-foreground'
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   )}
                 >
+                  {isActive && (
+                    <motion.span
+                      layoutId={prefersReducedMotion ? undefined : `wb-nav-active-${layoutScope}`}
+                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-lg bg-card ring-1 ring-border"
+                    />
+                  )}
                   <Icon
                     aria-hidden="true"
                     className={cn(
-                      'size-4 shrink-0 transition-colors',
+                      'relative z-10 size-4 shrink-0 transition-colors',
                       isActive
                         ? 'text-primary'
                         : 'text-muted-foreground group-hover:text-foreground'
                     )}
                   />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!collapsed && (
+                    <span className="relative z-10 truncate leading-5">
+                      {item.label}
+                    </span>
+                  )}
                 </Link>
               );
 
@@ -122,12 +137,12 @@ function RegulatoryFooter({ collapsed }) {
       <div className="flex justify-center border-t border-sidebar-border p-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex size-9 items-center justify-center rounded-lg border border-border/80 bg-card text-primary">
+            <div className="flex size-8 items-center justify-center rounded-lg text-muted-foreground">
               <Scale className="size-4" />
             </div>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
-            PP No. 35/2021 · 40j normal · maks 18j lembur/minggu
+            PP No. 35/2021 · 40j normal, maks 18j lembur/minggu
           </TooltipContent>
         </Tooltip>
       </div>
@@ -135,17 +150,10 @@ function RegulatoryFooter({ collapsed }) {
   }
 
   return (
-    <div className="border-t border-sidebar-border p-3">
-      <div className="flex flex-col gap-1.5 rounded-lg border border-border/80 bg-card/80 px-3 py-2.5">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-          <Scale className="size-3.5 shrink-0 text-primary" />
-          <span>Acuan PP No. 35/2021</span>
-        </div>
-        <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground tabular-nums">
-          <span>Normal 40j/mgg</span>
-          <span className="text-border">·</span>
-          <span>Lembur ≤18j</span>
-        </div>
+    <div className="border-t border-sidebar-border px-4 py-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
+        <Scale aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+        <span className="truncate">PP 35/2021 · 40j + maks 18j</span>
       </div>
     </div>
   );
@@ -164,17 +172,27 @@ export default function AppShell({
   const location = useLocation();
   const navigate = useNavigate();
 
+  useDocumentTitle(title);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readInitialCollapsed);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const navGroups = getNavGroupsForRole(user?.role);
-  const fullName = user?.employee?.full_name || user?.email || 'Pengguna WorkBalance';
+  const fullName = user?.employee?.full_name || user?.email || 'Pengguna';
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Pengguna';
-  const roleTone = ROLE_TONES[user?.role] || 'neutral';
   const initials = getInitials(user?.employee?.full_name, user?.email);
   const employeeCode = user?.employee?.employee_code;
   const departmentName = user?.employee?.department?.name;
+
+  // Keep breadcrumb concise: only show parent context when it does not repeat the page title
+  const normalizedParent = breadcrumb
+    ? String(breadcrumb).split('/')[0].trim()
+    : '';
+  const showBreadcrumb =
+    Boolean(normalizedParent) &&
+    normalizedParent.toLowerCase() !== String(title || '').trim().toLowerCase();
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -189,8 +207,14 @@ export default function AppShell({
   };
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -199,33 +223,21 @@ export default function AppShell({
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out lg:flex',
-          collapsed ? 'w-[68px]' : 'w-64'
+          collapsed ? 'w-[68px]' : 'w-60'
         )}
       >
         <div
           className={cn(
             'flex h-14 shrink-0 items-center border-b border-sidebar-border',
-            collapsed ? 'justify-center px-2' : 'justify-between px-4'
+            collapsed ? 'justify-center px-2' : 'px-4'
           )}
         >
           <Link
             to="/"
-            className="flex items-center gap-2 focus-visible:outline-none"
+            className="flex items-center focus-visible:outline-none"
             aria-label="Beranda WorkBalance"
           >
-            {collapsed ? (
-              <img
-                src="/assets/workbalance_logo_2.svg"
-                alt="WorkBalance"
-                className="size-7"
-              />
-            ) : (
-              <img
-                src="/assets/workbalance_horizontal_logo_2.svg"
-                alt="WorkBalance"
-                className="h-8 w-auto"
-              />
-            )}
+            <BrandLogo variant={collapsed ? 'mark' : 'horizontal'} />
           </Link>
         </div>
 
@@ -233,6 +245,7 @@ export default function AppShell({
           groups={navGroups}
           pathname={location.pathname}
           collapsed={collapsed}
+          layoutScope="desktop"
         />
 
         <RegulatoryFooter collapsed={collapsed} />
@@ -245,11 +258,7 @@ export default function AppShell({
           className="flex w-72 flex-col gap-0 bg-sidebar p-0"
         >
           <SheetHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 py-0">
-            <img
-              src="/assets/workbalance_horizontal_logo_2.svg"
-              alt="WorkBalance"
-              className="h-8 w-auto"
-            />
+            <BrandLogo variant="horizontal" />
             <SheetTitle className="sr-only">Navigasi WorkBalance</SheetTitle>
             <SheetDescription className="sr-only">
               Menu navigasi utama berdasarkan peran pengguna.
@@ -260,6 +269,7 @@ export default function AppShell({
             groups={navGroups}
             pathname={location.pathname}
             collapsed={false}
+            layoutScope="mobile"
             onNavigate={() => setMobileOpen(false)}
           />
 
@@ -271,20 +281,20 @@ export default function AppShell({
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col transition-[padding-left] duration-200 ease-out',
-          collapsed ? 'lg:pl-[68px]' : 'lg:pl-64'
+          collapsed ? 'lg:pl-[68px]' : 'lg:pl-60'
         )}
       >
         {/* Sticky Top Header Bar */}
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/90 px-4 backdrop-blur-sm sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2.5">
             <Button
               variant="ghost"
               size="icon-sm"
-              className="lg:hidden"
+              className="-ml-1.5 lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Buka navigasi"
             >
-              <Menu />
+              <Menu className="size-4" />
             </Button>
 
             <Tooltip>
@@ -292,11 +302,15 @@ export default function AppShell({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="hidden text-muted-foreground hover:text-foreground lg:inline-flex"
+                  className="-ml-1.5 hidden text-muted-foreground hover:text-foreground lg:inline-flex"
                   onClick={toggleCollapsed}
                   aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
                 >
-                  {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                  {collapsed ? (
+                    <PanelLeftOpen className="size-4" />
+                  ) : (
+                    <PanelLeftClose className="size-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -304,21 +318,27 @@ export default function AppShell({
               </TooltipContent>
             </Tooltip>
 
-            <Separator orientation="vertical" className="hidden h-4 lg:block" />
-
-            <div className="flex min-w-0 flex-col">
-              <h1 className="truncate text-[15px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
+            <div className="flex min-w-0 items-baseline gap-2">
+              {showBreadcrumb && (
+                <>
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                    {normalizedParent}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="hidden text-xs text-border sm:inline"
+                  >
+                    /
+                  </span>
+                </>
+              )}
+              <h1 className="truncate text-[15px] leading-tight font-semibold tracking-[-0.015em] text-foreground">
                 {title}
               </h1>
-              {breadcrumb && (
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {breadcrumb}
-                </p>
-              )}
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2.5">
             {onSearchChange && (
               <div className="relative hidden w-60 md:block lg:w-72">
                 <Search
@@ -354,24 +374,24 @@ export default function AppShell({
               className="hidden h-8 gap-2 bg-card px-2.5 text-xs font-normal text-muted-foreground hover:text-foreground sm:inline-flex"
             >
               <Search className="size-3.5" />
-              <span className="hidden xl:inline">Navigasi cepat...</span>
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="hidden xl:inline">Cari modul...</span>
+              <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs leading-none font-normal text-foreground">
                 Ctrl K
               </kbd>
             </Button>
 
             {actions}
 
-            <Separator orientation="vertical" className="mx-0.5 h-5" />
+            <ThemeSwitch />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="-mr-1.5 flex items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Avatar className="size-7 border border-border">
-                    <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">
+                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
@@ -379,7 +399,7 @@ export default function AppShell({
                     <span className="truncate text-xs leading-tight font-medium text-foreground">
                       {fullName}
                     </span>
-                    <span className="truncate text-[11px] leading-tight text-muted-foreground">
+                    <span className="truncate text-xs leading-tight text-muted-foreground">
                       {roleLabel}
                     </span>
                   </div>
@@ -388,19 +408,23 @@ export default function AppShell({
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end" className="w-60">
-                <DropdownMenuLabel className="flex flex-col gap-1.5 font-normal">
+                <DropdownMenuLabel className="flex flex-col gap-1 font-normal">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-xs font-semibold text-foreground">
                       {fullName}
                     </span>
-                    <StatusBadge tone={roleTone} label={roleLabel} />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {roleLabel}
+                    </span>
                   </div>
-                  <span className="truncate text-[11px] text-muted-foreground">
+                  <span className="truncate text-xs text-muted-foreground">
                     {user?.email}
                   </span>
                   {(employeeCode || departmentName) && (
-                    <span className="truncate font-mono text-[11px] text-muted-foreground">
-                      {[employeeCode, departmentName].filter(Boolean).join(' · ')}
+                    <span className="truncate text-xs text-muted-foreground">
+                      {employeeCode && <span className="font-mono">{employeeCode}</span>}
+                      {employeeCode && departmentName ? ' · ' : ''}
+                      {departmentName}
                     </span>
                   )}
                 </DropdownMenuLabel>
@@ -408,10 +432,18 @@ export default function AppShell({
                 <DropdownMenuGroup>
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={handleLogout}
+                    disabled={loggingOut}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      handleLogout();
+                    }}
                   >
-                    <LogOut />
-                    <span>Keluar dari WorkBalance</span>
+                    {loggingOut ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <LogOut className="size-4" />
+                    )}
+                    <span>{loggingOut ? 'Keluar...' : 'Keluar'}</span>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

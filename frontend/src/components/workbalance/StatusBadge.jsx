@@ -2,24 +2,24 @@ import { cn } from '@/lib/utils';
 
 const TONE_CLASSES = {
   success: {
-    pill: 'border-emerald-200/80 bg-emerald-50/70 text-emerald-800',
-    dot: 'bg-emerald-500',
+    pill: 'border-success-border bg-success-subtle text-success',
+    dot: 'bg-success-solid',
   },
   warning: {
-    pill: 'border-amber-200/80 bg-amber-50/70 text-amber-800',
-    dot: 'bg-amber-500',
+    pill: 'border-warning-border bg-warning-subtle text-warning',
+    dot: 'bg-warning-solid',
   },
   danger: {
-    pill: 'border-rose-200/80 bg-rose-50/70 text-rose-800',
-    dot: 'bg-rose-500',
+    pill: 'border-danger-border bg-danger-subtle text-danger',
+    dot: 'bg-danger-solid',
   },
   info: {
-    pill: 'border-sky-200/80 bg-sky-50/70 text-sky-800',
-    dot: 'bg-sky-500',
+    pill: 'border-info-border bg-info-subtle text-info',
+    dot: 'bg-info-solid',
   },
   neutral: {
-    pill: 'border-border bg-muted/60 text-muted-foreground',
-    dot: 'bg-slate-400',
+    pill: 'border-border bg-muted text-foreground',
+    dot: 'bg-muted-foreground',
   },
 };
 
@@ -28,7 +28,7 @@ const STATUS_PRESETS = {
   low: { label: 'Risiko Rendah', tone: 'success' },
   medium: { label: 'Risiko Sedang', tone: 'warning' },
   high: { label: 'Risiko Tinggi', tone: 'danger' },
-  override: { label: 'Override PP 35/2021', tone: 'danger' },
+  override: { label: 'Override PP 35', tone: 'danger' },
 
   // Decent Work Score
   good: { label: 'Baik', tone: 'success' },
@@ -52,7 +52,7 @@ const STATUS_PRESETS = {
   rejected: { label: 'Ditolak', tone: 'danger' },
   cancelled: { label: 'Dibatalkan', tone: 'neutral' },
   inactive: { label: 'Nonaktif', tone: 'neutral' },
-  severe: { label: 'Tinggi / Kritis', tone: 'danger' },
+  severe: { label: 'Kritis', tone: 'danger' },
 };
 
 export function StatusBadge({
@@ -72,7 +72,7 @@ export function StatusBadge({
     <span
       data-slot="status-badge"
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium leading-4 whitespace-nowrap',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs leading-4 font-medium whitespace-nowrap tabular-nums',
         styles.pill,
         className
       )}
@@ -80,7 +80,10 @@ export function StatusBadge({
       {showDot && (
         <span
           aria-hidden="true"
-          className={cn('size-1.5 shrink-0 rounded-full', styles.dot)}
+          className={cn(
+            'size-1.5 shrink-0 -translate-y-[0.5px] rounded-full',
+            styles.dot
+          )}
         />
       )}
       <span>{resolvedLabel}</span>

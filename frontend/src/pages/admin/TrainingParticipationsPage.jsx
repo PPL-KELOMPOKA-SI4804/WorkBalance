@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
-  Award,
   Calendar,
-  CheckCircle2,
-  Clock,
   Edit3,
-  Eye,
-  Lock,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
-  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
+import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate, toApiDate, toISODateLocal } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { departmentService } from '@/services/departmentService';
@@ -25,7 +21,6 @@ import { trainingService } from '@/services/trainingService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -38,17 +33,13 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import {
   ConfirmDialog,
   DataTable,
+  DatePicker,
   FormSheet,
   KpiStatCard,
+  RowActionsMenu,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -69,11 +60,35 @@ function emptyParticipationForm(trainings = [], employees = []) {
     training_id: trainings[0]?.id ? String(trainings[0].id) : '',
     employee_id: employees[0]?.id ? String(employees[0].id) : '',
     status: 'enrolled',
-    completion_date: new Date().toISOString().slice(0, 10),
+    completion_date: toISODateLocal(),
   };
 }
 
+function EmployeeDetailIdentity({ employee }) {
+  const emp = employee || {};
+
+  return (
+    <div className="flex items-center gap-2.5">
+      <Avatar className="size-8 border border-border">
+        <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+          {getInitials(emp.full_name)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium text-foreground">
+          {emp.full_name || '-'}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          <span className="font-mono font-normal">{emp.employee_code || '-'}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function TrainingParticipationsPage({ readOnly = false }) {
+  const prefersReducedMotion = useReducedMotion();
+
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -93,7 +108,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
   const [trainingFilter, setTrainingFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
 
@@ -121,7 +136,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       const [partRes, trainingsRes, empRes, deptRes] = await Promise.all([
         trainingParticipationService.getTrainingParticipations({
           search: search.trim(),
-          status: statusFilter === 'all' ? '' : statusFilter,
+          status: statusFilter,
           training_id: !readOnly ? trainingFilter : '',
           department_id: !readOnly ? departmentFilter : '',
         }),
@@ -160,17 +175,16 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
     loadAllData();
   }, [loadAllData]);
 
+  useRefetchOnFocus(loadAllData);
+
   const hasActiveFilters = useMemo(
-    () =>
-      Boolean(
-        search.trim() || statusFilter !== 'all' || trainingFilter || departmentFilter
-      ),
+    () => Boolean(search.trim() || statusFilter || trainingFilter || departmentFilter),
     [search, statusFilter, trainingFilter, departmentFilter]
   );
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('all');
+    setStatusFilter('');
     setTrainingFilter('');
     setDepartmentFilter('');
   };
@@ -195,7 +209,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
     return employees;
   }, [employees, editingParticipation]);
 
-  // --- Detail Handler ---
+  // Detail Handler
   const openDetailSheet = useCallback(async (item) => {
     setSelectedParticipation(item);
     setDetailSheetOpen(true);
@@ -213,7 +227,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
     }
   }, []);
 
-  // --- Create / Edit Handlers ---
+  // Create / Edit Handlers
   const openCreateSheet = useCallback(() => {
     setEditingParticipation(null);
     setForm(emptyParticipationForm(trainings, employees));
@@ -228,8 +242,8 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       employee_id: String(item.employee_id || ''),
       status: item.status || 'enrolled',
       completion_date: item.completion_date
-        ? String(item.completion_date).slice(0, 10)
-        : new Date().toISOString().slice(0, 10),
+        ? toApiDate(item.completion_date)
+        : toISODateLocal(),
     });
     setFormError('');
     setFormSheetOpen(true);
@@ -247,7 +261,11 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       setFormError('Pegawai peserta wajib dipilih.');
       return;
     }
-    if (form.status === 'completed' && !form.completion_date) {
+
+    const normalizedCompletionDate =
+      form.status === 'completed' ? toApiDate(form.completion_date) : null;
+
+    if (form.status === 'completed' && !normalizedCompletionDate) {
       setFormError('Tanggal kelulusan wajib diisi untuk peserta yang lulus.');
       return;
     }
@@ -258,7 +276,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       training_id: Number(form.training_id),
       employee_id: Number(form.employee_id),
       status: form.status,
-      completion_date: form.status === 'completed' ? form.completion_date : null,
+      completion_date: normalizedCompletionDate,
     };
 
     try {
@@ -287,7 +305,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
     }
   };
 
-  // --- Delete Handler ---
+  // Delete Handler
   const handleConfirmDelete = async () => {
     if (!deletingParticipation) return;
     setDeleteLoading(true);
@@ -311,80 +329,50 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
 
   const coverageRate = Number(summary.training_coverage_rate || 0);
 
-  const columns = useMemo(
-    () => [
-      {
+  const columns = useMemo(() => {
+    const cols = [];
+
+    if (!readOnly) {
+      cols.push({
         accessorFn: (row) => row.employee?.full_name || '-',
         id: 'employee',
-        header: 'Pegawai Peserta',
+        header: 'Pegawai',
         cell: ({ row }) => {
           const emp = row.original.employee || {};
+          const name = emp.full_name || '-';
           return (
-            <div className="flex items-center gap-2.5">
-              <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
-                  {getInitials(emp.full_name)}
+            <div className="flex items-center gap-2.5 whitespace-nowrap">
+              <Avatar className="size-7 border border-border">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                  {getInitials(name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 flex-col">
-                <span className="max-w-[180px] truncate text-xs font-medium text-foreground">
-                  {emp.full_name || '-'}
-                </span>
-                <span className="max-w-[180px] truncate text-[11px] text-muted-foreground tabular-nums">
-                  <span className="font-mono">{emp.employee_code || '-'}</span>
-                  {emp.department?.name ? ` · ${emp.department.name}` : ''}
-                </span>
-              </div>
+              <span
+                className="max-w-[180px] truncate text-xs font-medium text-foreground"
+                title={name}
+              >
+                {name}
+              </span>
             </div>
           );
         },
-      },
+      });
+    }
+
+    cols.push(
       {
         accessorFn: (row) => row.training?.title || '-',
         id: 'training',
-        header: 'Program Pelatihan',
+        header: 'Program',
         cell: ({ row }) => {
-          const training = row.original.training || {};
+          const title = row.original.training?.title || '-';
           return (
-            <div className="flex max-w-[240px] flex-col gap-1 whitespace-normal">
-              <span className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
-                {training.title || '-'}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="secondary" className="text-[11px] font-normal">
-                  {training.category || '-'}
-                </Badge>
-                {training.provider && (
-                  <span className="max-w-[130px] truncate text-[11px] text-muted-foreground">
-                    {training.provider}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        accessorFn: (row) => Number(row.training?.duration_hours || 0),
-        id: 'schedule',
-        header: 'Durasi & Jadwal',
-        cell: ({ row }) => {
-          const training = row.original.training || {};
-          const startDate = training.start_date
-            ? String(training.start_date).slice(0, 10)
-            : '-';
-          const endDate = training.end_date
-            ? String(training.end_date).slice(0, 10)
-            : '-';
-          return (
-            <div className="flex flex-col font-mono text-xs whitespace-nowrap tabular-nums">
-              <span className="font-medium text-foreground">
-                {Number(training.duration_hours || 0).toFixed(1)} jam
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {startDate} s.d. {endDate}
-              </span>
-            </div>
+            <span
+              className="block max-w-[260px] truncate text-xs font-medium text-foreground"
+              title={title}
+            >
+              {title}
+            </span>
           );
         },
       },
@@ -401,18 +389,19 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         },
       },
       {
-        accessorFn: (row) => (row.completion_date ? String(row.completion_date).slice(0, 10) : ''),
+        accessorFn: (row) => toApiDate(row.completion_date) || '',
         id: 'completion_date',
-        header: 'Tgl. Kelulusan',
+        header: 'Tgl Lulus',
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {row.original.completion_date
-              ? String(row.original.completion_date).slice(0, 10)
-              : '-'}
+          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+            {formatDate(row.original.completion_date)}
           </span>
         ),
-      },
-      {
+      }
+    );
+
+    if (!readOnly) {
+      cols.push({
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
@@ -421,181 +410,96 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           const isCompleted = item.status === 'completed';
 
           return (
-            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-              {readOnly ? (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openDetailSheet(item);
-                  }}
-                >
-                  <Eye data-icon="inline-start" />
-                  Detail
-                </Button>
-              ) : (
-                <>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Lihat detail keikutsertaan"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          openDetailSheet(item);
-                        }}
-                      >
-                        <Eye className="size-4 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Lihat detail keikutsertaan</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Ubah status keikutsertaan"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          openEditSheet(item);
-                        }}
-                      >
-                        <Edit3 className="size-4 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Ubah status keikutsertaan</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Hapus pendaftaran"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setDeletingParticipation(item);
-                        }}
-                      >
-                        <Trash2
-                          className={
-                            isCompleted
-                              ? 'size-4 text-muted-foreground/60'
-                              : 'size-4 text-destructive'
-                          }
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {isCompleted
-                        ? 'Peserta sudah lulus (riwayat kelulusan dilindungi)'
-                        : 'Hapus pendaftaran'}
-                    </TooltipContent>
-                  </Tooltip>
-                </>
-              )}
-            </div>
+            <RowActionsMenu
+              ariaLabel="Aksi partisipasi pelatihan"
+              items={[
+                {
+                  key: 'edit',
+                  label: 'Ubah',
+                  icon: Edit3,
+                  onSelect: () => openEditSheet(item),
+                },
+                {
+                  key: 'delete',
+                  label: 'Hapus',
+                  icon: Trash2,
+                  variant: 'destructive',
+                  title: isCompleted
+                    ? 'Peserta sudah lulus (riwayat kelulusan dilindungi)'
+                    : 'Hapus pendaftaran',
+                  onSelect: () => setDeletingParticipation(item),
+                },
+              ]}
+            />
           );
         },
-      },
-    ],
-    [readOnly, openDetailSheet, openEditSheet]
-  );
+      });
+    }
+
+    return cols;
+  }, [readOnly, openEditSheet]);
 
   const selectedStatusMeta = selectedParticipation
     ? getParticipationStatusMeta(selectedParticipation.status)
     : null;
 
+  const detailNotes =
+    selectedParticipation?.notes || selectedParticipation?.training?.description || '';
+
   return (
     <AppShell
-      title={readOnly ? 'Pelatihan Saya' : 'Keikutsertaan Pelatihan'}
-      breadcrumb={
-        readOnly
-          ? 'Kesejahteraan & Pelatihan / Riwayat & Status Pelatihan Pribadi'
-          : 'Kesejahteraan & Kompetensi / Pendaftaran & Kelulusan Pelatihan'
-      }
-      actions={
-        !readOnly ? (
-          <Button size="sm" onClick={openCreateSheet}>
-            <Plus data-icon="inline-start" />
-            Daftarkan Peserta
-          </Button>
-        ) : undefined
-      }
+      title={readOnly ? 'Pelatihan Saya' : 'Partisipasi Pelatihan'}
+      breadcrumb={readOnly ? 'Ruang Kerja' : 'Kesejahteraan'}
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Row 1: 4 KPI Cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-xl" />
+              <Skeleton key={n} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard
-              label="Total Keikutsertaan"
+              label="Total Partisipasi"
               value={summary.total ?? 0}
               unit="pendaftaran"
-              icon={Users}
-              statusTone="info"
-              statusLabel="Seluruh program"
+              hint="Seluruh program"
             />
 
             <KpiStatCard
-              label="Peserta Terdaftar"
+              label="Sedang Berlangsung"
               value={summary.enrolled ?? 0}
               unit="peserta"
-              icon={Clock}
               status="enrolled"
               statusLabel="Terdaftar"
-              hint="Sedang berlangsung"
             />
 
             <KpiStatCard
               label="Lulus Pelatihan"
               value={summary.completed ?? 0}
               unit="lulus"
-              icon={CheckCircle2}
               status="completed"
               statusLabel="Lulus"
-              hint={`${summary.dropped ?? 0} batal/mundur`}
             />
 
             <KpiStatCard
-              label={readOnly ? 'Status Keikutsertaan' : 'Cakupan Pegawai Terlatih'}
+              label={readOnly ? 'Tingkat Kelulusan' : 'Cakupan Terlatih'}
               value={`${coverageRate.toFixed(1)}%`}
-              icon={Award}
-              progress={coverageRate}
               statusTone={coverageRate >= 75 ? 'success' : 'warning'}
-              statusLabel={coverageRate >= 75 ? 'Target tercapai' : 'Perlu ditingkatkan'}
-              hint={
+              statusLabel={
                 readOnly
                   ? `${summary.completed ?? 0} program lulus`
-                  : `${summary.trained_employees_count ?? 0} pegawai ≥ 1 pelatihan`
+                  : `${summary.trained_employees_count ?? 0} pegawai terlatih`
               }
             />
           </section>
         )}
 
-        {/* Read-only notice for Employee */}
-        {readOnly && (
-          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-            <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
-            <p>
-              <span className="font-medium text-foreground">Mode Baca Saja:</span> Menampilkan
-              program pelatihan yang Anda ikuti beserta jadwal dan status kelulusan kompetensi Anda.
-            </p>
-          </div>
-        )}
-
         {/* Row 2: Participations DataTable */}
         <DataTable
-          title="Daftar Keikutsertaan Pelatihan"
+          title="Riwayat Partisipasi"
           countLabel="peserta"
           columns={columns}
           data={participations}
@@ -610,7 +514,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           onRowClick={(row) => openDetailSheet(row)}
           emptyTitle={
             hasActiveFilters
-              ? 'Tidak ada data keikutsertaan sesuai filter'
+              ? 'Tidak ada data sesuai filter'
               : 'Belum ada pendaftaran pelatihan'
           }
           emptyDescription={
@@ -623,14 +527,14 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
+                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetFilters}>
+                  <RotateCcw className="size-4" data-icon="inline-start" />
                   Reset Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" onClick={openCreateSheet}>
-                  <Plus data-icon="inline-start" />
+                <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                  <Plus className="size-4" data-icon="inline-start" />
                   Daftarkan Peserta
                 </Button>
               )}
@@ -638,26 +542,28 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           }
           filterSlot={
             <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={statusFilter}
-                onValueChange={(val) => val && setStatusFilter(val)}
-                variant="outline"
-                size="sm"
+              <Select
+                name="filter_status"
+                value={statusFilter || ALL_VALUE}
+                onValueChange={(val) => setStatusFilter(val === ALL_VALUE ? '' : val)}
               >
-                <ToggleGroupItem value="all" className="text-xs">
-                  Semua
-                </ToggleGroupItem>
-                <ToggleGroupItem value="enrolled" className="text-xs">
-                  Terdaftar
-                </ToggleGroupItem>
-                <ToggleGroupItem value="completed" className="text-xs">
-                  Lulus
-                </ToggleGroupItem>
-                <ToggleGroupItem value="dropped" className="text-xs">
-                  Batal
-                </ToggleGroupItem>
-              </ToggleGroup>
+                <SelectTrigger
+                  id="tp-filter-status"
+                  size="sm"
+                  aria-label="Filter Status Partisipasi"
+                  className="w-40 rounded-lg bg-background text-xs"
+                >
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={ALL_VALUE}>Semua Status</SelectItem>
+                    <SelectItem value="enrolled">Terdaftar</SelectItem>
+                    <SelectItem value="completed">Lulus</SelectItem>
+                    <SelectItem value="dropped">Batal / Mundur</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
 
               {!readOnly && (
                 <>
@@ -672,7 +578,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                       id="tp-filter-training"
                       size="sm"
                       aria-label="Filter Program Pelatihan"
-                      className="w-48 bg-background text-xs"
+                      className="w-48 rounded-lg bg-background text-xs"
                     >
                       <SelectValue placeholder="Semua Pelatihan" />
                     </SelectTrigger>
@@ -699,7 +605,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                       id="tp-filter-department"
                       size="sm"
                       aria-label="Filter Departemen"
-                      className="w-44 bg-background text-xs"
+                      className="w-44 rounded-lg bg-background text-xs"
                     >
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
@@ -717,23 +623,36 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                 </>
               )}
 
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  <RotateCcw data-icon="inline-start" />
-                  Reset
-                </Button>
-              )}
+              <AnimatePresence initial={false}>
+                {hasActiveFilters && (
+                  <motion.div
+                    key="tp-reset-filters"
+                    initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={resetFilters}
+                    >
+                      <RotateCcw className="size-4" data-icon="inline-start" />
+                      Reset
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           }
           actionsSlot={
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={loadAllData}
-              aria-label="Muat ulang data"
-            >
-              <RefreshCw className={loading ? 'animate-spin' : ''} />
-            </Button>
+            !readOnly ? (
+              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                <Plus className="size-4" data-icon="inline-start" />
+                Daftarkan Peserta
+              </Button>
+            ) : undefined
           }
         />
       </div>
@@ -742,23 +661,29 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       <FormSheet
         open={detailSheetOpen && Boolean(selectedParticipation)}
         onOpenChange={setDetailSheetOpen}
-        title="Detail Keikutsertaan Pelatihan"
+        title="Detail Partisipasi Pelatihan"
         description={selectedParticipation?.training?.title || undefined}
         size="md"
+        loading={detailLoading}
         footer={
           <>
-            <Button variant="outline" onClick={() => setDetailSheetOpen(false)}>
+            <Button
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setDetailSheetOpen(false)}
+            >
               Tutup
             </Button>
             {!readOnly && selectedParticipation && (
               <Button
+                className="rounded-lg"
                 onClick={() => {
                   const target = selectedParticipation;
                   setDetailSheetOpen(false);
                   openEditSheet(target);
                 }}
               >
-                <Edit3 data-icon="inline-start" />
+                <Edit3 className="size-4" data-icon="inline-start" />
                 Ubah Status
               </Button>
             )}
@@ -766,15 +691,8 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         }
       >
         {selectedParticipation && (
-          <div className="flex flex-col gap-5">
-            {detailLoading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Spinner />
-                <span>Memuat rincian keikutsertaan pelatihan...</span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2.5">
               <div className="flex flex-wrap items-center gap-2">
                 {selectedStatusMeta && (
                   <StatusBadge
@@ -783,77 +701,80 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                     label={selectedStatusMeta.label}
                   />
                 )}
-                <Badge variant="secondary" className="text-[11px] font-normal">
+                <Badge variant="secondary" className="text-xs font-normal">
                   {selectedParticipation.training?.category || '-'}
                 </Badge>
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-semibold tracking-[-0.015em] text-foreground">
                 {selectedParticipation.training?.title || '-'}
               </h4>
               <p className="text-xs text-muted-foreground">
                 Penyelenggara: {selectedParticipation.training?.provider || '-'}
               </p>
-              <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground tabular-nums">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
                 <Calendar className="size-3.5 shrink-0" />
                 <span>
-                  {selectedParticipation.training?.start_date
-                    ? String(selectedParticipation.training.start_date).slice(0, 10)
-                    : '-'}{' '}
-                  s.d.{' '}
-                  {selectedParticipation.training?.end_date
-                    ? String(selectedParticipation.training.end_date).slice(0, 10)
-                    : '-'}
+                  {formatDate(selectedParticipation.training?.start_date)} s.d.{' '}
+                  {formatDate(selectedParticipation.training?.end_date)}
                 </span>
               </div>
             </div>
 
             <Separator />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-2 rounded-lg border border-border p-3.5">
-                <span className="text-xs text-muted-foreground">Pegawai Peserta</span>
-                <div className="flex items-center gap-2.5">
-                  <Avatar className="size-8 border border-border">
-                    <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
-                      {getInitials(selectedParticipation.employee?.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {selectedParticipation.employee?.full_name || '-'}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                      {selectedParticipation.employee?.employee_code || '-'}
-                    </span>
-                  </div>
-                </div>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <dt className="text-xs text-muted-foreground">Pegawai Peserta</dt>
+                <dd>
+                  <EmployeeDetailIdentity employee={selectedParticipation.employee} />
+                </dd>
               </div>
 
-              <div className="flex flex-col gap-1 rounded-lg border border-border p-3.5">
-                <span className="text-xs text-muted-foreground">Departemen & Jabatan</span>
-                <span className="text-sm font-medium text-foreground">
-                  {selectedParticipation.employee?.department?.name || '-'}
-                </span>
-                <span className="text-xs text-muted-foreground">
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs text-muted-foreground">Departemen &amp; Jabatan</dt>
+                <dd className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
+                  {selectedParticipation.employee?.department?.code && (
+                    <Badge variant="outline" className="font-mono text-xs font-normal">
+                      {selectedParticipation.employee.department.code}
+                    </Badge>
+                  )}
+                  <span>{selectedParticipation.employee?.department?.name || '-'}</span>
+                </dd>
+                <dd className="text-xs text-muted-foreground">
                   {selectedParticipation.employee?.position?.title || '-'}
-                </span>
+                </dd>
               </div>
 
-              <div className="flex flex-col gap-1 rounded-lg border border-border p-3.5">
-                <span className="text-xs text-muted-foreground">Durasi Program</span>
-                <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs text-muted-foreground">Durasi Program</dt>
+                <dd className="text-sm font-semibold text-foreground tabular-nums">
                   {Number(selectedParticipation.training?.duration_hours || 0).toFixed(1)} jam
-                </span>
+                </dd>
               </div>
 
-              <div className="flex flex-col gap-1 rounded-lg border border-border p-3.5">
-                <span className="text-xs text-muted-foreground">Tanggal Kelulusan</span>
-                <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs text-muted-foreground">Tanggal Kelulusan</dt>
+                <dd className="text-sm font-semibold text-foreground tabular-nums">
                   {selectedParticipation.completion_date
-                    ? String(selectedParticipation.completion_date).slice(0, 10)
+                    ? formatDate(selectedParticipation.completion_date)
                     : 'Belum selesai'}
-                </span>
+                </dd>
               </div>
+            </dl>
+
+            <Separator />
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Catatan</span>
+              <p
+                className={
+                  detailNotes
+                    ? 'text-sm leading-relaxed whitespace-pre-wrap text-foreground'
+                    : 'text-sm leading-relaxed text-muted-foreground'
+                }
+              >
+                {detailNotes || 'Tidak ada catatan tambahan.'}
+              </p>
             </div>
           </div>
         )}
@@ -865,7 +786,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         onOpenChange={setFormSheetOpen}
         title={
           editingParticipation
-            ? 'Ubah Status Keikutsertaan Pelatihan'
+            ? 'Ubah Status Partisipasi'
             : 'Daftarkan Peserta Pelatihan'
         }
         description="Pilih program pelatihan, pegawai peserta, serta status kelulusan kompetensi."
@@ -875,6 +796,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
             <Button
               type="button"
               variant="outline"
+              className="rounded-lg"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
             >
@@ -883,6 +805,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
             <Button
               type="submit"
               form="training-participation-form"
+              className="rounded-lg"
               disabled={submitting}
             >
               {submitting && <Spinner data-icon="inline-start" />}
@@ -898,14 +821,24 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         <form
           id="training-participation-form"
           onSubmit={handleSubmit}
-          className="flex flex-col gap-4"
+          className="flex flex-col gap-5"
         >
-          {formError && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+          <AnimatePresence initial={false}>
+            {formError && (
+              <motion.div
+                key="tp-form-error"
+                role="alert"
+                initial={prefersReducedMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+                className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{formError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tp-training-id">Program Pelatihan</Label>
@@ -914,7 +847,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
               value={form.training_id || undefined}
               onValueChange={(val) => setForm((prev) => ({ ...prev, training_id: val }))}
             >
-              <SelectTrigger id="tp-training-id" className="w-full bg-background">
+              <SelectTrigger id="tp-training-id" className="w-full rounded-lg bg-background">
                 <SelectValue placeholder="Pilih Program Pelatihan" />
               </SelectTrigger>
               <SelectContent>
@@ -936,14 +869,22 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
               value={form.employee_id || undefined}
               onValueChange={(val) => setForm((prev) => ({ ...prev, employee_id: val }))}
             >
-              <SelectTrigger id="tp-employee-id" className="w-full bg-background">
+              <SelectTrigger id="tp-employee-id" className="w-full rounded-lg bg-background">
                 <SelectValue placeholder="Pilih Pegawai Aktif" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   {employeeOptions.map((emp) => (
                     <SelectItem key={emp.id} value={String(emp.id)}>
-                      {emp.full_name} ({emp.employee_code}) — {emp.department?.name || '-'}
+                      <span className="inline-flex items-center gap-2">
+                        <span className="font-mono text-xs font-normal text-muted-foreground">
+                          {emp.employee_code || '-'}
+                        </span>
+                        <span>
+                          {emp.full_name}
+                          {emp.department?.name ? ` (${emp.department.name})` : ''}
+                        </span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -959,7 +900,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                 value={form.status}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
               >
-                <SelectTrigger id="tp-status" className="w-full bg-background">
+                <SelectTrigger id="tp-status" className="w-full rounded-lg bg-background">
                   <SelectValue placeholder="Pilih Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -975,16 +916,13 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
             {form.status === 'completed' && (
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="tp-completion-date">Tanggal Kelulusan</Label>
-                <Input
+                <DatePicker
                   id="tp-completion-date"
-                  name="completion_date"
-                  type="date"
-                  required
+                  ariaLabel="Tanggal Kelulusan"
                   value={form.completion_date}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, completion_date: e.target.value }))
+                  onChange={(val) =>
+                    setForm((prev) => ({ ...prev, completion_date: val }))
                   }
-                  className="bg-background font-mono tabular-nums"
                 />
               </div>
             )}
@@ -998,7 +936,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         onOpenChange={(open) => {
           if (!open) setDeletingParticipation(null);
         }}
-        title="Hapus Data Keikutsertaan?"
+        title="Hapus Data Partisipasi?"
         description={
           deletingParticipation ? (
             <>
@@ -1012,7 +950,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
               </span>{' '}
               akan dihapus.
               {deletingParticipation.status === 'completed' && (
-                <span className="mt-2 block rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground">
+                <span className="mt-2 block text-xs text-destructive">
                   Perhatian: Peserta sudah berstatus Lulus (Completed). Penghapusan akan
                   ditolak sistem untuk menjaga riwayat kompetensi pegawai.
                 </span>
