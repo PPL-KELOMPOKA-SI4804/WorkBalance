@@ -1,6 +1,6 @@
 # UI/UX & Brand Identity Design System (DESIGN.md): WorkBalance
 
-**Versi Dokumen:** 3.1 (Tanggal Teks Indonesia, Tabel Detail Resizable, Animasi Hover Light/Dark & Data Perusahaan Menengah)  
+**Versi Dokumen:** 3.2 (Carousel Login 3 Foto, Smart Truncated Tooltip, Dashboard 8 Baris & Full JWT)  
 **Tanggal:** 25 November 2026  
 **Mode Permukaan:** `Operate` (Enterprise Workforce & SDG 8 Decision Support System)  
 **Referensi Produk & Teknis:** `PRD.md` & `ARCHITECTURE.md`  
@@ -52,7 +52,7 @@ Logo **WorkBalance** terdiri atas tiga pilar vertikal berujung membulat (*capsul
 | `horizontal` | Simbol `32px` + wordmark `20px` bold | Tidak ada | Header Sidebar (expanded), Sheet navigasi mobile, Login mobile. |
 | `lockup` | Simbol `44px` + wordmark `28px` bold | `Decent Work, Better Life` + prop `inverted` | Panel foto editorial kiri Login desktop (`inverted={true}`). |
 
-Aset statis lokal (100% *offline-safe*): [favicon.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/favicon.svg), [workbalance_horizontal_logo.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/workbalance_horizontal_logo.svg), dan foto editorial [login-hero.jpg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/login-hero.jpg).
+Aset statis lokal (100% *offline-safe*): [favicon.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/favicon.svg), [workbalance_horizontal_logo.svg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/workbalance_horizontal_logo.svg), serta 3 foto editorial carousel Login ([login-hero.jpg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/login-hero.jpg), [login-hero-2.jpg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/login-hero-2.jpg), dan [login-hero-3.jpg](file:///c:/Kuliah/PPL/WorkBalance/frontend/public/assets/login-hero-3.jpg) dengan rotasi 3 detik, 3 tema narasi SDG 8, klik indikator manual, dan jeda otomatis saat hover).
 
 ---
 
@@ -100,6 +100,7 @@ Empat grup nada (`success`, `warning`, `danger`, `info`) masing-masing menyediak
   - Setiap tabel dikemas dalam satu kartu `rounded-2xl border bg-card` dengan judul + jumlah di kiri atas, tombol **Create `variant="cta"`** di kanan atas, baris pencarian + filter sebaris, strip header `bg-muted/85 rounded-xl`, dan **paginasi bernomor `< 1 2 3 ... N >`** + `Menampilkan X–Y dari Z`.
   - Seluruh tabel menampilkan **kolom detail sesuai skema basis data** (terkalibrasi `size`, `minSize`, `maxSize`, dengan `overflow-x-auto` dan `truncate` + `title` yang bersih).
   - **Hold-and-Drag Resizing (TanStack Table v9 `columnSizingFeature` + `columnResizingFeature`):** Garis pemisah vertikal di antara setiap header kolom dapat ditahan & digeser (`cursor-col-resize`, sorotan biru `--primary`) untuk mempersempit atau memperpanjang lebar kolom secara *real-time*, klik 2× untuk reset kolom tunggal, dan tombol `Reset Lebar` otomatis muncul bila ada kolom yang diubah.
+  - **Smart Truncated Tooltip (`TruncatedText.jsx` & `OverflowTooltipCell`):** Seluruh sel/header tabel dan daftar dashboard memeriksa `scrollWidth > clientWidth` secara dinamis saat hover (~150ms) dan menampilkan custom Radix Tooltip teks lengkap **hanya** jika teks benar-benar terpotong (`...`), tanpa tooltip ganda bawaan browser.
   - Klik atau `Enter`/`Space` pada baris membuka **Detail `FormSheet`** bergaya drawer `21. Add New Profile`; tombol aksi baris `RowActionsMenu` (`⋯`) memiliki lebar tetap (`enableResizing: false`).
   - Seluruh tombol refresh manual dihapus; data disegarkan otomatis saat mutasi dan saat tab kembali aktif (`useRefetchOnFocus`).
 
@@ -110,8 +111,8 @@ Empat grup nada (`success`, `warning`, `danger`, `info`) masing-masing menyediak
 - **Sidebar Collapsible (`w-64` expanded / `w-[72px]` collapsed):** Header `BrandLogo` + tombol lipat `<<`, **Tombol Hero `Dashboard`** biru (`--hero-primary`), **Grup Accordion Lipat-Buka** dengan hover latar `--hover-surface` & strip kiri biru, serta footer `PP 35/2021 · 40j + maks 18j`.
 - **Sticky Top Header (`h-[68px]`):** Kiri berisi pemicu menu mobile, bilah pencarian global `Ctrl K`, serta breadcrumb & judul halaman (`H1`); kanan berisi isyarat kontekstual (seperti `NFR-02` pada Survei), **`ThemeSwitch`**, dan menu profil pengguna.
 - **Komposisi Dasbor (`15. Home - V1`):**
-  1. Sapaan (`Halo, {Nama}`) + meta periode/identitas & filter ringkas.
+  1. Sapaan (`Halo, {Nama}`) + rentang periode minggu (bersih tanpa teks `Tercatat` / `Tugas aktif` berlebih) & filter ringkas.
   2. **`<HeroBentoCard />`:** 5 kolom kiri berupa grid KPI 2×2 bersekat *hairline* dengan hover sel halus & animasi ikon sirkular, 7 kolom kanan berupa grafik terintegrasi (`PerformanceLineChart` / `WorkHoursBarChart`).
-  3. **Baris Bawah 8/4:** 8 kolom kiri `DataTable` detail resizable, 4 kolom kanan `DecentWorkDonutChart` (6 dimensi + Survei Agregat NFR-02) atau `Profil Beban Kerja` + `Aksi Cepat`.
+  3. **Baris Bawah 8/4:** 8 kolom kiri `DataTable` detail resizable (`Prioritas Redistribusi` 8 baris per halaman berpaginasi bernomor), 4 kolom kanan `DecentWorkDonutChart` (6 dimensi + Survei Agregat NFR-02) atau `Profil Beban Kerja` + `Aksi Cepat`.
 - **Dataset Perusahaan Menengah (`MidSizeCompanySeeder`):** Menyediakan data realistis tingkat perusahaan menengah (10 departemen, 70 pegawai, 28 jabatan, 4 jenis kepegawaian, 42 tugas, 78 penugasan, ~500 log kerja, lembur/cuti termasuk 5 kasus Override PP No. 35/2021, 10 pelatihan, 4 survei bulanan + ~180 respons, dan 18 masalah kerja) secara idempoten di atas akun uji cepat `DatabaseSeeder`.
-- **Komponen Domain (`src/components/workbalance/`):** `BrandLogo`, `ThemeSwitch`, `AnimatedNumber`, `HeroBentoCard`, `KpiStatCard`, `StatusBadge`, `DataTable`, `RowActionsMenu`, `DatePicker`, `MonthPicker`, `WeekPicker`, `FormSheet`, `ConfirmDialog`, `CommandMenu`, `Charts` (`DecentWorkDonutChart`, `WorkHoursBarChart`, `WorkloadTrendAreaChart`, `PerformanceLineChart`).
+- **Komponen Domain (`src/components/workbalance/`):** `BrandLogo`, `ThemeSwitch`, `AnimatedNumber`, `HeroBentoCard`, `KpiStatCard`, `StatusBadge`, `DataTable`, `TruncatedText`, `RowActionsMenu`, `DatePicker`, `MonthPicker`, `WeekPicker`, `FormSheet`, `ConfirmDialog`, `CommandMenu`, `Charts` (`DecentWorkDonutChart`, `WorkHoursBarChart`, `WorkloadTrendAreaChart`, `PerformanceLineChart`).
