@@ -333,42 +333,86 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
     const cols = [];
 
     if (!readOnly) {
-      cols.push({
-        accessorFn: (row) => row.employee?.full_name || '-',
-        id: 'employee',
-        header: 'Pegawai',
-        cell: ({ row }) => {
-          const emp = row.original.employee || {};
-          const name = emp.full_name || '-';
-          return (
-            <div className="flex items-center gap-2.5 whitespace-nowrap">
-              <Avatar className="size-7 border border-border">
-                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                  {getInitials(name)}
-                </AvatarFallback>
-              </Avatar>
-              <span
-                className="max-w-[180px] truncate text-xs font-medium text-foreground"
-                title={name}
-              >
-                {name}
-              </span>
-            </div>
-          );
+      cols.push(
+        {
+          accessorFn: (row) => row.employee?.full_name || '-',
+          id: 'employee',
+          header: 'Pegawai',
+          size: 215,
+          minSize: 145,
+          maxSize: 360,
+          cell: ({ row }) => {
+            const emp = row.original.employee || {};
+            const name = emp.full_name || '-';
+            const code = emp.employee_code || '-';
+            return (
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Avatar className="size-7 shrink-0 border border-border">
+                  <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                    {getInitials(name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col">
+                  <span
+                    className="truncate text-xs font-medium text-foreground"
+                    title={name}
+                  >
+                    {name}
+                  </span>
+                  <span
+                    className="truncate font-mono text-xs text-muted-foreground"
+                    title={code}
+                  >
+                    {code}
+                  </span>
+                </div>
+              </div>
+            );
+          },
         },
-      });
+        {
+          accessorFn: (row) => row.employee?.department?.name || '-',
+          id: 'department',
+          header: 'Departemen',
+          size: 165,
+          minSize: 110,
+          maxSize: 300,
+          cell: ({ row }) => {
+            const dept = row.original.employee?.department;
+            if (!dept) {
+              return <span className="text-xs text-muted-foreground">-</span>;
+            }
+            const label = dept.code ? `${dept.code} · ${dept.name}` : dept.name || '-';
+            return (
+              <div className="flex min-w-0 items-center gap-1.5" title={label}>
+                {dept.code && (
+                  <Badge variant="outline" className="shrink-0 font-mono text-xs font-normal">
+                    {dept.code}
+                  </Badge>
+                )}
+                <span className="min-w-0 truncate text-xs text-foreground">
+                  {dept.name || '-'}
+                </span>
+              </div>
+            );
+          },
+        }
+      );
     }
 
     cols.push(
       {
         accessorFn: (row) => row.training?.title || '-',
         id: 'training',
-        header: 'Program',
+        header: 'Program Pelatihan',
+        size: 255,
+        minSize: 150,
+        maxSize: 440,
         cell: ({ row }) => {
           const title = row.original.training?.title || '-';
           return (
             <span
-              className="block max-w-[260px] truncate text-xs font-medium text-foreground"
+              className="block truncate text-xs font-medium text-foreground"
               title={title}
             >
               {title}
@@ -377,8 +421,70 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         },
       },
       {
+        accessorFn: (row) => row.training?.category || '-',
+        id: 'category',
+        header: 'Kategori',
+        size: 175,
+        minSize: 120,
+        maxSize: 320,
+        cell: ({ row }) => {
+          const category = row.original.training?.category || '-';
+          return (
+            <span className="block truncate text-xs text-foreground" title={category}>
+              {category}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.training?.provider || '-',
+        id: 'provider',
+        header: 'Penyelenggara',
+        size: 190,
+        minSize: 125,
+        maxSize: 340,
+        cell: ({ row }) => {
+          const provider = row.original.training?.provider || '-';
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={provider}
+            >
+              {provider}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.training?.duration_hours ?? 0),
+        id: 'duration_hours',
+        header: 'Durasi',
+        size: 105,
+        minSize: 84,
+        maxSize: 160,
+        cell: ({ row }) => {
+          const raw = row.original.training?.duration_hours;
+          const hours = Number(raw);
+          const hasHours = raw !== null && raw !== undefined && Number.isFinite(hours);
+          const formatted = hasHours
+            ? `${hours % 1 === 0 ? hours : hours.toFixed(1)} jam`
+            : '-';
+          return (
+            <span
+              className="block truncate text-xs font-medium text-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: 'status',
         header: 'Status',
+        size: 130,
+        minSize: 102,
+        maxSize: 200,
         cell: ({ row }) => {
           const meta = getParticipationStatusMeta(row.original.status);
           return (
@@ -391,12 +497,21 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       {
         accessorFn: (row) => toApiDate(row.completion_date) || '',
         id: 'completion_date',
-        header: 'Tgl Lulus',
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {formatDate(row.original.completion_date)}
-          </span>
-        ),
+        header: 'Tanggal Lulus',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.completion_date);
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
       }
     );
 
@@ -405,6 +520,10 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const item = row.original;
           const isCompleted = item.status === 'completed';

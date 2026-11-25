@@ -377,16 +377,19 @@ export default function WorkplaceIssuesPage() {
 
   const resolutionRate = Number(summary.resolution_rate || 0);
 
-  const columns = useMemo(() => {
-    const cols = [
+  const columns = useMemo(
+    () => [
       {
         accessorKey: 'category',
         header: 'Kategori',
+        size: 175,
+        minSize: 120,
+        maxSize: 300,
         cell: ({ row }) => {
           const category = row.original.category || '-';
           return (
             <span
-              className="block max-w-[220px] truncate text-xs font-medium text-foreground"
+              className="block truncate text-xs font-medium text-foreground"
               title={category}
             >
               {category}
@@ -394,25 +397,43 @@ export default function WorkplaceIssuesPage() {
           );
         },
       },
-    ];
-
-    if (!isEmployee) {
-      cols.push({
+      {
+        accessorKey: 'description',
+        header: 'Deskripsi Masalah',
+        size: 275,
+        minSize: 150,
+        maxSize: 480,
+        cell: ({ row }) => {
+          const description = row.original.description;
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={description || undefined}
+            >
+              {description || '-'}
+            </span>
+          );
+        },
+      },
+      {
         accessorFn: (row) => row.reporter?.full_name || '-',
         id: 'reporter',
         header: 'Pelapor',
+        size: 200,
+        minSize: 135,
+        maxSize: 340,
         cell: ({ row }) => {
           const rep = row.original.reporter || {};
           const name = rep.full_name || '-';
           return (
-            <div className="flex items-center gap-2.5 whitespace-nowrap">
-              <Avatar className="size-7 border border-border">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar className="size-7 shrink-0 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(name)}
                 </AvatarFallback>
               </Avatar>
               <span
-                className="max-w-[180px] truncate text-xs font-medium text-foreground"
+                className="min-w-0 truncate text-xs font-medium text-foreground"
                 title={name}
               >
                 {name}
@@ -420,13 +441,40 @@ export default function WorkplaceIssuesPage() {
             </div>
           );
         },
-      });
-    }
-
-    cols.push(
+      },
+      {
+        accessorFn: (row) => row.department?.name || '-',
+        id: 'department',
+        header: 'Departemen',
+        size: 175,
+        minSize: 115,
+        maxSize: 300,
+        cell: ({ row }) => {
+          const dept = row.original.department;
+          if (!dept) {
+            return <span className="text-xs text-muted-foreground">-</span>;
+          }
+          const label = dept.code ? `${dept.code} · ${dept.name}` : dept.name || '-';
+          return (
+            <div className="flex min-w-0 items-center gap-1.5" title={label}>
+              {dept.code && (
+                <Badge variant="outline" className="shrink-0 font-mono text-xs font-normal">
+                  {dept.code}
+                </Badge>
+              )}
+              <span className="min-w-0 truncate text-xs text-foreground">
+                {dept.name || '-'}
+              </span>
+            </div>
+          );
+        },
+      },
       {
         accessorKey: 'status',
         header: 'Status',
+        size: 130,
+        minSize: 102,
+        maxSize: 200,
         cell: ({ row }) => {
           const meta = getIssueStatusMeta(row.original.status);
           return (
@@ -437,19 +485,72 @@ export default function WorkplaceIssuesPage() {
         },
       },
       {
+        accessorFn: (row) => row.resolution_notes || '',
+        id: 'resolution_notes',
+        header: 'Catatan Resolusi',
+        size: 240,
+        minSize: 140,
+        maxSize: 440,
+        cell: ({ row }) => {
+          const notes = row.original.resolution_notes;
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={notes || undefined}
+            >
+              {notes || '-'}
+            </span>
+          );
+        },
+      },
+      {
         accessorFn: (row) => row.created_at || '',
         id: 'created_at',
-        header: 'Tanggal',
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {formatDate(row.original.created_at)}
-          </span>
-        ),
+        header: 'Dilaporkan',
+        size: 175,
+        minSize: 135,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.created_at);
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.resolved_at || '',
+        id: 'resolved_at',
+        header: 'Selesai',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = row.original.resolved_at
+            ? formatDate(row.original.resolved_at)
+            : '-';
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
       },
       {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const issue = row.original;
           const isOpen = issue.status === 'open';
@@ -484,11 +585,10 @@ export default function WorkplaceIssuesPage() {
             />
           );
         },
-      }
-    );
-
-    return cols;
-  }, [canHandle, isEmployee, openEditSheet, openFollowUpSheet]);
+      },
+    ],
+    [canHandle, isEmployee, openEditSheet, openFollowUpSheet]
+  );
 
   const detailStatusMeta = detailIssue ? getIssueStatusMeta(detailIssue.status) : null;
 

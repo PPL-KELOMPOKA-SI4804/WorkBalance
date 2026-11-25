@@ -375,53 +375,127 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
   const columns = useMemo(() => {
     const cols = [];
 
-    if (!isEmployee) {
-      cols.push({
-        accessorFn: (row) => row.employee?.full_name || '-',
-        id: 'employee',
-        header: 'Pegawai',
-        cell: ({ row }) => {
-          const emp = row.original.employee || {};
-          const fullName = emp.full_name || '-';
-          return (
-            <div className="flex min-w-0 max-w-[190px] items-center gap-2.5">
-              <Avatar className="size-7 shrink-0 border border-border">
-                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                  {getInitials(emp.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate text-xs font-medium text-foreground" title={fullName}>
-                {fullName}
+    const departmentCol = {
+      accessorFn: (row) =>
+        isEmployee
+          ? row.task?.department?.name || row.employee?.department?.name || '-'
+          : row.employee?.department?.name || row.task?.department?.name || '-',
+      id: 'department',
+      header: 'Departemen',
+      size: 165,
+      minSize: 110,
+      maxSize: 300,
+      cell: ({ row }) => {
+        const dept = isEmployee
+          ? row.original.task?.department || row.original.employee?.department
+          : row.original.employee?.department || row.original.task?.department;
+        if (!dept) {
+          return <span className="text-xs text-muted-foreground">-</span>;
+        }
+        const label = dept.code ? `${dept.code} · ${dept.name}` : dept.name || '-';
+        return (
+          <div className="flex min-w-0 items-center gap-1.5" title={label}>
+            {dept.code && (
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                {dept.code}
               </span>
-            </div>
-          );
-        },
-      });
-    }
+            )}
+            <span className="truncate text-xs text-foreground">{dept.name || '-'}</span>
+          </div>
+        );
+      },
+    };
 
-    cols.push({
+    const taskCol = {
       accessorFn: (row) => row.task?.title || '-',
       id: 'task',
       header: 'Tugas',
+      size: 245,
+      minSize: 145,
+      maxSize: 460,
       cell: ({ row }) => {
         const title = row.original.task?.title || '-';
         return (
           <span
-            className="block max-w-[260px] truncate text-xs font-medium text-foreground"
+            className="block truncate text-xs font-medium text-foreground"
             title={title}
           >
             {title}
           </span>
         );
       },
-    });
+    };
 
-    if (isEmployee) {
-      cols.push({
+    if (!isEmployee) {
+      cols.push(
+        {
+          accessorFn: (row) => row.employee?.full_name || '-',
+          id: 'employee',
+          header: 'Pegawai',
+          size: 215,
+          minSize: 145,
+          maxSize: 340,
+          cell: ({ row }) => {
+            const emp = row.original.employee || {};
+            const fullName = emp.full_name || '-';
+            const code = emp.employee_code || '';
+            const tooltip = code ? `${fullName} (${code})` : fullName;
+            return (
+              <div className="flex min-w-0 items-center gap-2.5" title={tooltip}>
+                <Avatar className="size-7 shrink-0 border border-border">
+                  <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                    {getInitials(emp.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-xs font-medium text-foreground">
+                    {fullName}
+                  </span>
+                  {code && (
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {code}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          },
+        },
+        departmentCol,
+        taskCol
+      );
+    } else {
+      cols.push(taskCol, departmentCol);
+    }
+
+    cols.push(
+      {
+        accessorFn: (row) => Number(row.task?.estimated_hours || 0),
+        id: 'estimated_hours',
+        header: 'Estimasi',
+        size: 105,
+        minSize: 84,
+        maxSize: 160,
+        cell: ({ row }) => {
+          const hours = Number(row.original.task?.estimated_hours || 0);
+          const label = `${hours.toFixed(1)} jam`;
+          return (
+            <span
+              className="block truncate text-xs font-medium whitespace-nowrap text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
         accessorFn: (row) => row.task?.priority || 'medium',
         id: 'priority',
         header: 'Prioritas',
-        meta: { className: 'hidden sm:table-cell' },
+        size: 115,
+        minSize: 92,
+        maxSize: 175,
         cell: ({ row }) => {
           const meta = PRIORITY_META[row.original.task?.priority] || PRIORITY_META.medium;
           return (
@@ -430,25 +504,79 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
             </div>
           );
         },
-      });
-    }
-
-    cols.push(
+      },
+      {
+        accessorFn: (row) => row.assigner?.full_name || '-',
+        id: 'assigner',
+        header: 'Ditugaskan Oleh',
+        size: 175,
+        minSize: 120,
+        maxSize: 300,
+        cell: ({ row }) => {
+          const assignerName = row.original.assigner?.full_name || '-';
+          return (
+            <span
+              className="block truncate text-xs text-foreground"
+              title={assignerName !== '-' ? assignerName : undefined}
+            >
+              {assignerName}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'assigned_at',
+        header: 'Tgl Ditugaskan',
+        size: 165,
+        minSize: 130,
+        maxSize: 230,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.assigned_at);
+          return (
+            <span
+              className="block truncate text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+              title={formatted !== '-' ? formatted : undefined}
+            >
+              {formatted}
+            </span>
+          );
+        },
+      },
       {
         accessorKey: 'deadline',
         header: 'Tenggat',
+        size: 165,
+        minSize: 130,
+        maxSize: 230,
         cell: ({ row }) => {
           const item = row.original;
           const deadlineHint = getDeadlineIndicator(item.deadline, item.status);
+          const formatted = formatDate(item.deadline);
           return (
             <span
-              title={deadlineHint?.text}
+              title={deadlineHint?.text ? `${formatted} · ${deadlineHint.text}` : formatted}
               className={cn(
-                'text-xs font-medium whitespace-nowrap tabular-nums',
+                'block truncate text-xs font-medium whitespace-nowrap tabular-nums',
                 deadlineHint?.tone === 'danger' ? 'text-danger' : 'text-foreground'
               )}
             >
-              {formatDate(item.deadline)}
+              {formatted}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.work_logs_count ?? 0),
+        id: 'work_logs_count',
+        header: 'Log Kerja',
+        size: 105,
+        minSize: 84,
+        maxSize: 165,
+        cell: ({ row }) => {
+          const count = Number(row.original.work_logs_count ?? 0);
+          return (
+            <span className="block truncate text-xs font-medium whitespace-nowrap text-foreground tabular-nums">
+              {count} log
             </span>
           );
         },
@@ -456,6 +584,9 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
       {
         accessorKey: 'status',
         header: 'Status',
+        size: 130,
+        minSize: 102,
+        maxSize: 190,
         cell: ({ row }) => {
           const meta =
             ASSIGNMENT_STATUS_META[row.original.status] || ASSIGNMENT_STATUS_META.assigned;
@@ -473,6 +604,10 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const item = row.original;
           return (
@@ -1058,7 +1193,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 id="assignment-deadline"
                 value={form.deadline}
                 onChange={(val) => setForm((prev) => ({ ...prev, deadline: val }))}
-                placeholder="DD-MM-YYYY"
+                placeholder="Pilih tanggal"
                 ariaLabel="Tenggat Penugasan"
                 className="h-10 rounded-xl"
               />

@@ -342,12 +342,15 @@ export default function TasksPage({ readOnly = false }) {
     const cols = [
       {
         accessorKey: 'title',
-        header: 'Tugas',
+        header: 'Judul Tugas',
+        size: 255,
+        minSize: 150,
+        maxSize: 480,
         cell: ({ row }) => {
           const title = row.original.title || '-';
           return (
             <span
-              className="block max-w-[300px] truncate text-xs font-medium text-foreground"
+              className="block truncate text-xs font-medium text-foreground"
               title={title}
             >
               {title}
@@ -356,9 +359,75 @@ export default function TasksPage({ readOnly = false }) {
         },
       },
       {
+        accessorFn: (row) => row.department?.name || '-',
+        id: 'department',
+        header: 'Departemen',
+        size: 175,
+        minSize: 115,
+        maxSize: 320,
+        cell: ({ row }) => {
+          const dept = row.original.department;
+          if (!dept) {
+            return <span className="text-xs text-muted-foreground">-</span>;
+          }
+          const label = dept.code ? `${dept.code} · ${dept.name}` : dept.name || '-';
+          return (
+            <div className="flex min-w-0 items-center gap-1.5" title={label}>
+              {dept.code && (
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  {dept.code}
+                </span>
+              )}
+              <span className="truncate text-xs text-foreground">{dept.name || '-'}</span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.description || '',
+        id: 'description',
+        header: 'Deskripsi',
+        size: 250,
+        minSize: 140,
+        maxSize: 520,
+        cell: ({ row }) => {
+          const desc = row.original.description?.trim();
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={desc || undefined}
+            >
+              {desc || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.estimated_hours || 0),
+        id: 'estimated_hours',
+        header: 'Estimasi',
+        size: 105,
+        minSize: 84,
+        maxSize: 160,
+        cell: ({ row }) => {
+          const hours = Number(row.original.estimated_hours || 0);
+          const label = `${hours.toFixed(1)} jam`;
+          return (
+            <span
+              className="block truncate text-xs font-medium whitespace-nowrap text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: 'priority',
         header: 'Prioritas',
-        meta: { className: 'hidden sm:table-cell' },
+        size: 120,
+        minSize: 94,
+        maxSize: 180,
         cell: ({ row }) => {
           const meta = PRIORITY_META[row.original.priority] || PRIORITY_META.medium;
           return (
@@ -371,18 +440,22 @@ export default function TasksPage({ readOnly = false }) {
       {
         accessorKey: 'due_date',
         header: 'Tenggat',
+        size: 165,
+        minSize: 130,
+        maxSize: 230,
         cell: ({ row }) => {
           const task = row.original;
           const deadlineHint = getDeadlineIndicator(task.due_date, task.status);
+          const formatted = formatDate(task.due_date);
           return (
             <span
-              title={deadlineHint?.text}
+              title={deadlineHint?.text ? `${formatted} · ${deadlineHint.text}` : formatted}
               className={cn(
-                'text-xs font-medium whitespace-nowrap tabular-nums',
+                'block truncate text-xs font-medium whitespace-nowrap tabular-nums',
                 deadlineHint?.tone === 'danger' ? 'text-danger' : 'text-foreground'
               )}
             >
-              {formatDate(task.due_date)}
+              {formatted}
             </span>
           );
         },
@@ -390,12 +463,50 @@ export default function TasksPage({ readOnly = false }) {
       {
         accessorKey: 'status',
         header: 'Status',
+        size: 130,
+        minSize: 102,
+        maxSize: 190,
         cell: ({ row }) => {
           const meta = TASK_STATUS_META[row.original.status] || TASK_STATUS_META.open;
           return (
             <div className="whitespace-nowrap">
               <StatusBadge tone={meta.tone} label={meta.label} />
             </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.creator?.full_name || '-',
+        id: 'creator',
+        header: 'Pembuat',
+        size: 175,
+        minSize: 120,
+        maxSize: 300,
+        cell: ({ row }) => {
+          const creatorName = row.original.creator?.full_name || '-';
+          return (
+            <span
+              className="block truncate text-xs text-foreground"
+              title={creatorName !== '-' ? creatorName : undefined}
+            >
+              {creatorName}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.assignments_count ?? 0),
+        id: 'assignments_count',
+        header: 'Penugasan',
+        size: 110,
+        minSize: 88,
+        maxSize: 170,
+        cell: ({ row }) => {
+          const count = Number(row.original.assignments_count ?? 0);
+          return (
+            <span className="block truncate text-xs font-medium whitespace-nowrap text-foreground tabular-nums">
+              {count} orang
+            </span>
           );
         },
       },
@@ -406,6 +517,10 @@ export default function TasksPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const task = row.original;
           return (
@@ -1002,7 +1117,7 @@ export default function TasksPage({ readOnly = false }) {
                 id="task-due-date"
                 value={form.due_date}
                 onChange={(val) => setForm((prev) => ({ ...prev, due_date: val }))}
-                placeholder="DD-MM-YYYY"
+                placeholder="Pilih tanggal"
                 ariaLabel="Tenggat Waktu"
                 className="h-10 rounded-xl"
               />
