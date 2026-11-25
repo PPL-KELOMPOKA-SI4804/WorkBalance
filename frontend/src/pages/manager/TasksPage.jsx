@@ -379,7 +379,7 @@ export default function TasksPage({ readOnly = false }) {
               title={deadlineHint?.text}
               className={cn(
                 'text-xs font-medium whitespace-nowrap tabular-nums',
-                deadlineHint?.tone === 'danger' ? 'text-destructive' : 'text-foreground'
+                deadlineHint?.tone === 'danger' ? 'text-danger' : 'text-foreground'
               )}
             >
               {formatDate(task.due_date)}
@@ -449,7 +449,7 @@ export default function TasksPage({ readOnly = false }) {
       title={readOnly ? 'Tugas Tim' : 'Katalog Tugas'}
       breadcrumb={readOnly ? 'Ruang Kerja' : 'Operasional'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* 4 KPI Summary Cards */}
         {loading && !hasLoadedOnce ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -519,13 +519,23 @@ export default function TasksPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-xl px-3"
+                  onClick={resetFilters}
+                >
                   <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="h-9 rounded-xl px-3.5"
+                  onClick={openCreateSheet}
+                >
                   <Plus data-icon="inline-start" className="size-4" />
                   Tambah Tugas
                 </Button>
@@ -541,9 +551,8 @@ export default function TasksPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="tasks-filter-status"
-                  size="sm"
                   aria-label="Filter Status"
-                  className="w-36 rounded-lg bg-background text-xs"
+                  className="h-9 w-36 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -565,9 +574,8 @@ export default function TasksPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="tasks-filter-priority"
-                  size="sm"
                   aria-label="Filter Prioritas"
-                  className="w-36 rounded-lg bg-background text-xs"
+                  className="h-9 w-36 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Prioritas" />
                 </SelectTrigger>
@@ -589,9 +597,8 @@ export default function TasksPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="tasks-filter-department"
-                  size="sm"
                   aria-label="Filter Departemen"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Departemen" />
                 </SelectTrigger>
@@ -623,9 +630,8 @@ export default function TasksPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="tasks-filter-due"
-                  size="sm"
                   aria-label="Filter Tenggat"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Tenggat" />
                 </SelectTrigger>
@@ -647,7 +653,12 @@ export default function TasksPage({ readOnly = false }) {
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      onClick={resetFilters}
+                    >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Reset
                     </Button>
@@ -658,7 +669,12 @@ export default function TasksPage({ readOnly = false }) {
           }
           actionsSlot={
             !readOnly ? (
-              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+              <Button
+                variant="cta"
+                size="sm"
+                className="h-9 rounded-xl px-3.5"
+                onClick={openCreateSheet}
+              >
                 <Plus data-icon="inline-start" className="size-4" />
                 Tambah Tugas
               </Button>
@@ -681,12 +697,19 @@ export default function TasksPage({ readOnly = false }) {
         loading={detailLoading}
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => setDetailSheetOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDetailSheetOpen(false)}
+            >
               Tutup
             </Button>
             {!readOnly && selectedTask && (
               <Button
                 type="button"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = selectedTask;
                   setDetailSheetOpen(false);
@@ -717,7 +740,7 @@ export default function TasksPage({ readOnly = false }) {
                   />
                 )}
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {selectedTask.title}
               </h4>
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -832,12 +855,19 @@ export default function TasksPage({ readOnly = false }) {
             <Button
               type="button"
               variant="outline"
+              className="rounded-xl"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
             >
               Batal
             </Button>
-            <Button type="submit" form="task-form" disabled={submitting}>
+            <Button
+              type="submit"
+              form="task-form"
+              variant="cta"
+              className="rounded-xl"
+              disabled={submitting}
+            >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
                 ? 'Menyimpan...'
@@ -858,7 +888,7 @@ export default function TasksPage({ readOnly = false }) {
                 animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -867,8 +897,8 @@ export default function TasksPage({ readOnly = false }) {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="task-title" className="text-xs">
-              Judul Tugas <span className="text-destructive">*</span>
+            <Label htmlFor="task-title" className="text-xs font-semibold">
+              Judul Tugas <span className="text-danger">*</span>
             </Label>
             <Input
               id="task-title"
@@ -879,21 +909,24 @@ export default function TasksPage({ readOnly = false }) {
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
               placeholder="Contoh: Penyusunan Laporan Kepatuhan K3 Q4"
-              className="rounded-lg"
+              className="h-10 rounded-xl bg-background"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-department" className="text-xs">
-                Departemen <span className="text-destructive">*</span>
+              <Label htmlFor="task-department" className="text-xs font-semibold">
+                Departemen <span className="text-danger">*</span>
               </Label>
               <Select
                 name="department_id"
                 value={form.department_id || undefined}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, department_id: val }))}
               >
-                <SelectTrigger id="task-department" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="task-department"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Pilih Departemen" />
                 </SelectTrigger>
                 <SelectContent>
@@ -918,8 +951,8 @@ export default function TasksPage({ readOnly = false }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-estimated-hours" className="text-xs">
-                Estimasi Waktu (Jam) <span className="text-destructive">*</span>
+              <Label htmlFor="task-estimated-hours" className="text-xs font-semibold">
+                Estimasi Waktu (Jam) <span className="text-danger">*</span>
               </Label>
               <Input
                 id="task-estimated-hours"
@@ -931,20 +964,23 @@ export default function TasksPage({ readOnly = false }) {
                 step="0.5"
                 value={form.estimated_hours}
                 onChange={(e) => setForm((prev) => ({ ...prev, estimated_hours: e.target.value }))}
-                className="rounded-lg tabular-nums"
+                className="h-10 rounded-xl bg-background tabular-nums"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-priority" className="text-xs">
-                Tingkat Prioritas <span className="text-destructive">*</span>
+              <Label htmlFor="task-priority" className="text-xs font-semibold">
+                Tingkat Prioritas <span className="text-danger">*</span>
               </Label>
               <Select
                 name="priority"
                 value={form.priority}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, priority: val }))}
               >
-                <SelectTrigger id="task-priority" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="task-priority"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Pilih Prioritas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -959,8 +995,8 @@ export default function TasksPage({ readOnly = false }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-due-date" className="text-xs">
-                Tenggat Waktu <span className="text-destructive">*</span>
+              <Label htmlFor="task-due-date" className="text-xs font-semibold">
+                Tenggat Waktu <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="task-due-date"
@@ -968,12 +1004,13 @@ export default function TasksPage({ readOnly = false }) {
                 onChange={(val) => setForm((prev) => ({ ...prev, due_date: val }))}
                 placeholder="DD-MM-YYYY"
                 ariaLabel="Tenggat Waktu"
+                className="h-10 rounded-xl"
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="task-status" className="text-xs">
+            <Label htmlFor="task-status" className="text-xs font-semibold">
               Status Tugas
             </Label>
             <Select
@@ -981,7 +1018,10 @@ export default function TasksPage({ readOnly = false }) {
               value={form.status}
               onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
             >
-              <SelectTrigger id="task-status" className="w-full rounded-lg">
+              <SelectTrigger
+                id="task-status"
+                className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+              >
                 <SelectValue placeholder="Pilih Status" />
               </SelectTrigger>
               <SelectContent>
@@ -996,7 +1036,7 @@ export default function TasksPage({ readOnly = false }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="task-description" className="text-xs">
+            <Label htmlFor="task-description" className="text-xs font-semibold">
               Deskripsi Tugas (Opsional)
             </Label>
             <Textarea
@@ -1007,7 +1047,7 @@ export default function TasksPage({ readOnly = false }) {
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="Rincian ruang lingkup pekerjaan atau target keluaran..."
-              className="rounded-lg"
+              className="rounded-xl bg-background"
             />
           </div>
         </form>

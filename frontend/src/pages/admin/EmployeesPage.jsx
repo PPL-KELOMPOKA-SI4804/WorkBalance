@@ -542,7 +542,7 @@ export default function EmployeesPage({ readOnly = false }) {
       title={readOnly ? 'Direktori Pegawai' : 'Pegawai'}
       breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -634,14 +634,19 @@ export default function EmployeesPage({ readOnly = false }) {
                       variant="outline"
                       size="sm"
                       onClick={resetFilters}
-                      className="rounded-lg"
+                      className="h-9 rounded-xl"
                     >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Setel Ulang Filter
                     </Button>
                   )}
                   {!readOnly && (
-                    <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
+                    <Button
+                      variant="cta"
+                      size="sm"
+                      onClick={openCreateEmployeeSheet}
+                      className="h-9 rounded-xl px-3.5"
+                    >
                       <Plus data-icon="inline-start" className="size-4" />
                       Tambah Pegawai
                     </Button>
@@ -657,8 +662,7 @@ export default function EmployeesPage({ readOnly = false }) {
                   >
                     <SelectTrigger
                       id="emp-filter-status"
-                      size="sm"
-                      className="w-36 rounded-lg bg-background text-xs"
+                      className="h-9 w-36 rounded-xl bg-background text-xs data-[size=default]:h-9"
                       aria-label="Filter Status Pegawai"
                     >
                       <SelectValue placeholder="Semua Status" />
@@ -679,8 +683,7 @@ export default function EmployeesPage({ readOnly = false }) {
                   >
                     <SelectTrigger
                       id="emp-filter-department"
-                      size="sm"
-                      className="w-44 rounded-lg bg-background text-xs"
+                      className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                       aria-label="Filter Departemen"
                     >
                       <SelectValue placeholder="Semua Departemen" />
@@ -704,8 +707,7 @@ export default function EmployeesPage({ readOnly = false }) {
                   >
                     <SelectTrigger
                       id="emp-filter-type"
-                      size="sm"
-                      className="w-44 rounded-lg bg-background text-xs"
+                      className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                       aria-label="Filter Jenis Kepegawaian"
                     >
                       <SelectValue placeholder="Semua Kepegawaian" />
@@ -735,7 +737,7 @@ export default function EmployeesPage({ readOnly = false }) {
                           variant="ghost"
                           size="sm"
                           onClick={resetFilters}
-                          className="rounded-lg"
+                          className="h-9 rounded-xl"
                         >
                           <RotateCcw data-icon="inline-start" className="size-4" />
                           Reset
@@ -747,7 +749,12 @@ export default function EmployeesPage({ readOnly = false }) {
               }
               actionsSlot={
                 !readOnly ? (
-                  <Button size="sm" onClick={openCreateEmployeeSheet} className="rounded-lg">
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    onClick={openCreateEmployeeSheet}
+                    className="h-9 rounded-xl px-3.5"
+                  >
                     <Plus data-icon="inline-start" className="size-4" />
                     Tambah Pegawai
                   </Button>
@@ -774,7 +781,12 @@ export default function EmployeesPage({ readOnly = false }) {
               emptyDescription="Tambahkan kategori hubungan kerja untuk menetapkan standar hari dan jam kerja normal."
               emptyAction={
                 !readOnly ? (
-                  <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    onClick={openCreateTypeSheet}
+                    className="h-9 rounded-xl px-3.5"
+                  >
                     <Plus data-icon="inline-start" className="size-4" />
                     Tambah Jenis Kepegawaian
                   </Button>
@@ -782,7 +794,12 @@ export default function EmployeesPage({ readOnly = false }) {
               }
               actionsSlot={
                 !readOnly ? (
-                  <Button size="sm" onClick={openCreateTypeSheet} className="rounded-lg">
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    onClick={openCreateTypeSheet}
+                    className="h-9 rounded-xl px-3.5"
+                  >
                     <Plus data-icon="inline-start" className="size-4" />
                     Tambah Jenis Kepegawaian
                   </Button>
@@ -810,19 +827,20 @@ export default function EmployeesPage({ readOnly = false }) {
               type="button"
               variant="outline"
               onClick={() => setDetailEmployee(null)}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Tutup
             </Button>
             {!readOnly && detailEmployee && (
               <Button
                 type="button"
+                variant="cta"
                 onClick={() => {
                   const target = detailEmployee;
                   setDetailEmployee(null);
                   openEditEmployeeSheet(target);
                 }}
-                className="rounded-lg"
+                className="rounded-xl"
               >
                 <Edit3 data-icon="inline-start" className="size-4" />
                 Ubah Pegawai
@@ -841,7 +859,7 @@ export default function EmployeesPage({ readOnly = false }) {
               </Avatar>
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="truncate text-base font-semibold tracking-[-0.01em] text-foreground">
+                  <h4 className="truncate text-base font-bold tracking-[-0.02em] text-foreground">
                     {detailEmployee.full_name}
                   </h4>
                   <StatusBadge
@@ -930,19 +948,20 @@ export default function EmployeesPage({ readOnly = false }) {
               type="button"
               variant="outline"
               onClick={() => setDetailType(null)}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Tutup
             </Button>
             {!readOnly && detailType && (
               <Button
                 type="button"
+                variant="cta"
                 onClick={() => {
                   const target = detailType;
                   setDetailType(null);
                   openEditTypeSheet(target);
                 }}
-                className="rounded-lg"
+                className="rounded-xl"
               >
                 <Edit3 data-icon="inline-start" className="size-4" />
                 Ubah Kategori
@@ -954,7 +973,7 @@ export default function EmployeesPage({ readOnly = false }) {
         {detailType && (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1.5">
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {detailType.name}
               </h4>
               <p className="text-xs text-muted-foreground">
@@ -1014,15 +1033,16 @@ export default function EmployeesPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setEmployeeSheetOpen(false)}
               disabled={employeeSubmitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Batal
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="employee-form"
               disabled={employeeSubmitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               {employeeSubmitting && <Spinner data-icon="inline-start" />}
               {employeeSubmitting
@@ -1044,7 +1064,7 @@ export default function EmployeesPage({ readOnly = false }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{employeeFormError}</span>
@@ -1056,8 +1076,8 @@ export default function EmployeesPage({ readOnly = false }) {
             <p className="text-xs font-semibold text-foreground">Identitas &amp; Penempatan</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-code" className="text-xs font-medium">
-                  Kode Pegawai
+                <Label htmlFor="emp-code" className="text-xs font-semibold">
+                  Kode Pegawai <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="emp-code"
@@ -1069,13 +1089,13 @@ export default function EmployeesPage({ readOnly = false }) {
                     setEmployeeForm({ ...employeeForm, employee_code: e.target.value })
                   }
                   placeholder="EMP-006"
-                  className="rounded-lg tabular-nums"
+                  className="h-10 rounded-xl bg-background tabular-nums"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-full-name" className="text-xs font-medium">
-                  Nama Lengkap
+                <Label htmlFor="emp-full-name" className="text-xs font-semibold">
+                  Nama Lengkap <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="emp-full-name"
@@ -1087,13 +1107,13 @@ export default function EmployeesPage({ readOnly = false }) {
                     setEmployeeForm({ ...employeeForm, full_name: e.target.value })
                   }
                   placeholder="Nama lengkap pegawai"
-                  className="rounded-lg"
+                  className="h-10 rounded-xl bg-background"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-department" className="text-xs font-medium">
-                  Departemen
+                <Label htmlFor="emp-department" className="text-xs font-semibold">
+                  Departemen <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="department_id"
@@ -1102,7 +1122,10 @@ export default function EmployeesPage({ readOnly = false }) {
                     setEmployeeForm({ ...employeeForm, department_id: val })
                   }
                 >
-                  <SelectTrigger id="emp-department" className="w-full rounded-lg">
+                  <SelectTrigger
+                    id="emp-department"
+                    className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                  >
                     <SelectValue placeholder="Pilih Departemen" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1118,15 +1141,18 @@ export default function EmployeesPage({ readOnly = false }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-position" className="text-xs font-medium">
-                  Jabatan / Posisi
+                <Label htmlFor="emp-position" className="text-xs font-semibold">
+                  Jabatan / Posisi <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="position_id"
                   value={employeeForm.position_id || undefined}
                   onValueChange={(val) => setEmployeeForm({ ...employeeForm, position_id: val })}
                 >
-                  <SelectTrigger id="emp-position" className="w-full rounded-lg">
+                  <SelectTrigger
+                    id="emp-position"
+                    className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                  >
                     <SelectValue placeholder="Pilih Jabatan" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1142,8 +1168,8 @@ export default function EmployeesPage({ readOnly = false }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-type" className="text-xs font-medium">
-                  Jenis Kepegawaian
+                <Label htmlFor="emp-type" className="text-xs font-semibold">
+                  Jenis Kepegawaian <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="employment_type_id"
@@ -1152,7 +1178,10 @@ export default function EmployeesPage({ readOnly = false }) {
                     setEmployeeForm({ ...employeeForm, employment_type_id: val })
                   }
                 >
-                  <SelectTrigger id="emp-type" className="w-full rounded-lg">
+                  <SelectTrigger
+                    id="emp-type"
+                    className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                  >
                     <SelectValue placeholder="Pilih Jenis Kepegawaian" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1168,8 +1197,8 @@ export default function EmployeesPage({ readOnly = false }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-join-date" className="text-xs font-medium">
-                  Tanggal Bergabung
+                <Label htmlFor="emp-join-date" className="text-xs font-semibold">
+                  Tanggal Bergabung <span className="text-danger">*</span>
                 </Label>
                 <DatePicker
                   id="emp-join-date"
@@ -1178,6 +1207,7 @@ export default function EmployeesPage({ readOnly = false }) {
                     setEmployeeForm({ ...employeeForm, join_date: val })
                   }
                   ariaLabel="Tanggal Bergabung"
+                  className="h-10 rounded-xl"
                 />
               </div>
             </div>
@@ -1189,7 +1219,7 @@ export default function EmployeesPage({ readOnly = false }) {
             <p className="text-xs font-semibold text-foreground">Akun &amp; Akses</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-email" className="text-xs font-medium">
+                <Label htmlFor="emp-email" className="text-xs font-semibold">
                   Email Akun
                 </Label>
                 <Input
@@ -1200,12 +1230,12 @@ export default function EmployeesPage({ readOnly = false }) {
                   value={employeeForm.email}
                   onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
                   placeholder="pegawai@workbalance.id"
-                  className="rounded-lg"
+                  className="h-10 rounded-xl bg-background"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-password" className="text-xs font-medium">
+                <Label htmlFor="emp-password" className="text-xs font-semibold">
                   {editingEmployee ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Awal'}
                 </Label>
                 <Input
@@ -1221,20 +1251,23 @@ export default function EmployeesPage({ readOnly = false }) {
                       ? 'Kosongkan jika tetap'
                       : 'Min. 8 karakter (default password123)'
                   }
-                  className="rounded-lg"
+                  className="h-10 rounded-xl bg-background"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-role" className="text-xs font-medium">
-                  Peran Akses (RBAC)
+                <Label htmlFor="emp-role" className="text-xs font-semibold">
+                  Peran Akses (RBAC) <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="role"
                   value={employeeForm.role}
                   onValueChange={(val) => setEmployeeForm({ ...employeeForm, role: val })}
                 >
-                  <SelectTrigger id="emp-role" className="w-full rounded-lg">
+                  <SelectTrigger
+                    id="emp-role"
+                    className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                  >
                     <SelectValue placeholder="Pilih Peran" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1248,15 +1281,18 @@ export default function EmployeesPage({ readOnly = false }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="emp-status" className="text-xs font-medium">
-                  Status Keaktifan
+                <Label htmlFor="emp-status" className="text-xs font-semibold">
+                  Status Keaktifan <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="status"
                   value={employeeForm.status}
                   onValueChange={(val) => setEmployeeForm({ ...employeeForm, status: val })}
                 >
-                  <SelectTrigger id="emp-status" className="w-full rounded-lg">
+                  <SelectTrigger
+                    id="emp-status"
+                    className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                  >
                     <SelectValue placeholder="Pilih Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1313,15 +1349,16 @@ export default function EmployeesPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setTypeSheetOpen(false)}
               disabled={typeSubmitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Batal
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="employment-type-form"
               disabled={typeSubmitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               {typeSubmitting && <Spinner data-icon="inline-start" />}
               {typeSubmitting ? 'Menyimpan...' : 'Simpan'}
@@ -1339,7 +1376,7 @@ export default function EmployeesPage({ readOnly = false }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{typeFormError}</span>
@@ -1348,8 +1385,8 @@ export default function EmployeesPage({ readOnly = false }) {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="type-name" className="text-xs font-medium">
-              Nama Jenis Kepegawaian
+            <Label htmlFor="type-name" className="text-xs font-semibold">
+              Nama Jenis Kepegawaian <span className="text-danger">*</span>
             </Label>
             <Input
               id="type-name"
@@ -1359,21 +1396,24 @@ export default function EmployeesPage({ readOnly = false }) {
               value={typeForm.name}
               onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
               placeholder="Misal: Tetap (PKWTT)"
-              className="rounded-lg"
+              className="h-10 rounded-xl bg-background"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="type-work-days" className="text-xs font-medium">
-                Hari Kerja / Minggu
+              <Label htmlFor="type-work-days" className="text-xs font-semibold">
+                Hari Kerja / Minggu <span className="text-danger">*</span>
               </Label>
               <Select
                 name="work_days_per_week"
                 value={typeForm.work_days_per_week}
                 onValueChange={(val) => setTypeForm({ ...typeForm, work_days_per_week: val })}
               >
-                <SelectTrigger id="type-work-days" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="type-work-days"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Pilih Hari Kerja" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1386,8 +1426,8 @@ export default function EmployeesPage({ readOnly = false }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="type-weekly-hours" className="text-xs font-medium">
-                Jam Normal / Minggu
+              <Label htmlFor="type-weekly-hours" className="text-xs font-semibold">
+                Jam Normal / Minggu <span className="text-danger">*</span>
               </Label>
               <Input
                 id="type-weekly-hours"
@@ -1400,7 +1440,7 @@ export default function EmployeesPage({ readOnly = false }) {
                 onChange={(e) =>
                   setTypeForm({ ...typeForm, normal_weekly_hours: e.target.value })
                 }
-                className="rounded-lg tabular-nums"
+                className="h-10 rounded-xl bg-background tabular-nums"
               />
             </div>
           </div>

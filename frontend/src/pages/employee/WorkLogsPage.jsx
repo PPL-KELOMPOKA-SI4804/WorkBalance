@@ -508,7 +508,7 @@ export default function WorkLogsPage({ readOnly = false }) {
       title="Log Jam Kerja"
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Operasional'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* 4 KPI Summary Cards */}
         {loading && !hasLoadedOnce ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -569,9 +569,9 @@ export default function WorkLogsPage({ readOnly = false }) {
         {/* Panel 1: Assigned Tasks Estimation vs Realization Comparison */}
         {!errorMsg && (
           <section className="overflow-hidden rounded-2xl border border-border bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3.5">
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4 sm:px-6">
+              <div className="flex items-baseline gap-2.5">
+                <h2 className="text-base font-bold tracking-[-0.02em] text-foreground">
                   {isEmployee ? 'Realisasi Tugas Saya' : 'Realisasi Tugas Tim'}
                 </h2>
                 <span className="text-xs font-medium text-muted-foreground tabular-nums">
@@ -631,7 +631,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                             size="xs"
                             variant="outline"
                             onClick={() => openCreateSheet(assign)}
-                            className="shrink-0 rounded-lg"
+                            className="shrink-0 rounded-xl"
                           >
                             <Plus data-icon="inline-start" className="size-3.5" />
                             Catat Log
@@ -706,13 +706,23 @@ export default function WorkLogsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-xl px-3"
+                  onClick={resetFilters}
+                >
                   <RotateCcw data-icon="inline-start" className="size-4" />
                   Reset Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" className="rounded-lg" onClick={() => openCreateSheet(null)}>
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="h-9 rounded-xl px-3.5"
+                  onClick={() => openCreateSheet(null)}
+                >
                   <Plus data-icon="inline-start" className="size-4" />
                   Catat Work Log
                 </Button>
@@ -728,9 +738,8 @@ export default function WorkLogsPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="wl-filter-assignment"
-                  size="sm"
                   aria-label="Filter penugasan tugas"
-                  className="w-52 rounded-lg bg-background text-xs"
+                  className="h-9 w-52 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Penugasan Tugas" />
                 </SelectTrigger>
@@ -756,9 +765,8 @@ export default function WorkLogsPage({ readOnly = false }) {
                   >
                     <SelectTrigger
                       id="wl-filter-department"
-                      size="sm"
                       aria-label="Filter departemen"
-                      className="w-44 rounded-lg bg-background text-xs"
+                      className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                     >
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
@@ -790,9 +798,8 @@ export default function WorkLogsPage({ readOnly = false }) {
                   >
                     <SelectTrigger
                       id="wl-filter-employee"
-                      size="sm"
                       aria-label="Filter pegawai"
-                      className="w-48 rounded-lg bg-background text-xs"
+                      className="h-9 w-48 rounded-xl bg-background text-xs data-[size=default]:h-9"
                     >
                       <SelectValue placeholder="Semua Pegawai" />
                     </SelectTrigger>
@@ -824,7 +831,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                   clearable
                   size="sm"
                   ariaLabel="Tanggal mulai"
-                  className="w-36"
+                  className="h-9 w-36 rounded-xl"
                 />
                 <span>s.d.</span>
                 <DatePicker
@@ -835,7 +842,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                   clearable
                   size="sm"
                   ariaLabel="Tanggal akhir"
-                  className="w-36"
+                  className="h-9 w-36 rounded-xl"
                 />
               </div>
 
@@ -848,7 +855,12 @@ export default function WorkLogsPage({ readOnly = false }) {
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      onClick={resetFilters}
+                    >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Reset
                     </Button>
@@ -859,7 +871,12 @@ export default function WorkLogsPage({ readOnly = false }) {
           }
           actionsSlot={
             !readOnly ? (
-              <Button size="sm" className="rounded-lg" onClick={() => openCreateSheet(null)}>
+              <Button
+                variant="cta"
+                size="sm"
+                className="h-9 rounded-xl px-3.5"
+                onClick={() => openCreateSheet(null)}
+              >
                 <Plus data-icon="inline-start" className="size-4" />
                 Catat Work Log
               </Button>
@@ -882,12 +899,19 @@ export default function WorkLogsPage({ readOnly = false }) {
         loading={detailLoading}
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => setDetailSheetOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDetailSheetOpen(false)}
+            >
               Tutup
             </Button>
             {!readOnly && detailLog && (
               <Button
                 type="button"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = detailLog;
                   setDetailSheetOpen(false);
@@ -1002,12 +1026,19 @@ export default function WorkLogsPage({ readOnly = false }) {
             <Button
               type="button"
               variant="outline"
+              className="rounded-xl"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
             >
               Batal
             </Button>
-            <Button type="submit" form="work-log-form" disabled={submitting}>
+            <Button
+              type="submit"
+              form="work-log-form"
+              variant="cta"
+              className="rounded-xl"
+              disabled={submitting}
+            >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
                 ? 'Menyimpan...'
@@ -1028,7 +1059,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                 animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -1038,8 +1069,8 @@ export default function WorkLogsPage({ readOnly = false }) {
 
           {isAdmin && !editingLog && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wl-employee" className="text-xs">
-                Pegawai Pelaksana <span className="text-destructive">*</span>
+              <Label htmlFor="wl-employee" className="text-xs font-semibold">
+                Pegawai Pelaksana <span className="text-danger">*</span>
               </Label>
               <Select
                 name="employee_id"
@@ -1052,7 +1083,10 @@ export default function WorkLogsPage({ readOnly = false }) {
                   }))
                 }
               >
-                <SelectTrigger id="wl-employee" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="wl-employee"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Pilih pegawai..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1074,7 +1108,7 @@ export default function WorkLogsPage({ readOnly = false }) {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wl-assignment" className="text-xs">
+            <Label htmlFor="wl-assignment" className="text-xs font-semibold">
               Penugasan Tugas (Opsional)
             </Label>
             <Select
@@ -1087,7 +1121,10 @@ export default function WorkLogsPage({ readOnly = false }) {
                 }))
               }
             >
-              <SelectTrigger id="wl-assignment" className="w-full rounded-lg">
+              <SelectTrigger
+                id="wl-assignment"
+                className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+              >
                 <SelectValue placeholder="Aktivitas Umum (Tanpa tautan tugas)" />
               </SelectTrigger>
               <SelectContent>
@@ -1109,8 +1146,8 @@ export default function WorkLogsPage({ readOnly = false }) {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wl-work-date" className="text-xs">
-                Tanggal Kerja <span className="text-destructive">*</span>
+              <Label htmlFor="wl-work-date" className="text-xs font-semibold">
+                Tanggal Kerja <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="wl-work-date"
@@ -1118,12 +1155,13 @@ export default function WorkLogsPage({ readOnly = false }) {
                 onChange={(val) => setForm((prev) => ({ ...prev, work_date: val }))}
                 placeholder="DD-MM-YYYY"
                 ariaLabel="Tanggal Kerja"
+                className="h-10 rounded-xl"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wl-hours-spent" className="text-xs">
-                Durasi Aktual (Jam) <span className="text-destructive">*</span>
+              <Label htmlFor="wl-hours-spent" className="text-xs font-semibold">
+                Durasi Aktual (Jam) <span className="text-danger">*</span>
               </Label>
               <Input
                 id="wl-hours-spent"
@@ -1135,14 +1173,14 @@ export default function WorkLogsPage({ readOnly = false }) {
                 required
                 value={form.hours_spent}
                 onChange={(e) => setForm((prev) => ({ ...prev, hours_spent: e.target.value }))}
-                className="rounded-lg tabular-nums"
+                className="h-10 rounded-xl bg-background tabular-nums"
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wl-activity-description" className="text-xs">
-              Deskripsi Aktivitas Kerja <span className="text-destructive">*</span>
+            <Label htmlFor="wl-activity-description" className="text-xs font-semibold">
+              Deskripsi Aktivitas Kerja <span className="text-danger">*</span>
             </Label>
             <Textarea
               id="wl-activity-description"
@@ -1154,7 +1192,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                 setForm((prev) => ({ ...prev, activity_description: e.target.value }))
               }
               placeholder="Tuliskan aktivitas yang dikerjakan, progres modul, atau hasil pekerjaan hari ini..."
-              className="rounded-lg"
+              className="rounded-xl bg-background"
             />
             <span className="text-xs text-muted-foreground tabular-nums">
               Minimal 5 karakter ({form.activity_description.trim().length} karakter tertulis).

@@ -451,7 +451,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
       title={readOnly ? 'Pelatihan Saya' : 'Partisipasi Pelatihan'}
       breadcrumb={readOnly ? 'Ruang Kerja' : 'Kesejahteraan'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -527,13 +527,13 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetFilters}>
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={resetFilters}>
                   <RotateCcw className="size-4" data-icon="inline-start" />
                   Reset Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSheet}>
                   <Plus className="size-4" data-icon="inline-start" />
                   Daftarkan Peserta
                 </Button>
@@ -551,7 +551,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                   id="tp-filter-status"
                   size="sm"
                   aria-label="Filter Status Partisipasi"
-                  className="w-40 rounded-lg bg-background text-xs"
+                  className="h-9 w-40 rounded-xl bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -578,7 +578,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                       id="tp-filter-training"
                       size="sm"
                       aria-label="Filter Program Pelatihan"
-                      className="w-48 rounded-lg bg-background text-xs"
+                      className="h-9 w-48 rounded-xl bg-background text-xs"
                     >
                       <SelectValue placeholder="Semua Pelatihan" />
                     </SelectTrigger>
@@ -605,7 +605,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                       id="tp-filter-department"
                       size="sm"
                       aria-label="Filter Departemen"
-                      className="w-44 rounded-lg bg-background text-xs"
+                      className="h-9 w-44 rounded-xl bg-background text-xs"
                     >
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
@@ -635,7 +635,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-lg"
+                      className="rounded-xl"
                       onClick={resetFilters}
                     >
                       <RotateCcw className="size-4" data-icon="inline-start" />
@@ -648,7 +648,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           }
           actionsSlot={
             !readOnly ? (
-              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+              <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSheet}>
                 <Plus className="size-4" data-icon="inline-start" />
                 Daftarkan Peserta
               </Button>
@@ -669,14 +669,15 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           <>
             <Button
               variant="outline"
-              className="rounded-lg"
+              className="rounded-xl"
               onClick={() => setDetailSheetOpen(false)}
             >
               Tutup
             </Button>
             {!readOnly && selectedParticipation && (
               <Button
-                className="rounded-lg"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = selectedParticipation;
                   setDetailSheetOpen(false);
@@ -705,7 +706,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                   {selectedParticipation.training?.category || '-'}
                 </Badge>
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.015em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {selectedParticipation.training?.title || '-'}
               </h4>
               <p className="text-xs text-muted-foreground">
@@ -796,7 +797,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
             <Button
               type="button"
               variant="outline"
-              className="rounded-lg"
+              className="rounded-xl"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
             >
@@ -804,8 +805,9 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="training-participation-form"
-              className="rounded-lg"
+              className="rounded-xl"
               disabled={submitting}
             >
               {submitting && <Spinner data-icon="inline-start" />}
@@ -832,7 +834,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-                className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -841,13 +843,15 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="tp-training-id">Program Pelatihan</Label>
+            <Label htmlFor="tp-training-id" className="text-xs font-semibold">
+              Program Pelatihan <span className="text-danger">*</span>
+            </Label>
             <Select
               name="training_id"
               value={form.training_id || undefined}
               onValueChange={(val) => setForm((prev) => ({ ...prev, training_id: val }))}
             >
-              <SelectTrigger id="tp-training-id" className="w-full rounded-lg bg-background">
+              <SelectTrigger id="tp-training-id" className="h-10 w-full rounded-xl bg-background">
                 <SelectValue placeholder="Pilih Program Pelatihan" />
               </SelectTrigger>
               <SelectContent>
@@ -863,13 +867,15 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="tp-employee-id">Pegawai Peserta</Label>
+            <Label htmlFor="tp-employee-id" className="text-xs font-semibold">
+              Pegawai Peserta <span className="text-danger">*</span>
+            </Label>
             <Select
               name="employee_id"
               value={form.employee_id || undefined}
               onValueChange={(val) => setForm((prev) => ({ ...prev, employee_id: val }))}
             >
-              <SelectTrigger id="tp-employee-id" className="w-full rounded-lg bg-background">
+              <SelectTrigger id="tp-employee-id" className="h-10 w-full rounded-xl bg-background">
                 <SelectValue placeholder="Pilih Pegawai Aktif" />
               </SelectTrigger>
               <SelectContent>
@@ -894,13 +900,15 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="tp-status">Status Keikutsertaan</Label>
+              <Label htmlFor="tp-status" className="text-xs font-semibold">
+                Status Keikutsertaan <span className="text-danger">*</span>
+              </Label>
               <Select
                 name="status"
                 value={form.status}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
               >
-                <SelectTrigger id="tp-status" className="w-full rounded-lg bg-background">
+                <SelectTrigger id="tp-status" className="h-10 w-full rounded-xl bg-background">
                   <SelectValue placeholder="Pilih Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -915,7 +923,9 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
 
             {form.status === 'completed' && (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="tp-completion-date">Tanggal Kelulusan</Label>
+                <Label htmlFor="tp-completion-date" className="text-xs font-semibold">
+                  Tanggal Kelulusan <span className="text-danger">*</span>
+                </Label>
                 <DatePicker
                   id="tp-completion-date"
                   ariaLabel="Tanggal Kelulusan"
@@ -923,6 +933,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
                   onChange={(val) =>
                     setForm((prev) => ({ ...prev, completion_date: val }))
                   }
+                  className="h-10 rounded-xl"
                 />
               </div>
             )}
@@ -950,7 +961,7 @@ export default function TrainingParticipationsPage({ readOnly = false }) {
               </span>{' '}
               akan dihapus.
               {deletingParticipation.status === 'completed' && (
-                <span className="mt-2 block text-xs text-destructive">
+                <span className="mt-2 block text-xs text-danger">
                   Perhatian: Peserta sudah berstatus Lulus (Completed). Penghapusan akan
                   ditolak sistem untuk menjaga riwayat kompetensi pegawai.
                 </span>

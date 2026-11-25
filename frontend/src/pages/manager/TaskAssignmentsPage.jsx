@@ -445,7 +445,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               title={deadlineHint?.text}
               className={cn(
                 'text-xs font-medium whitespace-nowrap tabular-nums',
-                deadlineHint?.tone === 'danger' ? 'text-destructive' : 'text-foreground'
+                deadlineHint?.tone === 'danger' ? 'text-danger' : 'text-foreground'
               )}
             >
               {formatDate(item.deadline)}
@@ -517,7 +517,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
       title={readOnly ? 'Penugasan Saya' : 'Penugasan Kerja'}
       breadcrumb={readOnly ? 'Ruang Kerja' : 'Operasional'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* 4 KPI Summary Cards */}
         {loading && !hasLoadedOnce ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -599,13 +599,23 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-xl px-3"
+                  onClick={resetFilters}
+                >
                   <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="h-9 rounded-xl px-3.5"
+                  onClick={openCreateSheet}
+                >
                   <Plus data-icon="inline-start" className="size-4" />
                   Tambah Penugasan
                 </Button>
@@ -621,9 +631,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="assignments-filter-status"
-                  size="sm"
                   aria-label="Filter Status"
-                  className="w-36 rounded-lg bg-background text-xs"
+                  className="h-9 w-36 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -645,9 +654,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 >
                   <SelectTrigger
                     id="assignments-filter-employee"
-                    size="sm"
                     aria-label="Filter Pegawai"
-                    className="w-48 rounded-lg bg-background text-xs"
+                    className="h-9 w-48 rounded-xl bg-background text-xs data-[size=default]:h-9"
                   >
                     <SelectValue placeholder="Semua Pegawai" />
                   </SelectTrigger>
@@ -676,9 +684,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="assignments-filter-department"
-                  size="sm"
                   aria-label="Filter Departemen"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Departemen" />
                 </SelectTrigger>
@@ -710,9 +717,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="assignments-filter-deadline"
-                  size="sm"
                   aria-label="Filter Tenggat"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                 >
                   <SelectValue placeholder="Semua Tenggat" />
                 </SelectTrigger>
@@ -734,7 +740,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      onClick={resetFilters}
+                    >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Reset
                     </Button>
@@ -745,7 +756,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           }
           actionsSlot={
             !readOnly ? (
-              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+              <Button
+                variant="cta"
+                size="sm"
+                className="h-9 rounded-xl px-3.5"
+                onClick={openCreateSheet}
+              >
                 <Plus data-icon="inline-start" className="size-4" />
                 Tambah Penugasan
               </Button>
@@ -768,12 +784,19 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
         loading={detailLoading}
         footer={
           <>
-            <Button type="button" variant="outline" onClick={() => setDetailSheetOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDetailSheetOpen(false)}
+            >
               Tutup
             </Button>
             {!readOnly && selectedAssignment && (
               <Button
                 type="button"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = selectedAssignment;
                   setDetailSheetOpen(false);
@@ -804,7 +827,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                   />
                 )}
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {selectedAssignment.task?.title || '-'}
               </h4>
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -914,12 +937,19 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
             <Button
               type="button"
               variant="outline"
+              className="rounded-xl"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
             >
               Batal
             </Button>
-            <Button type="submit" form="assignment-form" disabled={submitting}>
+            <Button
+              type="submit"
+              form="assignment-form"
+              variant="cta"
+              className="rounded-xl"
+              disabled={submitting}
+            >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
                 ? 'Menyimpan...'
@@ -940,7 +970,7 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -949,15 +979,18 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="assignment-task" className="text-xs">
-              Tugas yang Ditugaskan <span className="text-destructive">*</span>
+            <Label htmlFor="assignment-task" className="text-xs font-semibold">
+              Tugas yang Ditugaskan <span className="text-danger">*</span>
             </Label>
             <Select
               name="task_id"
               value={form.task_id || undefined}
               onValueChange={handleTaskSelectChange}
             >
-              <SelectTrigger id="assignment-task" className="w-full rounded-lg">
+              <SelectTrigger
+                id="assignment-task"
+                className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+              >
                 <SelectValue placeholder="Pilih Tugas" />
               </SelectTrigger>
               <SelectContent>
@@ -982,15 +1015,18 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="assignment-employee" className="text-xs">
-              Pegawai Penerima <span className="text-destructive">*</span>
+            <Label htmlFor="assignment-employee" className="text-xs font-semibold">
+              Pegawai Penerima <span className="text-danger">*</span>
             </Label>
             <Select
               name="employee_id"
               value={form.employee_id || undefined}
               onValueChange={(val) => setForm((prev) => ({ ...prev, employee_id: val }))}
             >
-              <SelectTrigger id="assignment-employee" className="w-full rounded-lg">
+              <SelectTrigger
+                id="assignment-employee"
+                className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+              >
                 <SelectValue placeholder="Pilih Pegawai Aktif" />
               </SelectTrigger>
               <SelectContent>
@@ -1015,8 +1051,8 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="assignment-deadline" className="text-xs">
-                Tenggat Penugasan <span className="text-destructive">*</span>
+              <Label htmlFor="assignment-deadline" className="text-xs font-semibold">
+                Tenggat Penugasan <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="assignment-deadline"
@@ -1024,11 +1060,12 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 onChange={(val) => setForm((prev) => ({ ...prev, deadline: val }))}
                 placeholder="DD-MM-YYYY"
                 ariaLabel="Tenggat Penugasan"
+                className="h-10 rounded-xl"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="assignment-status" className="text-xs">
+              <Label htmlFor="assignment-status" className="text-xs font-semibold">
                 Status Penugasan
               </Label>
               <Select
@@ -1036,7 +1073,10 @@ export default function TaskAssignmentsPage({ readOnly = false }) {
                 value={form.status}
                 onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
               >
-                <SelectTrigger id="assignment-status" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="assignment-status"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Pilih Status" />
                 </SelectTrigger>
                 <SelectContent>

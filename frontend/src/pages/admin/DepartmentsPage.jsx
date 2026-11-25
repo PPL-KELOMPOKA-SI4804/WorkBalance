@@ -332,7 +332,7 @@ export default function DepartmentsPage({ readOnly = false }) {
       title={readOnly ? 'Struktur Departemen' : 'Departemen'}
       breadcrumb={readOnly ? 'Organisasi' : 'Master Data'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -411,13 +411,23 @@ export default function DepartmentsPage({ readOnly = false }) {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters} className="rounded-lg">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-9 rounded-xl"
+                >
                   <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+                <Button
+                  variant="cta"
+                  size="sm"
+                  onClick={openCreateSheet}
+                  className="h-9 rounded-xl px-3.5"
+                >
                   <Plus data-icon="inline-start" className="size-4" />
                   Tambah Departemen
                 </Button>
@@ -433,8 +443,7 @@ export default function DepartmentsPage({ readOnly = false }) {
               >
                 <SelectTrigger
                   id="dept-filter-manager"
-                  size="sm"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs data-[size=default]:h-9"
                   aria-label="Filter Status Manajer"
                 >
                   <SelectValue placeholder="Semua Status" />
@@ -457,7 +466,12 @@ export default function DepartmentsPage({ readOnly = false }) {
                     exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <Button variant="ghost" size="sm" onClick={resetFilters} className="rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="h-9 rounded-xl"
+                    >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Reset
                     </Button>
@@ -468,7 +482,12 @@ export default function DepartmentsPage({ readOnly = false }) {
           }
           actionsSlot={
             !readOnly ? (
-              <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+              <Button
+                variant="cta"
+                size="sm"
+                onClick={openCreateSheet}
+                className="h-9 rounded-xl px-3.5"
+              >
                 <Plus data-icon="inline-start" className="size-4" />
                 Tambah Departemen
               </Button>
@@ -492,19 +511,20 @@ export default function DepartmentsPage({ readOnly = false }) {
               type="button"
               variant="outline"
               onClick={() => setDetailDepartment(null)}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Tutup
             </Button>
             {!readOnly && detailDepartment && (
               <Button
                 type="button"
+                variant="cta"
                 onClick={() => {
                   const target = detailDepartment;
                   setDetailDepartment(null);
                   openEditSheet(target);
                 }}
-                className="rounded-lg"
+                className="rounded-xl"
               >
                 <Edit3 data-icon="inline-start" className="size-4" />
                 Ubah Departemen
@@ -525,7 +545,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                   label={detailDepartment.manager ? 'Memiliki Manajer' : 'Belum Ada Manajer'}
                 />
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {detailDepartment.name}
               </h4>
             </div>
@@ -623,15 +643,16 @@ export default function DepartmentsPage({ readOnly = false }) {
               variant="outline"
               onClick={() => setSheetOpen(false)}
               disabled={submitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Batal
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="department-form"
               disabled={submitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
@@ -653,7 +674,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -663,8 +684,8 @@ export default function DepartmentsPage({ readOnly = false }) {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dept-code" className="text-xs font-medium">
-                Kode Departemen
+              <Label htmlFor="dept-code" className="text-xs font-semibold">
+                Kode Departemen <span className="text-danger">*</span>
               </Label>
               <Input
                 id="dept-code"
@@ -675,13 +696,13 @@ export default function DepartmentsPage({ readOnly = false }) {
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="FIN"
-                className="rounded-lg tabular-nums"
+                className="h-10 rounded-xl bg-background tabular-nums"
               />
             </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label htmlFor="dept-name" className="text-xs font-medium">
-                Nama Departemen
+              <Label htmlFor="dept-name" className="text-xs font-semibold">
+                Nama Departemen <span className="text-danger">*</span>
               </Label>
               <Input
                 id="dept-name"
@@ -692,7 +713,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Keuangan & Akuntansi"
-                className="rounded-lg"
+                className="h-10 rounded-xl bg-background"
               />
             </div>
           </div>
@@ -701,7 +722,7 @@ export default function DepartmentsPage({ readOnly = false }) {
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dept-manager" className="text-xs font-medium">
+              <Label htmlFor="dept-manager" className="text-xs font-semibold">
                 Manajer Departemen (Opsional)
               </Label>
               <Select
@@ -711,7 +732,10 @@ export default function DepartmentsPage({ readOnly = false }) {
                   setForm({ ...form, manager_id: val === NO_MANAGER_VALUE ? '' : val })
                 }
               >
-                <SelectTrigger id="dept-manager" className="w-full rounded-lg">
+                <SelectTrigger
+                  id="dept-manager"
+                  className="h-10 w-full rounded-xl bg-background data-[size=default]:h-10"
+                >
                   <SelectValue placeholder="Belum Ditentukan" />
                 </SelectTrigger>
                 <SelectContent>
@@ -729,7 +753,7 @@ export default function DepartmentsPage({ readOnly = false }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dept-description" className="text-xs font-medium">
+              <Label htmlFor="dept-description" className="text-xs font-semibold">
                 Deskripsi Unit / Fungsi (Opsional)
               </Label>
               <Textarea
@@ -740,7 +764,7 @@ export default function DepartmentsPage({ readOnly = false }) {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Ringkasan ruang lingkup tanggung jawab departemen..."
-                className="rounded-lg"
+                className="rounded-xl bg-background"
               />
             </div>
           </div>

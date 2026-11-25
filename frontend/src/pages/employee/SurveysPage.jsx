@@ -604,7 +604,7 @@ export default function SurveysPage() {
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
       actions={<Nfr02PrivacyCue isEmployee={isEmployee} compact />}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -744,13 +744,13 @@ export default function SurveysPage() {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetFilters}>
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={resetFilters}>
                   <RotateCcw className="size-4" data-icon="inline-start" />
                   Reset Filter
                 </Button>
               )}
               {canManage && (
-                <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
+                <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSurveySheet}>
                   <Plus className="size-4" data-icon="inline-start" />
                   Buat Survei
                 </Button>
@@ -768,7 +768,7 @@ export default function SurveysPage() {
                   id="survey-filter-status"
                   size="sm"
                   aria-label="Filter Status Periode"
-                  className="w-40 rounded-lg bg-background text-xs"
+                  className="h-9 w-40 rounded-xl bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -793,7 +793,7 @@ export default function SurveysPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-lg"
+                      className="rounded-xl"
                       onClick={resetFilters}
                     >
                       <RotateCcw className="size-4" data-icon="inline-start" />
@@ -806,7 +806,7 @@ export default function SurveysPage() {
           }
           actionsSlot={
             canManage ? (
-              <Button size="sm" className="rounded-lg" onClick={openCreateSurveySheet}>
+              <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSurveySheet}>
                 <Plus className="size-4" data-icon="inline-start" />
                 Buat Survei
               </Button>
@@ -831,7 +831,7 @@ export default function SurveysPage() {
           footer={
             <Button
               variant="outline"
-              className="rounded-lg"
+              className="rounded-xl"
               onClick={() => setAggregateSheetOpen(false)}
             >
               Tutup
@@ -961,7 +961,7 @@ export default function SurveysPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-lg"
+                className="rounded-xl"
                 onClick={() => setSurveySheetOpen(false)}
                 disabled={surveySubmitting}
               >
@@ -969,8 +969,9 @@ export default function SurveysPage() {
               </Button>
               <Button
                 type="submit"
+                variant="cta"
                 form="survey-form"
-                className="rounded-lg"
+                className="rounded-xl"
                 disabled={surveySubmitting}
               >
                 {surveySubmitting && <Spinner data-icon="inline-start" />}
@@ -997,7 +998,7 @@ export default function SurveysPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                   transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-                  className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                  className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
                 >
                   <AlertCircle className="mt-0.5 size-4 shrink-0" />
                   <span>{surveyFormError}</span>
@@ -1006,7 +1007,9 @@ export default function SurveysPage() {
             </AnimatePresence>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="survey-title">Judul Survei</Label>
+              <Label htmlFor="survey-title" className="text-xs font-semibold">
+                Judul Survei <span className="text-danger">*</span>
+              </Label>
               <Input
                 id="survey-title"
                 name="title"
@@ -1018,13 +1021,15 @@ export default function SurveysPage() {
                   setSurveyForm((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Contoh: Survei Kondisi Kerja Desember 2026"
-                className="rounded-lg bg-background"
+                className="h-10 rounded-xl bg-background"
               />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="survey-period-month">Periode Bulan</Label>
+                <Label htmlFor="survey-period-month" className="text-xs font-semibold">
+                  Periode Bulan <span className="text-danger">*</span>
+                </Label>
                 <MonthPicker
                   id="survey-period-month"
                   ariaLabel="Periode Bulan"
@@ -1032,11 +1037,14 @@ export default function SurveysPage() {
                   onChange={(val) =>
                     setSurveyForm((prev) => ({ ...prev, period_month: val }))
                   }
+                  className="h-10 rounded-xl"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="survey-is-active">Status Pengisian</Label>
+                <Label htmlFor="survey-is-active" className="text-xs font-semibold">
+                  Status Pengisian <span className="text-danger">*</span>
+                </Label>
                 <Select
                   name="is_active"
                   value={surveyForm.is_active ? '1' : '0'}
@@ -1044,7 +1052,7 @@ export default function SurveysPage() {
                     setSurveyForm((prev) => ({ ...prev, is_active: val === '1' }))
                   }
                 >
-                  <SelectTrigger id="survey-is-active" className="w-full rounded-lg bg-background">
+                  <SelectTrigger id="survey-is-active" className="h-10 w-full rounded-xl bg-background">
                     <SelectValue placeholder="Pilih Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1058,7 +1066,7 @@ export default function SurveysPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="survey-description">
+              <Label htmlFor="survey-description" className="text-xs font-semibold">
                 Deskripsi / Tujuan Survei (Opsional)
               </Label>
               <Textarea
@@ -1071,7 +1079,7 @@ export default function SurveysPage() {
                   setSurveyForm((prev) => ({ ...prev, description: e.target.value }))
                 }
                 placeholder="Penjelasan singkat mengenai tujuan pengisian survei periode ini..."
-                className="rounded-lg bg-background"
+                className="rounded-xl bg-background"
               />
             </div>
           </form>
@@ -1096,7 +1104,7 @@ export default function SurveysPage() {
                 (<span className="tabular-nums">{formatMonth(deletingSurvey.period_month)}</span>)
                 akan dihapus.
                 {Number(deletingSurvey.responses_count || 0) > 0 && (
-                  <span className="mt-2 block text-xs text-destructive">
+                  <span className="mt-2 block text-xs text-danger">
                     Perhatian: Survei ini sudah memiliki {deletingSurvey.responses_count}{' '}
                     respons pegawai. Penghapusan akan ditolak oleh sistem.
                   </span>
@@ -1131,7 +1139,7 @@ export default function SurveysPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-lg"
+                className="rounded-xl"
                 onClick={() => setResponseSheetOpen(false)}
                 disabled={responseSubmitting}
               >
@@ -1139,8 +1147,9 @@ export default function SurveysPage() {
               </Button>
               <Button
                 type="submit"
+                variant="cta"
                 form="survey-response-form"
-                className="rounded-lg"
+                className="rounded-xl"
                 disabled={responseSubmitting}
               >
                 {responseSubmitting && <Spinner data-icon="inline-start" />}
@@ -1179,7 +1188,7 @@ export default function SurveysPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                     transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-                    className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                    className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
                   >
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <span>{responseFormError}</span>
@@ -1212,7 +1221,7 @@ export default function SurveysPage() {
                     <ToggleGroupItem
                       key={score}
                       value={String(score)}
-                      className="h-10 rounded-lg text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      className="h-10 rounded-xl text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                       {score}
                     </ToggleGroupItem>
@@ -1257,7 +1266,7 @@ export default function SurveysPage() {
                     <ToggleGroupItem
                       key={score}
                       value={String(score)}
-                      className="h-10 rounded-lg text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      className="h-10 rounded-xl text-sm font-semibold tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                       {score}
                     </ToggleGroupItem>
@@ -1276,7 +1285,7 @@ export default function SurveysPage() {
 
               {/* Optional Comments */}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="survey-response-comments">
+                <Label htmlFor="survey-response-comments" className="text-xs font-semibold">
                   Catatan atau Masukan Tambahan (Opsional &amp; Rahasia)
                 </Label>
                 <Textarea
@@ -1289,7 +1298,7 @@ export default function SurveysPage() {
                     setResponseForm((prev) => ({ ...prev, comments: e.target.value }))
                   }
                   placeholder="Bagikan pengalaman kerja, masukan distribusi tugas, atau kendala waktu istirahat..."
-                  className="rounded-lg bg-background"
+                  className="rounded-xl bg-background"
                 />
               </div>
             </form>
