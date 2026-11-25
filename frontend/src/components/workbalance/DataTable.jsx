@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   createFilteredRowModel,
@@ -42,6 +42,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { detectCellOverflowText } from './TruncatedText';
 
 const INITIAL_COLUMN_RESIZING = {
   startOffset: null,
@@ -51,6 +57,82 @@ const INITIAL_COLUMN_RESIZING = {
   isResizingColumn: false,
   columnSizingStart: [],
 };
+
+const CELL_TOOLTIP_DELAY_MS = 150;
+
+function OverflowTooltipCell({
+  as: CellComponent = TableCell,
+  disabled = false,
+  children,
+  ...props
+}) {
+  const cellRef = useRef(null);
+  const timerRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [overflowText, setOverflowText] = useState('');
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  useEffect(() => {
+    if (disabled) {
+      clearTimer();
+      setOpen(false);
+    }
+  }, [disabled, clearTimer]);
+
+  const handleMouseEnter = useCallback(() => {
+    clearTimer();
+    if (disabled) return;
+    const text = detectCellOverflowText(cellRef.current);
+    if (!text) {
+      setOpen(false);
+      setOverflowText('');
+      return;
+    }
+    setOverflowText(text);
+    timerRef.current = window.setTimeout(() => {
+      setOpen(true);
+    }, CELL_TOOLTIP_DELAY_MS);
+  }, [clearTimer, disabled]);
+
+  const handleClose = useCallback(() => {
+    clearTimer();
+    setOpen(false);
+  }, [clearTimer]);
+
+  return (
+    <Tooltip open={open}>
+      <TooltipTrigger asChild>
+        <CellComponent
+          ref={cellRef}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleClose}
+          onMouseDown={handleClose}
+          {...props}
+        >
+          {children}
+        </CellComponent>
+      </TooltipTrigger>
+      {open && overflowText && (
+        <TooltipContent
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="max-w-sm whitespace-normal break-words px-3 py-2 text-xs leading-relaxed"
+        >
+          {overflowText}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
+}
 
 function buildPaginationRange(currentPage, totalPages) {
   if (totalPages <= 5) {
@@ -370,8 +452,10 @@ export function DataTable({
                         : header.column.id;
 
                     return (
-                      <TableHead
+                      <OverflowTooltipCell
                         key={header.id}
+                        as={TableHead}
+                        disabled={isAnyResizing || header.column.id === 'actions'}
                         style={
                           resizable
                             ? {
@@ -443,7 +527,7 @@ export function DataTable({
                             />
                           </div>
                         )}
-                      </TableHead>
+                      </OverflowTooltipCell>
                     );
                   })}
                 </TableRow>
@@ -475,8 +559,10 @@ export function DataTable({
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
+                    <OverflowTooltipCell
                       key={cell.id}
+                      as={TableCell}
+                      disabled={isAnyResizing || cell.column.id === 'actions'}
                       style={
                         resizable
                           ? {
@@ -495,7 +581,7 @@ export function DataTable({
                         cell.column.columnDef.cell,
                         cell.getContext()
                       )}
-                    </TableCell>
+                    </OverflowTooltipCell>
                   ))}
                 </TableRow>
               ))}

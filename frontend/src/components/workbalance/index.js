@@ -13,6 +13,7 @@ export { WeekPicker } from './WeekPicker';
 export { FormSheet } from './FormSheet';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CommandMenu } from './CommandMenu';
+export { TruncatedText } from './TruncatedText';
 export {
   DecentWorkDonutChart,
   WorkHoursBarChart,

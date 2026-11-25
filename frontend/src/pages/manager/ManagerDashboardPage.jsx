@@ -54,6 +54,7 @@ import {
   MonthPicker,
   PerformanceLineChart,
   StatusBadge,
+  TruncatedText,
 } from '@/components/workbalance';
 
 const ALL_VALUE = '__all__';
@@ -388,16 +389,6 @@ export default function ManagerDashboardPage() {
                   {formatDate(activeFiltersMeta.week_end)}
                 </span>
               </span>
-              <span>
-                Tercatat{' '}
-                <strong className="font-semibold text-foreground">
-                  {formatScore(kpi.weekly_logged_hours_total, 1)}j
-                </strong>{' '}
-                · Tugas aktif{' '}
-                <strong className="font-semibold text-foreground">
-                  {formatScore(kpi.active_estimated_hours_total, 1)}j
-                </strong>
-              </span>
             </div>
           </div>
 
@@ -594,9 +585,10 @@ export default function ManagerDashboardPage() {
                           <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                             {dept.code}
                           </span>
-                          <span className="truncate text-sm font-medium text-foreground">
-                            {dept.name}
-                          </span>
+                          <TruncatedText
+                            text={dept.name}
+                            className="text-sm font-medium text-foreground"
+                          />
                         </div>
                         <StatusBadge
                           status={dept.status_category}
@@ -626,7 +618,7 @@ export default function ManagerDashboardPage() {
                   searchValue={search}
                   onSearchChange={setSearch}
                   searchPlaceholder="Cari nama atau jabatan..."
-                  pageSize={6}
+                  pageSize={8}
                   onRowClick={(emp) => setSelectedEmployee(emp)}
                   emptyTitle="Tidak ada pegawai sesuai filter"
                   emptyDescription="Ubah pilihan risiko atau kata kunci pencarian."
@@ -786,18 +778,18 @@ export default function ManagerDashboardPage() {
                         className="group flex flex-col gap-1.5 px-6 py-4 transition-all duration-150 hover:bg-hover-surface hover:shadow-[inset_3px_0_0_var(--primary)]"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
-                            {item.title}
-                          </span>
+                          <TruncatedText
+                            text={item.title}
+                            className="text-sm font-semibold text-foreground group-hover:text-primary"
+                          />
                           <StatusBadge tone={sev.tone} label={sev.label} />
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                          <p
-                            className="truncate text-xs text-muted-foreground"
-                            title={item.description}
-                          >
-                            {item.description}
-                          </p>
+                          <TruncatedText
+                            as="p"
+                            text={item.description}
+                            className="text-xs text-muted-foreground"
+                          />
                           <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                         </div>
                       </Link>
@@ -852,15 +844,20 @@ export default function ManagerDashboardPage() {
                         className="flex flex-col gap-1 px-6 py-3.5 transition-colors hover:bg-hover-surface/70"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-foreground">
-                            {issue.category}
-                          </span>
+                          <TruncatedText
+                            text={issue.category}
+                            className="text-xs font-semibold text-foreground"
+                          />
                           <StatusBadge status={issue.status} />
                         </div>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <TruncatedText
+                          as="p"
+                          text={`${issue.reporter?.full_name || '-'} · ${issue.department?.code || '-'}`}
+                          className="text-xs text-muted-foreground"
+                        >
                           {issue.reporter?.full_name || '-'} ·{' '}
                           <span className="font-mono">{issue.department?.code || '-'}</span>
-                        </p>
+                        </TruncatedText>
                       </div>
                     ))
                   )}
