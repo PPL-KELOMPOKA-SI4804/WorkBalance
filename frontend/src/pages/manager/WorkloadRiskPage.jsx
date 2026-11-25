@@ -233,70 +233,109 @@ export default function WorkloadRiskPage() {
     [summary, thresholds]
   );
 
-  // Calm Rows: 4 single-line columns; clicking any row opens full diagnostic sheet
-  const columns = useMemo(
-    () => [
-      isEmployee
-        ? {
-            accessorKey: 'period_week',
-            header: 'Periode',
-            cell: ({ row }) => (
-              <span className="font-medium text-foreground whitespace-nowrap tabular-nums">
-                {formatWeek(row.original.period_week)}
-              </span>
-            ),
-          }
-        : {
-            accessorFn: (row) => row.employee?.full_name || '-',
-            id: 'employee',
-            header: 'Pegawai',
-            cell: ({ row }) => {
-              const emp = row.original.employee || {};
-              return (
-                <div className="flex items-center gap-2.5">
-                  <Avatar className="size-7 border border-border">
-                    <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                      {getInitials(emp.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="truncate font-medium text-foreground" title={emp.full_name}>
-                    {emp.full_name || '-'}
-                  </span>
-                  {emp.employee_code && (
-                    <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
-                      {emp.employee_code}
-                    </span>
-                  )}
-                </div>
-              );
-            },
-          },
+  // Detailed resizable columns for Matriks Risiko Pegawai / Riwayat Risiko; clicking any row opens diagnostic sheet
+  const columns = useMemo(() => {
+    const baseColumns = [
+      {
+        accessorKey: 'period_week',
+        header: 'Periode Minggu',
+        size: 190,
+        minSize: 140,
+        maxSize: 270,
+        cell: ({ row }) => {
+          const weekLabel = formatWeek(row.original.period_week);
+          return (
+            <span
+              className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums"
+              title={weekLabel}
+            >
+              {weekLabel}
+            </span>
+          );
+        },
+      },
       {
         accessorFn: (row) => Number(row.metrics?.weekly_hours_total || 0),
         id: 'weekly_hours',
-        header: 'Jam',
-        meta: { className: 'hidden sm:table-cell' },
+        header: 'Jam Aktual',
+        size: 130,
+        minSize: 100,
+        maxSize: 195,
         cell: ({ row }) => {
           const m = row.original.metrics || {};
           return (
-            <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
               {formatNumber(m.weekly_hours_total, 1)} / {formatNumber(m.normal_weekly_hours, 0)}j
             </span>
           );
         },
       },
       {
-        accessorKey: 'final_score',
-        header: 'Skor',
+        accessorKey: 'weekly_hours_score',
+        header: 'Skor Waktu',
+        size: 110,
+        minSize: 86,
+        maxSize: 160,
         cell: ({ row }) => (
-          <span className="text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {formatNumber(row.original.weekly_hours_score, 1)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'overtime_score',
+        header: 'Skor Lembur',
+        size: 110,
+        minSize: 86,
+        maxSize: 160,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {formatNumber(row.original.overtime_score, 1)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'task_load_score',
+        header: 'Skor Beban',
+        size: 110,
+        minSize: 86,
+        maxSize: 160,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {formatNumber(row.original.task_load_score, 1)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'deadline_pressure_score',
+        header: 'Skor Tenggat',
+        size: 115,
+        minSize: 88,
+        maxSize: 165,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {formatNumber(row.original.deadline_pressure_score, 1)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'final_score',
+        header: 'Skor Akhir',
+        size: 105,
+        minSize: 84,
+        maxSize: 155,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
             {formatNumber(row.original.final_score, 1)}
           </span>
         ),
       },
       {
         accessorKey: 'risk_category',
-        header: 'Risiko',
+        header: 'Kategori & PP 35',
+        size: 165,
+        minSize: 125,
+        maxSize: 225,
         cell: ({ row }) => {
           const r = row.original;
           return (
@@ -306,9 +345,79 @@ export default function WorkloadRiskPage() {
           );
         },
       },
-    ],
-    [isEmployee]
-  );
+    ];
+
+    if (isEmployee) {
+      return baseColumns;
+    }
+
+    return [
+      {
+        accessorFn: (row) => row.employee?.full_name || '-',
+        id: 'employee',
+        header: 'Pegawai',
+        size: 225,
+        minSize: 150,
+        maxSize: 380,
+        cell: ({ row }) => {
+          const emp = row.original.employee || {};
+          return (
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar className="size-7 shrink-0 border border-border">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                  {getInitials(emp.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col">
+                <span
+                  className="truncate font-medium text-foreground"
+                  title={emp.full_name || '-'}
+                >
+                  {emp.full_name || '-'}
+                </span>
+                {emp.employee_code && (
+                  <span
+                    className="truncate font-mono text-xs text-muted-foreground"
+                    title={emp.employee_code}
+                  >
+                    {emp.employee_code}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.employee?.department
+            ? `${row.employee.department.code || ''} ${row.employee.department.name || ''}`.trim()
+            : '-',
+        id: 'department',
+        header: 'Departemen',
+        size: 165,
+        minSize: 110,
+        maxSize: 280,
+        cell: ({ row }) => {
+          const dept = row.original.employee?.department;
+          const deptTitle = dept ? [dept.code, dept.name].filter(Boolean).join(' · ') : '-';
+          return (
+            <div className="flex min-w-0 items-center gap-1.5" title={deptTitle}>
+              {dept?.code && (
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  {dept.code}
+                </span>
+              )}
+              <span className="truncate text-xs font-medium text-foreground">
+                {dept?.name || '-'}
+              </span>
+            </div>
+          );
+        },
+      },
+      ...baseColumns,
+    ];
+  }, [isEmployee]);
 
   return (
     <AppShell
@@ -524,7 +633,7 @@ export default function WorkloadRiskPage() {
                 clearable={Boolean(periodWeek)}
                 placeholder="Pilih minggu"
                 ariaLabel="Pilih minggu periode"
-                className="w-56"
+                className="w-60"
               />
 
               {!isEmployee && (
@@ -775,7 +884,7 @@ export default function WorkloadRiskPage() {
                   {selectedRisk.active_assignments.map((assign) => (
                     <div
                       key={assign.id}
-                      className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
+                      className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs transition-colors hover:bg-hover-surface/70"
                     >
                       <span className="truncate font-medium text-foreground">
                         {assign.task?.title || `Penugasan #${assign.id}`}

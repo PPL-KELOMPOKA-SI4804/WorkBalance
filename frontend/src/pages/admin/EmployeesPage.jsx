@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
 import { formatDate, toApiDate, toISODateLocal } from '@/lib/format';
-import { getInitials, ROLE_LABELS } from '@/lib/navigation';
+import { getInitials, ROLE_LABELS, ROLE_TONES } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { employeeService } from '@/services/employeeService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -354,20 +354,38 @@ export default function EmployeesPage({ readOnly = false }) {
   const employeeColumns = useMemo(() => {
     const baseColumns = [
       {
+        accessorKey: 'employee_code',
+        header: 'Kode',
+        size: 110,
+        minSize: 88,
+        maxSize: 180,
+        cell: ({ row }) => (
+          <span
+            className="block truncate font-mono text-xs font-normal text-foreground tabular-nums"
+            title={row.original.employee_code}
+          >
+            {row.original.employee_code}
+          </span>
+        ),
+      },
+      {
         accessorFn: (row) => row.full_name || '',
         id: 'employee',
-        header: 'Pegawai',
+        header: 'Nama Lengkap',
+        size: 215,
+        minSize: 145,
+        maxSize: 380,
         cell: ({ row }) => {
           const emp = row.original;
           return (
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 items-center gap-2.5">
               <Avatar className="size-8 shrink-0 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name, emp.user_account?.email)}
                 </AvatarFallback>
               </Avatar>
               <span
-                className="max-w-[200px] truncate text-sm font-medium text-foreground"
+                className="min-w-0 truncate text-sm font-medium text-foreground"
                 title={emp.full_name}
               >
                 {emp.full_name}
@@ -377,27 +395,133 @@ export default function EmployeesPage({ readOnly = false }) {
         },
       },
       {
-        accessorKey: 'employee_code',
-        header: 'Kode',
-        cell: ({ row }) => (
-          <span className="font-mono text-xs font-normal text-foreground whitespace-nowrap tabular-nums">
-            {row.original.employee_code}
-          </span>
-        ),
+        accessorFn: (row) => row.user_account?.email || '',
+        id: 'email',
+        header: 'Email',
+        size: 230,
+        minSize: 150,
+        maxSize: 380,
+        cell: ({ row }) => {
+          const email = row.original.user_account?.email;
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground"
+              title={email || undefined}
+            >
+              {email || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) =>
+          row.user_account?.role
+            ? ROLE_LABELS[row.user_account.role] || row.user_account.role
+            : '',
+        id: 'role',
+        header: 'Peran',
+        size: 115,
+        minSize: 90,
+        maxSize: 180,
+        cell: ({ row }) => {
+          const role = row.original.user_account?.role;
+          if (!role) {
+            return <span className="block truncate text-sm text-muted-foreground">-</span>;
+          }
+          const label = ROLE_LABELS[role] || role;
+          return (
+            <StatusBadge
+              tone={ROLE_TONES[role] || 'neutral'}
+              label={label}
+              showDot={false}
+              className="max-w-full truncate"
+            />
+          );
+        },
       },
       {
         accessorFn: (row) => row.department?.name || '',
         id: 'department',
         header: 'Departemen',
-        meta: { className: 'hidden md:table-cell' },
+        size: 210,
+        minSize: 135,
+        maxSize: 360,
         cell: ({ row }) => {
-          const deptName = row.original.department?.name || '-';
+          const dept = row.original.department;
+          if (!dept) {
+            return <span className="block truncate text-sm text-muted-foreground">-</span>;
+          }
+          const fullLabel = dept.code ? `${dept.code} - ${dept.name}` : dept.name;
+          return (
+            <div className="flex min-w-0 items-center gap-1.5" title={fullLabel}>
+              {dept.code && (
+                <span className="shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-normal text-foreground tabular-nums">
+                  {dept.code}
+                </span>
+              )}
+              <span className="min-w-0 truncate text-sm text-foreground">{dept.name}</span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.position?.title || '',
+        id: 'position',
+        header: 'Jabatan',
+        size: 215,
+        minSize: 135,
+        maxSize: 360,
+        cell: ({ row }) => {
+          const pos = row.original.position;
+          if (!pos?.title) {
+            return <span className="block truncate text-sm text-muted-foreground">-</span>;
+          }
+          const fullLabel = pos.level ? `${pos.title} (${pos.level})` : pos.title;
+          return (
+            <span className="block truncate text-sm text-foreground" title={fullLabel}>
+              {pos.title}
+              {pos.level && (
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  · {pos.level}
+                </span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.employment_type?.name || '',
+        id: 'employment_type',
+        header: 'Jenis Kerja',
+        size: 175,
+        minSize: 125,
+        maxSize: 280,
+        cell: ({ row }) => {
+          const typeName = row.original.employment_type?.name;
           return (
             <span
-              className="block max-w-[200px] truncate text-sm text-muted-foreground"
-              title={deptName}
+              className="block truncate text-sm text-foreground"
+              title={typeName || undefined}
             >
-              {deptName}
+              {typeName || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'join_date',
+        header: 'Tgl Bergabung',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.join_date);
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
             </span>
           );
         },
@@ -405,6 +529,9 @@ export default function EmployeesPage({ readOnly = false }) {
       {
         accessorKey: 'status',
         header: 'Status',
+        size: 115,
+        minSize: 92,
+        maxSize: 180,
         cell: ({ row }) => (
           <StatusBadge status={row.original.status === 'active' ? 'active' : 'inactive'} />
         ),
@@ -416,6 +543,10 @@ export default function EmployeesPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const emp = row.original;
           return (
@@ -451,10 +582,13 @@ export default function EmployeesPage({ readOnly = false }) {
     const baseColumns = [
       {
         accessorKey: 'name',
-        header: 'Nama',
+        header: 'Nama Kategori',
+        size: 225,
+        minSize: 145,
+        maxSize: 400,
         cell: ({ row }) => (
           <span
-            className="block max-w-[220px] truncate text-sm font-medium text-foreground"
+            className="block truncate text-sm font-medium text-foreground"
             title={row.original.name}
           >
             {row.original.name}
@@ -463,32 +597,90 @@ export default function EmployeesPage({ readOnly = false }) {
       },
       {
         accessorKey: 'work_days_per_week',
-        header: 'Hari/Minggu',
-        cell: ({ row }) => (
-          <span className="text-sm text-foreground whitespace-nowrap tabular-nums">
-            {row.original.work_days_per_week} hari/minggu
-          </span>
-        ),
+        header: 'Hari / Minggu',
+        size: 135,
+        minSize: 100,
+        maxSize: 220,
+        cell: ({ row }) => {
+          const label = `${row.original.work_days_per_week} hari`;
+          return (
+            <span className="block truncate text-sm text-foreground tabular-nums" title={label}>
+              {label}
+            </span>
+          );
+        },
       },
       {
         accessorKey: 'normal_weekly_hours',
-        header: 'Jam Normal',
-        meta: { className: 'hidden sm:table-cell' },
-        cell: ({ row }) => (
-          <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
-            {row.original.normal_weekly_hours} jam/minggu
-          </span>
-        ),
+        header: 'Jam / Minggu',
+        size: 135,
+        minSize: 100,
+        maxSize: 220,
+        cell: ({ row }) => {
+          const label = `${row.original.normal_weekly_hours} jam`;
+          return (
+            <span
+              className="block truncate text-sm font-medium text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => (Number(row.work_days_per_week) >= 6 ? 7 : 8),
+        id: 'normal_daily_hours',
+        header: 'Jam / Hari',
+        size: 125,
+        minSize: 95,
+        maxSize: 200,
+        cell: ({ row }) => {
+          const label =
+            Number(row.original.work_days_per_week) >= 6 ? '7 jam/hr' : '8 jam/hr';
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
       },
       {
         accessorFn: (row) => Number(row.employees_count || 0),
         id: 'employees_count',
         header: 'Pegawai',
+        size: 115,
+        minSize: 90,
+        maxSize: 200,
         cell: ({ row }) => {
-          const count = Number(row.original.employees_count || 0);
+          const label = `${Number(row.original.employees_count || 0)} pegawai`;
           return (
-            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
-              {count} pegawai
+            <span
+              className="block truncate text-sm font-medium text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'updated_at',
+        header: 'Diperbarui',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.updated_at);
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
             </span>
           );
         },
@@ -500,6 +692,10 @@ export default function EmployeesPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const typeItem = row.original;
           const inUse = Number(typeItem.employees_count || 0) > 0;

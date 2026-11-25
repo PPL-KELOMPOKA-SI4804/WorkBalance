@@ -224,58 +224,140 @@ export default function ManagerDashboardPage() {
     [kpi, pendingIssuesTotal]
   );
 
-  // Calm Rows: 4 single-line data columns; clicking any row opens full diagnostic sheet
+  // Detailed resizable columns for Prioritas Redistribusi; clicking any row opens full diagnostic sheet
   const employeeColumns = useMemo(
     () => [
       {
         accessorKey: 'full_name',
         header: 'Pegawai',
+        size: 225,
+        minSize: 150,
+        maxSize: 380,
         cell: ({ row }) => {
           const emp = row.original;
           return (
-            <div className="flex items-center gap-2.5">
-              <Avatar className="size-7 border border-border">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar className="size-7 shrink-0 border border-border">
                 <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
                   {getInitials(emp.full_name)}
                 </AvatarFallback>
               </Avatar>
-              <span className="truncate font-medium text-foreground" title={emp.full_name}>
-                {emp.full_name}
-              </span>
-              {emp.department?.code && (
-                <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
-                  {emp.department.code}
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate font-medium text-foreground" title={emp.full_name}>
+                  {emp.full_name}
                 </span>
-              )}
+                {emp.employee_code && (
+                  <span
+                    className="truncate font-mono text-xs text-muted-foreground"
+                    title={emp.employee_code}
+                  >
+                    {emp.employee_code}
+                  </span>
+                )}
+              </div>
             </div>
           );
         },
       },
       {
+        accessorFn: (row) =>
+          row.department
+            ? `${row.department.code || ''} ${row.department.name || ''}`.trim()
+            : '-',
+        id: 'department',
+        header: 'Departemen',
+        size: 165,
+        minSize: 110,
+        maxSize: 280,
+        cell: ({ row }) => {
+          const dept = row.original.department;
+          const deptTitle = dept ? [dept.code, dept.name].filter(Boolean).join(' · ') : '-';
+          return (
+            <div className="flex min-w-0 items-center gap-1.5" title={deptTitle}>
+              {dept?.code && (
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  {dept.code}
+                </span>
+              )}
+              <span className="truncate text-xs font-medium text-foreground">
+                {dept?.name || '-'}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'position_title',
+        header: 'Jabatan',
+        size: 195,
+        minSize: 125,
+        maxSize: 320,
+        cell: ({ row }) => {
+          const title = row.original.position_title || '-';
+          return (
+            <span className="block truncate text-xs text-muted-foreground" title={title}>
+              {title}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: 'weekly_hours_total',
-        header: 'Jam',
-        meta: { className: 'hidden sm:table-cell' },
+        header: 'Jam Mingguan',
+        size: 135,
+        minSize: 105,
+        maxSize: 200,
         cell: ({ row }) => {
           const emp = row.original;
           return (
-            <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
               {formatScore(emp.weekly_hours_total, 1)} / {formatScore(emp.normal_weekly_hours, 0)}j
             </span>
           );
         },
       },
       {
-        accessorKey: 'final_score',
-        header: 'Skor',
+        accessorKey: 'overtime_hours_total',
+        header: 'Lembur',
+        size: 105,
+        minSize: 84,
+        maxSize: 160,
         cell: ({ row }) => (
-          <span className="text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {formatScore(row.original.overtime_hours_total, 1)}j
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'active_assignments_count',
+        header: 'Tugas Aktif',
+        size: 115,
+        minSize: 90,
+        maxSize: 170,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+            {row.original.active_assignments_count ?? 0} tugas
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'final_score',
+        header: 'Skor Akhir',
+        size: 105,
+        minSize: 84,
+        maxSize: 150,
+        cell: ({ row }) => (
+          <span className="block truncate text-xs font-semibold text-foreground whitespace-nowrap tabular-nums">
             {formatScore(row.original.final_score, 1)}
           </span>
         ),
       },
       {
         accessorKey: 'risk_category',
-        header: 'Risiko',
+        header: 'Kategori Risiko',
+        size: 160,
+        minSize: 120,
+        maxSize: 220,
         cell: ({ row }) => {
           const emp = row.original;
           return (
@@ -354,9 +436,9 @@ export default function ManagerDashboardPage() {
               value={periodMonth || activeFiltersMeta.period_month || ''}
               onChange={setPeriodMonth}
               clearable={Boolean(periodMonth)}
-              placeholder="MM-YYYY"
+              placeholder="Pilih bulan"
               ariaLabel="Filter periode bulan"
-              className="w-36"
+              className="w-44"
             />
 
             <AnimatePresence initial={false}>
@@ -505,7 +587,7 @@ export default function ManagerDashboardPage() {
                   {departmentComparison.map((dept) => (
                     <div
                       key={dept.department_id}
-                      className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-muted/35"
+                      className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-hover-surface"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
@@ -701,7 +783,7 @@ export default function ManagerDashboardPage() {
                       <Link
                         key={item.id}
                         to={resolveContextualRoute(item.action_route)}
-                        className="group flex flex-col gap-1.5 px-6 py-4 transition-colors hover:bg-muted/40"
+                        className="group flex flex-col gap-1.5 px-6 py-4 transition-all duration-150 hover:bg-hover-surface hover:shadow-[inset_3px_0_0_var(--primary)]"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
@@ -765,7 +847,10 @@ export default function ManagerDashboardPage() {
                     </div>
                   ) : (
                     issuesSummary.active_issues.map((issue) => (
-                      <div key={issue.id} className="flex flex-col gap-1 px-6 py-3.5">
+                      <div
+                        key={issue.id}
+                        className="flex flex-col gap-1 px-6 py-3.5 transition-colors hover:bg-hover-surface/70"
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate text-xs font-semibold text-foreground">
                             {issue.category}

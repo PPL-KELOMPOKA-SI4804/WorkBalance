@@ -13,6 +13,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
+import { formatDate } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { departmentService } from '@/services/departmentService';
@@ -234,18 +235,27 @@ export default function DepartmentsPage({ readOnly = false }) {
       {
         accessorKey: 'code',
         header: 'Kode',
+        size: 96,
+        minSize: 76,
+        maxSize: 160,
         cell: ({ row }) => (
-          <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground whitespace-nowrap">
+          <span
+            className="inline-flex max-w-full items-center truncate rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground tabular-nums"
+            title={row.original.code}
+          >
             {row.original.code}
           </span>
         ),
       },
       {
         accessorKey: 'name',
-        header: 'Departemen',
+        header: 'Nama Departemen',
+        size: 220,
+        minSize: 140,
+        maxSize: 420,
         cell: ({ row }) => (
           <span
-            className="block max-w-[260px] truncate text-sm font-medium text-foreground"
+            className="block truncate text-sm font-medium text-foreground"
             title={row.original.name}
           >
             {row.original.name}
@@ -256,18 +266,46 @@ export default function DepartmentsPage({ readOnly = false }) {
         accessorFn: (row) => row.manager?.full_name || '',
         id: 'manager',
         header: 'Manajer',
-        meta: { className: 'hidden sm:table-cell' },
+        size: 210,
+        minSize: 130,
+        maxSize: 360,
         cell: ({ row }) => {
           const manager = row.original.manager;
           if (!manager) {
-            return <StatusBadge tone="warning" label="Belum Ditentukan" />;
+            return <span className="block truncate text-sm text-muted-foreground">-</span>;
           }
           return (
+            <div className="flex min-w-0 items-center gap-2">
+              <Avatar className="size-7 shrink-0 border border-border">
+                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                  {getInitials(manager.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <span
+                className="min-w-0 truncate text-sm text-foreground"
+                title={manager.full_name}
+              >
+                {manager.full_name}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.description || '',
+        id: 'description',
+        header: 'Deskripsi',
+        size: 260,
+        minSize: 140,
+        maxSize: 520,
+        cell: ({ row }) => {
+          const desc = row.original.description;
+          return (
             <span
-              className="block max-w-[200px] truncate text-sm text-foreground"
-              title={manager.full_name}
+              className="block truncate text-xs text-muted-foreground"
+              title={desc || undefined}
             >
-              {manager.full_name}
+              {desc || '-'}
             </span>
           );
         },
@@ -276,11 +314,58 @@ export default function DepartmentsPage({ readOnly = false }) {
         accessorFn: (row) => Number(row.employees_count || 0),
         id: 'employees_count',
         header: 'Pegawai',
+        size: 130,
+        minSize: 96,
+        maxSize: 220,
         cell: ({ row }) => {
-          const employeesCount = Number(row.original.employees_count || 0);
+          const total = Number(row.original.employees_count || 0);
+          const hasActiveCount = row.original.active_employees_count != null;
+          const label = hasActiveCount
+            ? `${Number(row.original.active_employees_count)} / ${total} aktif`
+            : `${total}`;
           return (
-            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
-              {employeesCount} pegawai
+            <span
+              className="block truncate text-sm font-medium text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.tasks_count || 0),
+        id: 'tasks_count',
+        header: 'Tugas',
+        size: 96,
+        minSize: 76,
+        maxSize: 180,
+        cell: ({ row }) => {
+          const count = Number(row.original.tasks_count || 0);
+          return (
+            <span
+              className="block truncate text-sm text-foreground tabular-nums"
+              title={`${count} tugas`}
+            >
+              {count}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'created_at',
+        header: 'Dibuat',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.created_at);
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
             </span>
           );
         },
@@ -292,6 +377,10 @@ export default function DepartmentsPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const dept = row.original;
           const inUse =

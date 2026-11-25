@@ -305,10 +305,13 @@ export default function TrainingsPage() {
     () => [
       {
         accessorKey: 'title',
-        header: 'Program',
+        header: 'Judul Program',
+        size: 270,
+        minSize: 160,
+        maxSize: 480,
         cell: ({ row }) => (
           <span
-            className="block max-w-[260px] truncate text-sm font-medium text-foreground"
+            className="block truncate text-sm font-medium text-foreground"
             title={row.original.title}
           >
             {row.original.title}
@@ -316,18 +319,105 @@ export default function TrainingsPage() {
         ),
       },
       {
+        accessorKey: 'category',
+        header: 'Kategori',
+        size: 185,
+        minSize: 125,
+        maxSize: 320,
+        cell: ({ row }) => {
+          const category = row.original.category;
+          return (
+            <span
+              className="block truncate text-sm text-foreground"
+              title={category || undefined}
+            >
+              {category || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'provider',
+        header: 'Penyelenggara',
+        size: 200,
+        minSize: 130,
+        maxSize: 340,
+        cell: ({ row }) => {
+          const provider = row.original.provider;
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground"
+              title={provider || undefined}
+            >
+              {provider || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.duration_hours || 0),
+        id: 'duration_hours',
+        header: 'Durasi',
+        size: 105,
+        minSize: 84,
+        maxSize: 180,
+        cell: ({ row }) => {
+          const hours = Number(row.original.duration_hours || 0);
+          const formattedHours = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+          const label = `${formattedHours} jam`;
+          return (
+            <span
+              className="block truncate text-sm font-medium text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: 'start_date',
-        header: 'Mulai',
-        cell: ({ row }) => (
-          <span className="text-sm text-foreground whitespace-nowrap tabular-nums">
-            {formatDate(row.original.start_date)}
-          </span>
-        ),
+        header: 'Tanggal Mulai',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.start_date);
+          return (
+            <span
+              className="block truncate text-sm text-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'end_date',
+        header: 'Tanggal Selesai',
+        size: 165,
+        minSize: 130,
+        maxSize: 240,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.end_date);
+          return (
+            <span
+              className="block truncate text-sm text-muted-foreground tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
       },
       {
         accessorFn: (row) => getScheduleMeta(row.start_date, row.end_date).label,
         id: 'schedule_status',
-        header: 'Status',
+        header: 'Status Jadwal',
+        size: 140,
+        minSize: 110,
+        maxSize: 210,
         cell: ({ row }) => {
           const scheduleMeta = getScheduleMeta(row.original.start_date, row.original.end_date);
           return <StatusBadge tone={scheduleMeta.tone} label={scheduleMeta.label} />;
@@ -337,12 +427,26 @@ export default function TrainingsPage() {
         accessorFn: (row) => Number(row.participations_count || 0),
         id: 'participations_count',
         header: 'Peserta',
-        meta: { className: 'hidden sm:table-cell' },
+        size: 135,
+        minSize: 96,
+        maxSize: 220,
         cell: ({ row }) => {
-          const count = Number(row.original.participations_count || 0);
+          const total = Number(row.original.participations_count || 0);
+          const hasCompleted = row.original.completed_participations_count != null;
+          const completed = hasCompleted ? Number(row.original.completed_participations_count) : 0;
+          const label = hasCompleted
+            ? `${total} (${completed} selesai)`
+            : `${total} peserta`;
           return (
-            <span className="text-sm font-medium text-foreground whitespace-nowrap tabular-nums">
-              {count} peserta
+            <span
+              className="block truncate text-sm font-medium text-foreground tabular-nums"
+              title={
+                hasCompleted
+                  ? `${total} peserta, ${completed} selesai`
+                  : `${total} peserta`
+              }
+            >
+              {label}
             </span>
           );
         },
@@ -351,6 +455,10 @@ export default function TrainingsPage() {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const item = row.original;
           const inUse = Number(item.participations_count || 0) > 0;
