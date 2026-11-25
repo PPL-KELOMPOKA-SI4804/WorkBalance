@@ -32,7 +32,7 @@ export function RowActionsMenu({
             variant="ghost"
             size="icon-sm"
             aria-label={ariaLabel}
-            className="rounded-lg text-muted-foreground hover:text-foreground"
+            className="rounded-lg text-muted-foreground transition-all duration-150 hover:bg-hover-surface-strong hover:text-foreground"
           >
             <MoreHorizontal className="size-4" />
           </Button>

@@ -264,10 +264,10 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => applyDemoAccount(demo)}
                     className={cn(
-                      'flex flex-col items-start gap-1.5 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                      'flex flex-col items-start gap-1.5 rounded-xl border px-3 py-2.5 text-left transition-all duration-150',
                       selected
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border bg-card hover:border-foreground/25 hover:bg-muted/40'
+                        ? 'border-primary bg-primary/10 shadow-[inset_0_0_0_1px_var(--primary)]'
+                        : 'border-border bg-card hover:-translate-y-0.5 hover:border-hover-border hover:bg-hover-surface hover:shadow-xs dark:hover:shadow-none'
                     )}
                   >
                     <StatusBadge tone={demo.tone} label={demo.label} />

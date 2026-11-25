@@ -19,16 +19,16 @@ export function KpiStatCard({
     <div
       data-slot="kpi-stat-card"
       className={cn(
-        'flex flex-col justify-between gap-3.5 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20',
+        'group flex flex-col justify-between gap-3.5 rounded-2xl border border-border bg-card p-5 transition-all duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:border-hover-border hover:bg-hover-surface/45 hover:shadow-[0_10px_24px_-16px_oklch(0.215_0.028_260_/_35%)] dark:hover:bg-hover-surface/55 dark:hover:shadow-none',
         className
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground text-balance">
+        <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground text-balance">
           {label}
         </span>
         {Icon && (
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-all duration-180 group-hover:scale-105 group-hover:bg-primary/15 group-hover:text-primary">
             <Icon aria-hidden="true" className="size-4" />
           </span>
         )}

@@ -42,7 +42,7 @@ function Calendar({
         day: 'relative size-8 p-0 text-center text-xs focus-within:relative focus-within:z-20',
         day_button: cn(
           buttonVariants({ variant: 'ghost' }),
-          'size-8 rounded-lg p-0 text-xs font-normal tabular-nums aria-selected:opacity-100'
+          'size-8 rounded-lg p-0 text-xs font-normal tabular-nums transition-all duration-150 hover:scale-105 hover:bg-hover-surface-strong hover:text-foreground aria-selected:opacity-100'
         ),
         selected:
           '[&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:hover:bg-primary [&>button]:hover:text-primary-foreground [&>button]:font-medium',

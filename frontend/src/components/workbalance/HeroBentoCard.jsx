@@ -36,13 +36,13 @@ export function HeroBentoCard({
             <div
               key={item.key || item.label || index}
               className={cn(
-                'flex flex-col justify-between gap-4 p-5 sm:p-6',
+                'group flex flex-col justify-between gap-4 p-5 transition-colors duration-180 hover:bg-hover-surface/55 sm:p-6',
                 CELL_BORDER_CLASSES[index] || ''
               )}
             >
               <div className="flex items-center justify-between gap-2">
                 {Icon && (
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-all duration-180 group-hover:scale-105 group-hover:bg-primary/15 group-hover:text-primary">
                     <Icon aria-hidden="true" className="size-4" />
                   </span>
                 )}

@@ -15,6 +15,10 @@
   --color-hero-primary: var(--hero-primary);
   --color-hero-primary-foreground: var(--hero-primary-foreground);
 
+  --color-hover-surface: var(--hover-surface);
+  --color-hover-surface-strong: var(--hover-surface-strong);
+  --color-hover-border: var(--hover-border);
+
   --color-success: var(--success);
   --color-success-subtle: var(--success-subtle);
   --color-success-border: var(--success-border);
@@ -114,6 +118,11 @@
   --ring: oklch(0.538 0.150 238 / 42%);
   --scrollbar-thumb: oklch(0.830 0.008 250);
 
+  /* Tactile Hover Tokens (Light: crisp cool slate-blue tint clearly visible on #FFFFFF cards) */
+  --hover-surface: oklch(0.924 0.018 244);
+  --hover-surface-strong: oklch(0.888 0.026 242);
+  --hover-border: oklch(0.755 0.058 240);
+
   /* Semantic Status Tokens (Light: >= 5.5:1 on subtle pill) */
   --success: oklch(0.455 0.118 162);
   --success-subtle: oklch(0.968 0.028 162);
@@ -191,6 +200,11 @@
   --input: oklch(0.332 0.022 262);
   --ring: oklch(0.715 0.136 237 / 45%);
   --scrollbar-thumb: oklch(0.355 0.022 262);
+
+  /* Tactile Hover Tokens (Dark: luminous slate-blue lift clearly visible on #1A1F2C cards) */
+  --hover-surface: oklch(0.304 0.032 254);
+  --hover-surface-strong: oklch(0.348 0.038 250);
+  --hover-border: oklch(0.475 0.065 245);
 
   /* Semantic Status Tokens (Dark: verified >= 4.8:1 WCAG AA+ on dark card subtle pill) */
   --success: oklch(0.850 0.125 162);

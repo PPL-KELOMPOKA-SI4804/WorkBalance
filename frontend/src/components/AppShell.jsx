@@ -110,11 +110,11 @@ function SidebarNav({
                   aria-current={isDashboardActive ? 'page' : undefined}
                   aria-label={dashboardItem.label}
                   className={cn(
-                    'flex size-10 mx-auto items-center justify-center rounded-xl transition-all',
-                    'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)]',
+                    'flex size-10 mx-auto items-center justify-center rounded-xl transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                    'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)] hover:-translate-y-px hover:brightness-110 hover:shadow-[0_12px_24px_-8px_oklch(0.538_0.152_238_/_68%)] active:translate-y-0',
                     isDashboardActive
                       ? 'shadow-[0_8px_20px_-6px_oklch(0.538_0.152_238_/_55%)] ring-2 ring-primary/25'
-                      : 'opacity-90 hover:opacity-100'
+                      : 'opacity-92 hover:opacity-100'
                   )}
                 >
                   {DashboardIcon && <DashboardIcon aria-hidden="true" className="size-4" />}
@@ -130,11 +130,11 @@ function SidebarNav({
               onClick={onNavigate}
               aria-current={isDashboardActive ? 'page' : undefined}
               className={cn(
-                'flex h-11 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold transition-all',
-                'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)]',
+                'flex h-11 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)] hover:-translate-y-px hover:brightness-110 hover:shadow-[0_12px_26px_-8px_oklch(0.538_0.152_238_/_68%)] active:translate-y-0',
                 isDashboardActive
                   ? 'shadow-[0_10px_24px_-8px_oklch(0.538_0.152_238_/_60%)]'
-                  : 'opacity-90 hover:opacity-100'
+                  : 'opacity-92 hover:opacity-100'
               )}
             >
               <span className="truncate leading-5">{dashboardItem.label}</span>
@@ -167,10 +167,10 @@ function SidebarNav({
                           aria-current={isActive ? 'page' : undefined}
                           aria-label={item.label}
                           className={cn(
-                            'relative flex size-10 items-center justify-center rounded-xl transition-colors',
+                            'relative flex size-10 items-center justify-center rounded-xl transition-all duration-150',
                             isActive
-                              ? 'bg-sidebar-accent text-primary'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'
+                              ? 'bg-hover-surface text-primary'
+                              : 'text-sidebar-foreground hover:scale-105 hover:bg-hover-surface hover:text-primary'
                           )}
                         >
                           <Icon aria-hidden="true" className="size-4" />
@@ -193,10 +193,10 @@ function SidebarNav({
                 onClick={() => toggleGroup(group.id)}
                 aria-expanded={isOpen}
                 className={cn(
-                  'group flex h-10 w-full items-center justify-between gap-2.5 rounded-xl px-3 text-sm font-medium transition-colors',
+                  'group flex h-10 w-full items-center justify-between gap-2.5 rounded-xl px-3 text-sm font-medium transition-all duration-150 hover:bg-hover-surface hover:text-foreground',
                   groupHasActive
                     ? 'text-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground'
                 )}
               >
                 <span className="flex min-w-0 items-center gap-3">
@@ -204,10 +204,10 @@ function SidebarNav({
                     <GroupIcon
                       aria-hidden="true"
                       className={cn(
-                        'size-4 shrink-0 transition-colors',
+                        'size-4 shrink-0 transition-all duration-150 group-hover:scale-105 group-hover:text-primary',
                         groupHasActive
                           ? 'text-primary'
-                          : 'text-muted-foreground group-hover:text-foreground'
+                          : 'text-muted-foreground'
                       )}
                     />
                   )}
@@ -216,7 +216,7 @@ function SidebarNav({
                 <ChevronDown
                   aria-hidden="true"
                   className={cn(
-                    'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                    'size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
                     isOpen && 'rotate-180'
                   )}
                 />
@@ -242,10 +242,10 @@ function SidebarNav({
                             onClick={onNavigate}
                             aria-current={isActive ? 'page' : undefined}
                             className={cn(
-                              'relative flex items-center rounded-xl px-4 py-2 text-sm transition-colors',
+                              'group relative flex items-center rounded-xl px-4 py-2 text-sm transition-all duration-150',
                               isActive
                                 ? 'font-semibold text-foreground'
-                                : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground hover:bg-hover-surface hover:text-foreground hover:shadow-[inset_3px_0_0_var(--primary)]'
                             )}
                           >
                             {isActive && (
@@ -257,10 +257,10 @@ function SidebarNav({
                                 }
                                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                                 aria-hidden="true"
-                                className="absolute inset-0 rounded-xl bg-sidebar-accent"
+                                className="absolute inset-0 rounded-xl bg-hover-surface shadow-[inset_3px_0_0_var(--primary)]"
                               />
                             )}
-                            <span className="relative z-10 truncate leading-5">
+                            <span className="relative z-10 truncate leading-5 transition-transform duration-150 group-hover:translate-x-0.5">
                               {item.label}
                             </span>
                           </Link>
@@ -484,7 +484,7 @@ export default function AppShell({
               type="button"
               onClick={() => setCommandOpen(true)}
               aria-label="Cari modul atau halaman"
-              className="hidden h-10 w-60 items-center justify-between gap-2 rounded-xl border border-border bg-muted/65 px-3.5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex xl:w-72"
+              className="hidden h-10 w-60 items-center justify-between gap-2 rounded-xl border border-border bg-muted/65 px-3.5 text-sm text-muted-foreground transition-all duration-150 hover:border-hover-border hover:bg-hover-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex xl:w-72"
             >
               <span className="inline-flex min-w-0 items-center gap-2.5 truncate">
                 <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
@@ -534,7 +534,7 @@ export default function AppShell({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="-mr-1.5 flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="-mr-1.5 flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-all duration-150 hover:bg-hover-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Avatar className="size-8 border border-border">
                     <AvatarFallback className="bg-primary/12 text-xs font-semibold text-primary">
