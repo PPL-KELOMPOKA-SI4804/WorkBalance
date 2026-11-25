@@ -37,13 +37,13 @@ export function FormSheet({
           event.currentTarget?.focus?.({ preventScroll: true });
         }}
         className={cn(
-          'flex w-full flex-col gap-0 p-0 focus:outline-none',
+          'flex w-full flex-col gap-0 border-l border-border bg-card p-0 focus:outline-none',
           SIZE_CLASSES[size] || SIZE_CLASSES.md,
           className
         )}
       >
-        <SheetHeader className="border-b border-border px-6 py-5">
-          <SheetTitle className="text-base font-semibold tracking-[-0.015em] text-foreground text-balance">
+        <SheetHeader className="border-b border-border px-6 pt-6 pb-5">
+          <SheetTitle className="text-lg font-bold tracking-[-0.02em] text-foreground text-balance">
             {title}
           </SheetTitle>
           {description && (
@@ -53,7 +53,7 @@ export function FormSheet({
           )}
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {loading ? (
             <div className="flex flex-col gap-4" aria-busy="true" aria-label="Memuat detail">
               <Skeleton className="h-20 w-full rounded-xl" />
@@ -69,7 +69,7 @@ export function FormSheet({
         </div>
 
         {footer && (
-          <SheetFooter className="border-t border-border bg-background px-6 py-4 sm:flex-row sm:justify-end">
+          <SheetFooter className="border-t border-border bg-card px-6 py-4 sm:flex-row sm:justify-end sm:gap-2.5">
             {footer}
           </SheetFooter>
         )}
