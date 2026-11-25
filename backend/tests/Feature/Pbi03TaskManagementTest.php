@@ -35,7 +35,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_manager_can_list_and_filter_tasks_with_summary_metrics(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
 
         $response = $this->withToken($token)
@@ -88,7 +88,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_manager_can_create_view_update_and_delete_task(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $opsDept = Department::where('code', 'OPS')->firstOrFail();
         $managerEmployee = Employee::where('employee_code', 'EMP-002')->firstOrFail();
 
@@ -145,7 +145,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_admin_can_create_task(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $hrdDept = Department::where('code', 'HRD')->firstOrFail();
 
         $this->withToken($token)
@@ -163,7 +163,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_task_validation_rejects_invalid_hours_priority_status_and_department(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
         $existingTask = Task::firstOrFail();
 
@@ -200,7 +200,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_cannot_delete_task_with_active_assignments_or_recorded_work_logs(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $managerEmployee = Employee::where('employee_code', 'EMP-002')->firstOrFail();
         $assignee = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $engDept = Department::where('code', 'ENG')->firstOrFail();
@@ -266,7 +266,7 @@ class Pbi03TaskManagementTest extends TestCase
 
     public function test_rbac_employee_has_read_only_access_to_tasks(): void
     {
-        $token = $this->employeeUser->createToken('emp')->plainTextToken;
+        $token = $this->issueJwt($this->employeeUser);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
         $task = Task::firstOrFail();
 

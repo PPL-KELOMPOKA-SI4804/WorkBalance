@@ -36,7 +36,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_employee_can_list_surveys_submit_and_update_own_response(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $novSurvey = WorkSurvey::where('period_month', '2026-11')->firstOrFail();
 
         $listResponse = $this->withToken($token)
@@ -91,7 +91,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_employee_cannot_submit_duplicate_response_or_submit_to_inactive_survey(): void
     {
-        $token = $this->employee2->createToken('emp2')->plainTextToken;
+        $token = $this->issueJwt($this->employee2);
         $octSurvey = WorkSurvey::where('period_month', '2026-10')->firstOrFail();
         $novSurvey = WorkSurvey::where('period_month', '2026-11')->firstOrFail();
 
@@ -131,7 +131,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_manager_receives_strictly_aggregated_metrics_and_privacy_guard_blocks_individual_queries(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $octSurvey = WorkSurvey::where('period_month', '2026-10')->firstOrFail();
         $novSurvey = WorkSurvey::where('period_month', '2026-11')->firstOrFail();
 
@@ -185,7 +185,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_manager_can_create_update_and_delete_empty_survey(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
 
         $createResponse = $this->withToken($token)
             ->postJson('/api/v1/surveys', [
@@ -221,7 +221,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_admin_cannot_delete_survey_with_existing_responses(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $octSurvey = WorkSurvey::where('period_month', '2026-10')->firstOrFail();
 
         $this->withToken($token)
@@ -234,7 +234,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_survey_validation_rejects_out_of_range_likert_scores_and_invalid_period(): void
     {
-        $adminToken = $this->admin->createToken('adm')->plainTextToken;
+        $adminToken = $this->issueJwt($this->admin);
 
         $this->withToken($adminToken)
             ->postJson('/api/v1/surveys', [
@@ -252,7 +252,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
 
     public function test_employee_response_validation_rejects_out_of_range_likert_scores(): void
     {
-        $empToken = $this->employee1->createToken('emp')->plainTextToken;
+        $empToken = $this->issueJwt($this->employee1);
         $novSurvey = WorkSurvey::where('period_month', '2026-11')->firstOrFail();
 
         $this->withToken($empToken)
@@ -276,7 +276,7 @@ class Pbi07WorkSurveyManagementTest extends TestCase
         $this->getJson('/api/v1/surveys')->assertUnauthorized();
         $this->postJson('/api/v1/surveys', [])->assertUnauthorized();
 
-        $empToken = $this->employee1->createToken('emp')->plainTextToken;
+        $empToken = $this->issueJwt($this->employee1);
 
         $this->withToken($empToken)->postJson('/api/v1/surveys', [
             'title' => 'Blocked Employee Survey',

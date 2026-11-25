@@ -17,12 +17,13 @@ use App\Http\Controllers\Api\V1\WorkplaceIssueController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    // Public Auth routes
+    // Public Auth routes (JWT HS256)
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 
-    // Protected routes
-    Route::middleware('auth:sanctum')->group(function () {
+    // Protected routes (Strict JWT Guard)
+    Route::middleware('auth:jwt')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::delete('/auth/logout', [AuthController::class, 'logout']);
 

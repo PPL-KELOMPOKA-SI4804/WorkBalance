@@ -33,7 +33,7 @@ class Pbi02DepartmentManagementTest extends TestCase
 
     public function test_admin_can_list_and_filter_departments_with_employee_counts_and_manager(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         // List all seeded departments (ENG, OPS, HRD)
         $listResponse = $this->withToken($token)
@@ -72,7 +72,7 @@ class Pbi02DepartmentManagementTest extends TestCase
 
     public function test_admin_can_create_view_update_and_delete_department(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $managerEmployee = Employee::where('employee_code', 'EMP-002')->firstOrFail();
 
         // Create department
@@ -126,7 +126,7 @@ class Pbi02DepartmentManagementTest extends TestCase
 
     public function test_department_validation_rejects_duplicate_code_and_invalid_manager(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         // Duplicate code (ENG already exists)
         $this->withToken($token)
@@ -161,7 +161,7 @@ class Pbi02DepartmentManagementTest extends TestCase
 
     public function test_admin_cannot_delete_department_referenced_by_employees_or_tasks(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         // Referenced by employees (ENG has seeded employees)
         $eng = Department::where('code', 'ENG')->firstOrFail();
@@ -202,7 +202,7 @@ class Pbi02DepartmentManagementTest extends TestCase
 
     public function test_rbac_manager_has_read_only_access_to_departments(): void
     {
-        $managerToken = $this->manager->createToken('mgr')->plainTextToken;
+        $managerToken = $this->issueJwt($this->manager);
         $eng = Department::where('code', 'ENG')->firstOrFail();
 
         $this->withToken($managerToken)
@@ -242,7 +242,7 @@ class Pbi02DepartmentManagementTest extends TestCase
         $this->postJson('/api/v1/departments', [])->assertUnauthorized();
 
         // Employee (403)
-        $employeeToken = $this->employeeUser->createToken('emp')->plainTextToken;
+        $employeeToken = $this->issueJwt($this->employeeUser);
 
         $this->withToken($employeeToken)->getJson('/api/v1/departments')->assertForbidden();
         $this->withToken($employeeToken)->getJson("/api/v1/departments/{$eng->id}")->assertForbidden();
