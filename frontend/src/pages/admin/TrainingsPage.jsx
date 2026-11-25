@@ -390,7 +390,7 @@ export default function TrainingsPage() {
 
   return (
     <AppShell title="Katalog Pelatihan" breadcrumb="Kesejahteraan">
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Summary Cards */}
         {loading && !hasLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -463,12 +463,22 @@ export default function TrainingsPage() {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={resetFilters} className="rounded-lg">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-9 rounded-xl"
+                >
                   <RotateCcw data-icon="inline-start" className="size-4" />
                   Setel Ulang Filter
                 </Button>
               )}
-              <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+              <Button
+                variant="cta"
+                size="sm"
+                onClick={openCreateSheet}
+                className="h-9 rounded-xl px-3.5"
+              >
                 <Plus data-icon="inline-start" className="size-4" />
                 Tambah Pelatihan
               </Button>
@@ -483,8 +493,7 @@ export default function TrainingsPage() {
               >
                 <SelectTrigger
                   id="training-filter-schedule"
-                  size="sm"
-                  className="w-40 rounded-lg bg-background text-xs"
+                  className="h-9 w-40 rounded-xl bg-background text-xs data-[size=default]:h-9"
                   aria-label="Filter Status Jadwal"
                 >
                   <SelectValue placeholder="Semua Jadwal" />
@@ -506,8 +515,7 @@ export default function TrainingsPage() {
               >
                 <SelectTrigger
                   id="training-filter-category"
-                  size="sm"
-                  className="w-48 rounded-lg bg-background text-xs"
+                  className="h-9 w-48 rounded-xl bg-background text-xs data-[size=default]:h-9"
                   aria-label="Filter Kategori Pelatihan"
                 >
                   <SelectValue placeholder="Semua Kategori" />
@@ -533,7 +541,12 @@ export default function TrainingsPage() {
                     exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <Button variant="ghost" size="sm" onClick={resetFilters} className="rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="h-9 rounded-xl"
+                    >
                       <RotateCcw data-icon="inline-start" className="size-4" />
                       Reset
                     </Button>
@@ -543,7 +556,12 @@ export default function TrainingsPage() {
             </div>
           }
           actionsSlot={
-            <Button size="sm" onClick={openCreateSheet} className="rounded-lg">
+            <Button
+              variant="cta"
+              size="sm"
+              onClick={openCreateSheet}
+              className="h-9 rounded-xl px-3.5"
+            >
               <Plus data-icon="inline-start" className="size-4" />
               Tambah Pelatihan
             </Button>
@@ -571,19 +589,20 @@ export default function TrainingsPage() {
               type="button"
               variant="outline"
               onClick={() => setDetailSheetOpen(false)}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Tutup
             </Button>
             {selectedTraining && (
               <Button
                 type="button"
+                variant="cta"
                 onClick={() => {
                   const target = selectedTraining;
                   setDetailSheetOpen(false);
                   openEditSheet(target);
                 }}
-                className="rounded-lg"
+                className="rounded-xl"
               >
                 <Edit3 data-icon="inline-start" className="size-4" />
                 Ubah Pelatihan
@@ -606,7 +625,7 @@ export default function TrainingsPage() {
                   />
                 )}
               </div>
-              <h4 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              <h4 className="text-base font-bold tracking-[-0.02em] text-foreground">
                 {selectedTraining.title}
               </h4>
             </div>
@@ -734,15 +753,16 @@ export default function TrainingsPage() {
               variant="outline"
               onClick={() => setFormSheetOpen(false)}
               disabled={submitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               Batal
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="training-form"
               disabled={submitting}
-              className="rounded-lg"
+              className="rounded-xl"
             >
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting
@@ -764,7 +784,7 @@ export default function TrainingsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
-                className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -774,8 +794,8 @@ export default function TrainingsPage() {
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-title" className="text-xs font-medium">
-                Judul Program Pelatihan
+              <Label htmlFor="training-title" className="text-xs font-semibold">
+                Judul Program Pelatihan <span className="text-danger">*</span>
               </Label>
               <Input
                 id="training-title"
@@ -786,14 +806,14 @@ export default function TrainingsPage() {
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Contoh: Manajemen Beban Kerja & Kepatuhan K3"
-                className="rounded-lg"
+                className="h-10 rounded-xl bg-background"
               />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="training-category" className="text-xs font-medium">
-                  Kategori
+                <Label htmlFor="training-category" className="text-xs font-semibold">
+                  Kategori <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="training-category"
@@ -805,7 +825,7 @@ export default function TrainingsPage() {
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
                   placeholder="Teknis & Rekayasa"
-                  className="rounded-lg"
+                  className="h-10 rounded-xl bg-background"
                 />
                 <datalist id="training-category-options">
                   {categorySuggestions.map((cat) => (
@@ -815,8 +835,8 @@ export default function TrainingsPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="training-duration" className="text-xs font-medium">
-                  Durasi (Jam)
+                <Label htmlFor="training-duration" className="text-xs font-semibold">
+                  Durasi (Jam) <span className="text-danger">*</span>
                 </Label>
                 <Input
                   id="training-duration"
@@ -828,14 +848,14 @@ export default function TrainingsPage() {
                   step="0.5"
                   value={form.duration_hours}
                   onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
-                  className="rounded-lg tabular-nums"
+                  className="h-10 rounded-xl bg-background tabular-nums"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-provider" className="text-xs font-medium">
-                Penyelenggara / Provider
+              <Label htmlFor="training-provider" className="text-xs font-semibold">
+                Penyelenggara / Provider <span className="text-danger">*</span>
               </Label>
               <Input
                 id="training-provider"
@@ -846,7 +866,7 @@ export default function TrainingsPage() {
                 value={form.provider}
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
                 placeholder="Contoh: WorkBalance Tech Academy"
-                className="rounded-lg"
+                className="h-10 rounded-xl bg-background"
               />
             </div>
           </div>
@@ -855,26 +875,28 @@ export default function TrainingsPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-start-date" className="text-xs font-medium">
-                Tanggal Mulai
+              <Label htmlFor="training-start-date" className="text-xs font-semibold">
+                Tanggal Mulai <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="training-start-date"
                 value={form.start_date}
                 onChange={(val) => setForm({ ...form, start_date: val })}
                 ariaLabel="Tanggal Mulai"
+                className="h-10 rounded-xl"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-end-date" className="text-xs font-medium">
-                Tanggal Selesai
+              <Label htmlFor="training-end-date" className="text-xs font-semibold">
+                Tanggal Selesai <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="training-end-date"
                 value={form.end_date}
                 onChange={(val) => setForm({ ...form, end_date: val })}
                 ariaLabel="Tanggal Selesai"
+                className="h-10 rounded-xl"
               />
             </div>
           </div>

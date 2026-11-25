@@ -1,20 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Scale,
   Search,
-  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
+  getDashboardItemForRole,
   getInitials,
   getNavGroupsForRole,
   ROLE_LABELS,
@@ -30,7 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import {
   Sheet,
   SheetContent,
@@ -56,77 +55,225 @@ function readInitialCollapsed() {
   }
 }
 
-function SidebarNav({ groups, pathname, collapsed, onNavigate, layoutScope = 'desktop' }) {
+function SidebarNav({
+  dashboardItem,
+  groups,
+  pathname,
+  collapsed,
+  onNavigate,
+  layoutScope = 'desktop',
+}) {
   const prefersReducedMotion = useReducedMotion();
 
+  // Keep active route's accordion group expanded by default
+  const [openGroups, setOpenGroups] = useState(() => {
+    const initial = {};
+    for (const g of groups) {
+      const hasActive = g.items.some((item) => item.to === pathname);
+      initial[g.id] = hasActive || groups.length <= 2;
+    }
+    return initial;
+  });
+
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const g of groups) {
+        if (g.items.some((item) => item.to === pathname) && !next[g.id]) {
+          next[g.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [groups, pathname]);
+
+  const toggleGroup = (id) => {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const isDashboardActive = dashboardItem && pathname === dashboardItem.to;
+  const DashboardIcon = dashboardItem?.icon;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
-      {groups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1">
-          {!collapsed && (
-            <p className="px-2.5 pb-0.5 text-xs font-medium text-muted-foreground">
-              {group.label}
-            </p>
-          )}
-          <nav aria-label={group.label} className="flex flex-col gap-0.5">
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.to;
-              const linkNode = (
+    <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+      {/* HRDashboard Home-V1 Hero Dashboard CTA Pill */}
+      {dashboardItem && (
+        <div>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Link
-                  key={item.to}
-                  to={item.to}
+                  to={dashboardItem.to}
                   onClick={onNavigate}
-                  aria-current={isActive ? 'page' : undefined}
+                  aria-current={isDashboardActive ? 'page' : undefined}
+                  aria-label={dashboardItem.label}
                   className={cn(
-                    'group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors',
-                    collapsed ? 'justify-center p-2' : 'px-2.5 py-2',
-                    isActive
-                      ? 'font-medium text-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    'flex size-10 mx-auto items-center justify-center rounded-xl transition-all',
+                    'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)]',
+                    isDashboardActive
+                      ? 'shadow-[0_8px_20px_-6px_oklch(0.538_0.152_238_/_55%)] ring-2 ring-primary/25'
+                      : 'opacity-90 hover:opacity-100'
                   )}
                 >
-                  {isActive && (
-                    <motion.span
-                      layoutId={prefersReducedMotion ? undefined : `wb-nav-active-${layoutScope}`}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  {DashboardIcon && <DashboardIcon aria-hidden="true" className="size-4" />}
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                {dashboardItem.commandLabel || dashboardItem.label}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link
+              to={dashboardItem.to}
+              onClick={onNavigate}
+              aria-current={isDashboardActive ? 'page' : undefined}
+              className={cn(
+                'flex h-11 w-full items-center justify-between rounded-xl px-4 text-sm font-semibold transition-all',
+                'bg-[var(--hero-primary)] text-[var(--hero-primary-foreground)]',
+                isDashboardActive
+                  ? 'shadow-[0_10px_24px_-8px_oklch(0.538_0.152_238_/_60%)]'
+                  : 'opacity-90 hover:opacity-100'
+              )}
+            >
+              <span className="truncate leading-5">{dashboardItem.label}</span>
+              {DashboardIcon && <DashboardIcon aria-hidden="true" className="size-4 shrink-0" />}
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Collapsible Accordion Navigation Groups */}
+      <div className="flex flex-col gap-1.5">
+        {groups.map((group) => {
+          const GroupIcon = group.icon;
+          const groupHasActive = group.items.some((item) => item.to === pathname);
+          const isOpen = Boolean(openGroups[group.id]);
+
+          // Collapsed Icon Rail: render flat icons with tooltips
+          if (collapsed) {
+            return (
+              <div key={group.id} className="flex flex-col items-center gap-1 py-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.to;
+                  return (
+                    <Tooltip key={item.to}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to={item.to}
+                          onClick={onNavigate}
+                          aria-current={isActive ? 'page' : undefined}
+                          aria-label={item.label}
+                          className={cn(
+                            'relative flex size-10 items-center justify-center rounded-xl transition-colors',
+                            isActive
+                              ? 'bg-sidebar-accent text-primary'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'
+                          )}
+                        >
+                          <Icon aria-hidden="true" className="size-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={8}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          return (
+            <div key={group.id} className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={isOpen}
+                className={cn(
+                  'group flex h-10 w-full items-center justify-between gap-2.5 rounded-xl px-3 text-sm font-medium transition-colors',
+                  groupHasActive
+                    ? 'text-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  {GroupIcon && (
+                    <GroupIcon
                       aria-hidden="true"
-                      className="absolute inset-0 rounded-lg bg-card ring-1 ring-border"
+                      className={cn(
+                        'size-4 shrink-0 transition-colors',
+                        groupHasActive
+                          ? 'text-primary'
+                          : 'text-muted-foreground group-hover:text-foreground'
+                      )}
                     />
                   )}
-                  <Icon
-                    aria-hidden="true"
-                    className={cn(
-                      'relative z-10 size-4 shrink-0 transition-colors',
-                      isActive
-                        ? 'text-primary'
-                        : 'text-muted-foreground group-hover:text-foreground'
-                    )}
-                  />
-                  {!collapsed && (
-                    <span className="relative z-10 truncate leading-5">
-                      {item.label}
-                    </span>
+                  <span className="truncate leading-5">{group.label}</span>
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn(
+                    'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                    isOpen && 'rotate-180'
                   )}
-                </Link>
-              );
+                />
+              </button>
 
-              if (!collapsed) {
-                return linkNode;
-              }
-
-              return (
-                <Tooltip key={item.to}>
-                  <TooltipTrigger asChild>{linkNode}</TooltipTrigger>
-                  <TooltipContent side="right" sideOffset={8}>
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </nav>
-        </div>
-      ))}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.nav
+                    aria-label={group.label}
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-0.5 flex flex-col gap-0.5 pb-1.5 pl-4">
+                      {group.items.map((item) => {
+                        const isActive = pathname === item.to;
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            onClick={onNavigate}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={cn(
+                              'relative flex items-center rounded-xl px-4 py-2 text-sm transition-colors',
+                              isActive
+                                ? 'font-semibold text-foreground'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground'
+                            )}
+                          >
+                            {isActive && (
+                              <motion.span
+                                layoutId={
+                                  prefersReducedMotion
+                                    ? undefined
+                                    : `wb-nav-active-${layoutScope}`
+                                }
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                aria-hidden="true"
+                                className="absolute inset-0 rounded-xl bg-sidebar-accent"
+                              />
+                            )}
+                            <span className="relative z-10 truncate leading-5">
+                              {item.label}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </motion.nav>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -137,7 +284,7 @@ function RegulatoryFooter({ collapsed }) {
       <div className="flex justify-center border-t border-sidebar-border p-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex size-8 items-center justify-center rounded-lg text-muted-foreground">
+            <div className="flex size-9 items-center justify-center rounded-xl text-muted-foreground">
               <Scale className="size-4" />
             </div>
           </TooltipTrigger>
@@ -150,7 +297,7 @@ function RegulatoryFooter({ collapsed }) {
   }
 
   return (
-    <div className="border-t border-sidebar-border px-4 py-3">
+    <div className="border-t border-sidebar-border px-4 py-3.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
         <Scale aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
         <span className="truncate">PP 35/2021 · 40j + maks 18j</span>
@@ -162,9 +309,6 @@ function RegulatoryFooter({ collapsed }) {
 export default function AppShell({
   title,
   breadcrumb,
-  searchValue = '',
-  onSearchChange,
-  searchPlaceholder = 'Cari data...',
   actions,
   children,
 }) {
@@ -179,6 +323,7 @@ export default function AppShell({
   const [collapsed, setCollapsed] = useState(readInitialCollapsed);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const dashboardItem = getDashboardItemForRole(user?.role);
   const navGroups = getNavGroupsForRole(user?.role);
   const fullName = user?.employee?.full_name || user?.email || 'Pengguna';
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Pengguna';
@@ -186,7 +331,6 @@ export default function AppShell({
   const employeeCode = user?.employee?.employee_code;
   const departmentName = user?.employee?.department?.name;
 
-  // Keep breadcrumb concise: only show parent context when it does not repeat the page title
   const normalizedParent = breadcrumb
     ? String(breadcrumb).split('/')[0].trim()
     : '';
@@ -219,29 +363,66 @@ export default function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Desktop Collapsible Sidebar (Second Neutral Surface) */}
+      {/* Desktop Collapsible Sidebar (HRDashboard Home-V1) */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out lg:flex',
-          collapsed ? 'w-[68px]' : 'w-60'
+          collapsed ? 'w-[72px]' : 'w-64'
         )}
       >
         <div
           className={cn(
-            'flex h-14 shrink-0 items-center border-b border-sidebar-border',
-            collapsed ? 'justify-center px-2' : 'px-4'
+            'flex h-[68px] shrink-0 items-center border-b border-sidebar-border',
+            collapsed ? 'justify-center px-2' : 'justify-between px-4'
           )}
         >
           <Link
             to="/"
-            className="flex items-center focus-visible:outline-none"
+            className="flex min-w-0 items-center focus-visible:outline-none"
             aria-label="Beranda WorkBalance"
           >
             <BrandLogo variant={collapsed ? 'mark' : 'horizontal'} />
           </Link>
+
+          {!collapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleCollapsed}
+                  aria-label="Ciutkan sidebar"
+                  className="shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronsLeft className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Ciutkan sidebar</TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
+        {collapsed && (
+          <div className="flex justify-center pt-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleCollapsed}
+                  aria-label="Perluas sidebar"
+                  className="rounded-lg text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Perluas sidebar</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
         <SidebarNav
+          dashboardItem={dashboardItem}
           groups={navGroups}
           pathname={location.pathname}
           collapsed={collapsed}
@@ -257,7 +438,7 @@ export default function AppShell({
           side="left"
           className="flex w-72 flex-col gap-0 bg-sidebar p-0"
         >
-          <SheetHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 py-0">
+          <SheetHeader className="flex h-[68px] flex-row items-center border-b border-sidebar-border px-4 py-0">
             <BrandLogo variant="horizontal" />
             <SheetTitle className="sr-only">Navigasi WorkBalance</SheetTitle>
             <SheetDescription className="sr-only">
@@ -266,6 +447,7 @@ export default function AppShell({
           </SheetHeader>
 
           <SidebarNav
+            dashboardItem={dashboardItem}
             groups={navGroups}
             pathname={location.pathname}
             collapsed={false}
@@ -281,12 +463,12 @@ export default function AppShell({
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col transition-[padding-left] duration-200 ease-out',
-          collapsed ? 'lg:pl-[68px]' : 'lg:pl-60'
+          collapsed ? 'lg:pl-[72px]' : 'lg:pl-64'
         )}
       >
-        {/* Sticky Top Header Bar */}
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2.5">
+        {/* Sticky Top Header Bar (HRDashboard h-[68px] with wide search trigger & ThemeSwitch) */}
+        <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between gap-4 border-b border-border bg-sidebar/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <Button
               variant="ghost"
               size="icon-sm"
@@ -297,87 +479,51 @@ export default function AppShell({
               <Menu className="size-4" />
             </Button>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-ml-1.5 hidden text-muted-foreground hover:text-foreground lg:inline-flex"
-                  onClick={toggleCollapsed}
-                  aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
-                >
-                  {collapsed ? (
-                    <PanelLeftOpen className="size-4" />
-                  ) : (
-                    <PanelLeftClose className="size-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
-              </TooltipContent>
-            </Tooltip>
+            {/* Wide Command Search Trigger (Figma HRDashboard Topbar Signature) */}
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              aria-label="Cari modul atau halaman"
+              className="hidden h-10 w-60 items-center justify-between gap-2 rounded-xl border border-border bg-muted/65 px-3.5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex xl:w-72"
+            >
+              <span className="inline-flex min-w-0 items-center gap-2.5 truncate">
+                <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-xs">Cari modul...</span>
+              </span>
+              <kbd className="shrink-0 rounded-md border border-border bg-card px-1.5 py-0.5 font-mono text-xs leading-none font-normal text-foreground">
+                Ctrl K
+              </kbd>
+            </button>
 
-            <div className="flex min-w-0 items-baseline gap-2">
+            <div className="flex min-w-0 items-baseline gap-2 md:pl-1">
               {showBreadcrumb && (
                 <>
-                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                  <span className="hidden shrink-0 text-xs text-muted-foreground xl:inline">
                     {normalizedParent}
                   </span>
                   <span
                     aria-hidden="true"
-                    className="hidden text-xs text-border sm:inline"
+                    className="hidden text-xs text-border xl:inline"
                   >
                     /
                   </span>
                 </>
               )}
-              <h1 className="truncate text-[15px] leading-tight font-semibold tracking-[-0.015em] text-foreground">
+              <h1 className="truncate text-sm leading-tight font-semibold tracking-[-0.015em] text-foreground sm:text-[15px]">
                 {title}
               </h1>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
-            {onSearchChange && (
-              <div className="relative hidden w-60 md:block lg:w-72">
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="wb-header-search"
-                  name="header_search"
-                  type="text"
-                  value={searchValue}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="h-8 bg-card pl-8 pr-7 text-xs"
-                />
-                {searchValue && (
-                  <button
-                    type="button"
-                    onClick={() => onSearchChange('')}
-                    aria-label="Hapus pencarian"
-                    className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
-
+          <div className="flex shrink-0 items-center gap-3">
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setCommandOpen(true)}
-              className="hidden h-8 gap-2 bg-card px-2.5 text-xs font-normal text-muted-foreground hover:text-foreground sm:inline-flex"
+              aria-label="Cari modul"
+              className="rounded-lg text-muted-foreground hover:text-foreground md:hidden"
             >
-              <Search className="size-3.5" />
-              <span className="hidden xl:inline">Cari modul...</span>
-              <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs leading-none font-normal text-foreground">
-                Ctrl K
-              </kbd>
+              <Search className="size-4" />
             </Button>
 
             {actions}
@@ -388,15 +534,15 @@ export default function AppShell({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="-mr-1.5 flex items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="-mr-1.5 flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Avatar className="size-7 border border-border">
-                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                  <Avatar className="size-8 border border-border">
+                    <AvatarFallback className="bg-primary/12 text-xs font-semibold text-primary">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="hidden max-w-[140px] flex-col sm:flex">
-                    <span className="truncate text-xs leading-tight font-medium text-foreground">
+                    <span className="truncate text-xs leading-tight font-semibold text-foreground">
                       {fullName}
                     </span>
                     <span className="truncate text-xs leading-tight text-muted-foreground">

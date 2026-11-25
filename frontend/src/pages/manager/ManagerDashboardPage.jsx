@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Tooltip,
   TooltipContent,
@@ -50,8 +50,9 @@ import {
   DataTable,
   DecentWorkDonutChart,
   FormSheet,
-  KpiStatCard,
+  HeroBentoCard,
   MonthPicker,
+  PerformanceLineChart,
   StatusBadge,
 } from '@/components/workbalance';
 
@@ -66,27 +67,37 @@ const SEVERITY_TONES = {
 
 const DEPT_CHART_CONFIG = {
   decent_work_score: { label: 'Decent Work', color: 'var(--chart-2)' },
-  avg_workload_risk_score: { label: 'Workload Risk', color: 'var(--chart-1)' },
+  avg_workload_risk_score: { label: 'Workload Risk', color: 'var(--chart-3)' },
 };
 
 function formatScore(val, digits = 1) {
   return Number(val || 0).toFixed(digits);
 }
 
+function getGreetingName(user) {
+  const full = user?.employee?.full_name?.trim();
+  if (full) return full.split(/\s+/)[0];
+  if (user?.role === 'admin') return 'Admin';
+  if (user?.role === 'manager') return 'Manajer';
+  return 'Tim';
+}
+
 export default function ManagerDashboardPage() {
   const { user } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const routePrefix = user?.role === 'admin' ? '/admin' : '/manager';
+  const greetingName = getGreetingName(user);
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [dashboard, setDashboard] = useState(null);
 
-  // Filters
+  // Filters & local view state
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [periodMonth, setPeriodMonth] = useState('');
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState(ALL_VALUE);
+  const [deptView, setDeptView] = useState('chart');
 
   // Slide-over detail sheet for single employee 4 sub-indicators
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -171,6 +182,48 @@ export default function ManagerDashboardPage() {
   const pendingIssuesTotal =
     (kpi.open_issues_count ?? 0) + (kpi.in_progress_issues_count ?? 0);
 
+  const heroMetrics = useMemo(
+    () => [
+      {
+        key: 'workload-risk',
+        label: 'Workload Risk Tim',
+        value: formatScore(kpi.avg_workload_risk_score, 1),
+        unit: '/ 100',
+        icon: Activity,
+        status: kpi.workload_risk_category || 'low',
+      },
+      {
+        key: 'high-risk',
+        label: 'Risiko Tinggi',
+        value: kpi.high_risk_employees_count ?? 0,
+        unit: 'pegawai',
+        icon: ShieldAlert,
+        hint: `Sedang ${kpi.medium_risk_employees_count ?? 0} · Override ${
+          kpi.overridden_employees_count ?? 0
+        }`,
+      },
+      {
+        key: 'decent-work',
+        label: 'Decent Work Score',
+        value: formatScore(kpi.decent_work_score, 1),
+        unit: '/ 100',
+        icon: ShieldCheck,
+        status: kpi.decent_work_category || 'needs_attention',
+      },
+      {
+        key: 'issues-deadlines',
+        label: 'Isu & Tenggat',
+        value: pendingIssuesTotal,
+        unit: 'aktif',
+        icon: MessageSquareWarning,
+        hint: `${kpi.open_issues_count ?? 0} menunggu · ${
+          kpi.urgent_assignments_count ?? 0
+        } tugas ≤7h`,
+      },
+    ],
+    [kpi, pendingIssuesTotal]
+  );
+
   // Calm Rows: 4 single-line data columns; clicking any row opens full diagnostic sheet
   const employeeColumns = useMemo(
     () => [
@@ -238,27 +291,32 @@ export default function ManagerDashboardPage() {
 
   return (
     <AppShell title="Kondisi Kerja Tim" breadcrumb="Analitik">
-      <div className="flex flex-col gap-8">
-        {/* Compact Filter Bar */}
-        <section className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 xl:flex-row xl:items-center">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
-            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-              <Clock className="size-3.5 text-primary" />
-              <span>
-                {formatDate(activeFiltersMeta.week_start)} s.d.{' '}
-                {formatDate(activeFiltersMeta.week_end)}
+      <div className="flex flex-col gap-6">
+        {/* Top Greeting & Compact Filter Row (HRDashboard Home - V1) */}
+        <section className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-bold tracking-[-0.025em] text-foreground">
+              Halo, {greetingName}
+            </h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
+              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                <Clock className="size-3.5 text-primary" />
+                <span>
+                  {formatDate(activeFiltersMeta.week_start)} s.d.{' '}
+                  {formatDate(activeFiltersMeta.week_end)}
+                </span>
               </span>
-            </span>
-            <span>
-              Tercatat{' '}
-              <strong className="font-medium text-foreground">
-                {formatScore(kpi.weekly_logged_hours_total, 1)}j
-              </strong>{' '}
-              · Tugas aktif{' '}
-              <strong className="font-medium text-foreground">
-                {formatScore(kpi.active_estimated_hours_total, 1)}j
-              </strong>
-            </span>
+              <span>
+                Tercatat{' '}
+                <strong className="font-semibold text-foreground">
+                  {formatScore(kpi.weekly_logged_hours_total, 1)}j
+                </strong>{' '}
+                · Tugas aktif{' '}
+                <strong className="font-semibold text-foreground">
+                  {formatScore(kpi.active_estimated_hours_total, 1)}j
+                </strong>
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -266,7 +324,11 @@ export default function ManagerDashboardPage() {
               value={departmentFilter || ALL_VALUE}
               onValueChange={(val) => setDepartmentFilter(val === ALL_VALUE ? '' : val)}
             >
-              <SelectTrigger id="mgr-dept-filter" size="sm" className="w-48 rounded-lg bg-background text-xs">
+              <SelectTrigger
+                id="mgr-dept-filter"
+                size="sm"
+                className="h-9 w-48 rounded-xl bg-card text-xs"
+              >
                 <SelectValue placeholder="Semua Departemen" />
               </SelectTrigger>
               <SelectContent>
@@ -317,13 +379,13 @@ export default function ManagerDashboardPage() {
 
         {/* Error State */}
         {errorMsg && (
-          <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-destructive/30 bg-card p-5 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-danger-border bg-card p-5 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-danger" />
               <div className="flex flex-col gap-0.5">
-                <h2 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm font-semibold text-foreground">
                   Gagal Memuat Kondisi Kerja Tim
-                </h2>
+                </h3>
                 <p className="text-xs text-muted-foreground">{errorMsg}</p>
               </div>
             </div>
@@ -333,17 +395,13 @@ export default function ManagerDashboardPage() {
           </div>
         )}
 
-        {/* Initial Loading Skeleton */}
+        {/* Initial Loading Skeleton matching HeroBentoCard + 8/4 Split */}
         {loading && !dashboard && !errorMsg && (
-          <div className="flex flex-col gap-8">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((card) => (
-                <Skeleton key={card} className="h-32 rounded-2xl" />
-              ))}
-            </div>
+          <div className="flex flex-col gap-6">
+            <Skeleton className="h-[340px] w-full rounded-2xl" />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              <Skeleton className="h-80 rounded-2xl xl:col-span-8" />
-              <Skeleton className="h-80 rounded-2xl xl:col-span-4" />
+              <Skeleton className="h-96 rounded-2xl xl:col-span-8" />
+              <Skeleton className="h-96 rounded-2xl xl:col-span-4" />
             </div>
           </div>
         )}
@@ -351,276 +409,183 @@ export default function ManagerDashboardPage() {
         {/* Success State */}
         {!errorMsg && dashboard && (
           <>
-            {/* Band 1: 4 Executive KPI Cards */}
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <KpiStatCard
-                label="Workload Risk Tim"
-                value={formatScore(kpi.avg_workload_risk_score, 1)}
-                unit="/ 100"
-                icon={Activity}
-                status={kpi.workload_risk_category || 'low'}
-              />
-
-              <KpiStatCard
-                label="Risiko Tinggi"
-                value={kpi.high_risk_employees_count ?? 0}
-                unit="pegawai"
-                icon={ShieldAlert}
-                hint={`Sedang ${kpi.medium_risk_employees_count ?? 0} · Override ${kpi.overridden_employees_count ?? 0}`}
-              />
-
-              <KpiStatCard
-                label="Decent Work Score"
-                value={formatScore(kpi.decent_work_score, 1)}
-                unit="/ 100"
-                icon={ShieldCheck}
-                status={kpi.decent_work_category || 'needs_attention'}
-              />
-
-              <KpiStatCard
-                label="Isu & Tenggat"
-                value={pendingIssuesTotal}
-                unit="aktif"
-                icon={MessageSquareWarning}
-                hint={`${kpi.open_issues_count ?? 0} menunggu · ${kpi.urgent_assignments_count ?? 0} tugas ≤7h`}
-              />
-            </section>
-
-            {/* Band 2: Department Comparison + Priorities & Issues (8 cols) | Decent Work & Survey Aggregate (4 cols) */}
-            <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              <div className="flex flex-col gap-6 xl:col-span-8">
-                {/* Interactive Recharts Department Comparison Card */}
-                <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                  <Tabs defaultValue="chart" className="w-full">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
-                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                        Perbandingan Departemen
-                      </h2>
-                      <TabsList>
-                        <TabsTrigger value="chart" className="text-xs">
-                          Grafik
-                        </TabsTrigger>
-                        <TabsTrigger value="breakdown" className="text-xs">
-                          Rincian ({departmentComparison.length})
-                        </TabsTrigger>
-                      </TabsList>
-                    </div>
-
-                    <TabsContent value="chart" className="m-0 p-5">
-                      {deptChartData.length === 0 ? (
-                        <p className="py-12 text-center text-xs text-muted-foreground">
-                          Belum ada data departemen pada filter ini.
-                        </p>
-                      ) : (
-                        <div className="flex flex-col gap-4">
-                          <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="size-2 rounded-xs bg-[var(--chart-2)]" />
-                              Decent Work
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
-                              Workload Risk
-                            </span>
-                          </div>
-
-                          <ChartContainer
-                            config={DEPT_CHART_CONFIG}
-                            className="h-64 w-full aspect-auto"
-                          >
-                            <BarChart
-                              data={deptChartData}
-                              margin={{ top: 8, right: 12, left: -12, bottom: 0 }}
-                            >
-                              <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="code"
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                              />
-                              <YAxis
-                                domain={[0, 100]}
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                              />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <Bar
-                                dataKey="decent_work_score"
-                                fill="var(--color-decent_work_score)"
-                                radius={[6, 6, 0, 0]}
-                                maxBarSize={32}
-                                isAnimationActive={!prefersReducedMotion}
-                                animationDuration={220}
-                              />
-                              <Bar
-                                dataKey="avg_workload_risk_score"
-                                fill="var(--color-avg_workload_risk_score)"
-                                radius={[6, 6, 0, 0]}
-                                maxBarSize={32}
-                                isAnimationActive={!prefersReducedMotion}
-                                animationDuration={220}
-                              />
-                            </BarChart>
-                          </ChartContainer>
+            {/* Band 1: Hero Bento Card (2x2 Divided KPIs + Department Performance Chart) */}
+            <HeroBentoCard
+              metrics={heroMetrics}
+              chartTitle="Perbandingan Departemen"
+              chartSubtitle={`Ringkasan ${departmentComparison.length} departemen · ${formatMonth(
+                activeFiltersMeta.period_month
+              )}`}
+              chartLegend={
+                deptView === 'chart' && deptChartData.length > 0 ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-[var(--chart-2)]" />
+                      Decent Work
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-[var(--chart-3)]" />
+                      Workload Risk
+                    </span>
+                  </>
+                ) : null
+              }
+              chartActions={
+                <Tabs value={deptView} onValueChange={setDeptView}>
+                  <TabsList className="h-8 rounded-xl">
+                    <TabsTrigger value="chart" className="rounded-lg px-2.5 text-xs">
+                      Grafik
+                    </TabsTrigger>
+                    <TabsTrigger value="breakdown" className="rounded-lg px-2.5 text-xs">
+                      Rincian ({departmentComparison.length})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              }
+            >
+              {deptView === 'chart' ? (
+                deptChartData.length === 0 ? (
+                  <p className="py-16 text-center text-xs text-muted-foreground">
+                    Belum ada data departemen pada filter ini.
+                  </p>
+                ) : deptChartData.length >= 2 ? (
+                  <PerformanceLineChart
+                    data={deptChartData}
+                    xKey="code"
+                    heightClass="h-60"
+                  />
+                ) : (
+                  <ChartContainer
+                    config={DEPT_CHART_CONFIG}
+                    className="h-60 w-full aspect-auto"
+                  >
+                    <BarChart
+                      data={deptChartData}
+                      margin={{ top: 10, right: 12, left: -14, bottom: 0 }}
+                    >
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="code"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={10}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar
+                        dataKey="decent_work_score"
+                        fill="var(--color-decent_work_score)"
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={44}
+                        isAnimationActive={!prefersReducedMotion}
+                        animationDuration={220}
+                      />
+                      <Bar
+                        dataKey="avg_workload_risk_score"
+                        fill="var(--color-avg_workload_risk_score)"
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={44}
+                        isAnimationActive={!prefersReducedMotion}
+                        animationDuration={220}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                )
+              ) : departmentComparison.length === 0 ? (
+                <p className="py-16 text-center text-xs text-muted-foreground">
+                  Belum ada data departemen pada filter ini.
+                </p>
+              ) : (
+                <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+                  {departmentComparison.map((dept) => (
+                    <div
+                      key={dept.department_id}
+                      className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-muted/35"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+                            {dept.code}
+                          </span>
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {dept.name}
+                          </span>
                         </div>
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="breakdown" className="m-0 divide-y divide-border">
-                      {departmentComparison.length === 0 ? (
-                        <p className="p-8 text-center text-xs text-muted-foreground">
-                          Belum ada data departemen pada filter ini.
-                        </p>
-                      ) : (
-                        departmentComparison.map((dept) => (
-                          <div
-                            key={dept.department_id}
-                            className="flex flex-col gap-1.5 px-5 py-3.5 transition-colors hover:bg-muted/30"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
-                                  {dept.code}
-                                </span>
-                                <span className="truncate text-sm font-medium text-foreground">
-                                  {dept.name}
-                                </span>
-                              </div>
-                              <StatusBadge
-                                status={dept.status_category}
-                                label={`Skor ${formatScore(dept.decent_work_score, 1)}`}
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground tabular-nums">
-                              {dept.active_employees_count} pegawai · Risiko{' '}
-                              {formatScore(dept.avg_workload_risk_score, 1)} ·{' '}
-                              {dept.open_issues_count + dept.in_progress_issues_count} isu aktif
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                        <StatusBadge
+                          status={dept.status_category}
+                          label={`Skor ${formatScore(dept.decent_work_score, 1)}`}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {dept.active_employees_count} pegawai · Risiko{' '}
+                        {formatScore(dept.avg_workload_risk_score, 1)} ·{' '}
+                        {dept.open_issues_count + dept.in_progress_issues_count} isu aktif
+                      </p>
+                    </div>
+                  ))}
                 </div>
+              )}
+            </HeroBentoCard>
 
-                {/* Priorities & Active Issues Side-by-Side */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                  <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card lg:col-span-7">
-                    <div className="border-b border-border px-5 py-3.5">
-                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                        Prioritas Tim
-                      </h2>
-                    </div>
-
-                    <div className="flex-1 divide-y divide-border">
-                      {priorityHighlights.map((item) => {
-                        const sev = SEVERITY_TONES[item.severity] || SEVERITY_TONES.info;
-                        return (
-                          <Link
-                            key={item.id}
-                            to={resolveContextualRoute(item.action_route)}
-                            className="group flex flex-col gap-1.5 px-5 py-3.5 transition-colors hover:bg-muted/40"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-                                {item.title}
-                              </span>
-                              <StatusBadge tone={sev.tone} label={sev.label} />
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <p
-                                className="truncate text-xs text-muted-foreground"
-                                title={item.description}
-                              >
-                                {item.description}
-                              </p>
-                              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card lg:col-span-5">
-                    <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
-                      <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                        Masalah Kerja
-                      </h2>
-                      <span className="text-xs font-medium text-success tabular-nums">
-                        {formatScore(issuesSummary.counts.resolution_rate, 0)}% selesai
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 divide-x divide-border border-b border-border py-3 text-center">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Menunggu</p>
-                        <p className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">
-                          {issuesSummary.counts.open}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Ditangani</p>
-                        <p className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">
-                          {issuesSummary.counts.in_progress}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Selesai</p>
-                        <p className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">
-                          {issuesSummary.counts.resolved}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="max-h-72 flex-1 divide-y divide-border overflow-y-auto">
-                      {issuesSummary.active_issues.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-                          <CheckCircle2 className="size-5 text-success" />
-                          <p className="text-xs font-medium text-foreground">
-                            Tidak ada masalah aktif
-                          </p>
-                        </div>
-                      ) : (
-                        issuesSummary.active_issues.map((issue) => (
-                          <div key={issue.id} className="flex flex-col gap-1 px-5 py-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="truncate text-xs font-medium text-foreground">
-                                {issue.category}
-                              </span>
-                              <StatusBadge status={issue.status} />
-                            </div>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {issue.reporter?.full_name || '-'} ·{' '}
-                              <span className="font-mono">{issue.department?.code || '-'}</span>
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="border-t border-border p-3.5">
-                      <Button variant="outline" size="sm" className="w-full" asChild>
-                        <Link to={`${routePrefix}/workplace-issues`}>
-                          Kelola Masalah
-                          <ArrowRight data-icon="inline-end" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+            {/* Band 2: Bottom 8/4 Split (Prioritas Redistribusi Table | Decent Work Donut + NFR-02 Survey) */}
+            <section className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
+              <div className="xl:col-span-8">
+                <DataTable
+                  title="Prioritas Redistribusi"
+                  countLabel="pegawai"
+                  columns={employeeColumns}
+                  data={filteredEmployeePriorities}
+                  loading={loading}
+                  searchValue={search}
+                  onSearchChange={setSearch}
+                  searchPlaceholder="Cari nama atau jabatan..."
+                  pageSize={6}
+                  onRowClick={(emp) => setSelectedEmployee(emp)}
+                  emptyTitle="Tidak ada pegawai sesuai filter"
+                  emptyDescription="Ubah pilihan risiko atau kata kunci pencarian."
+                  actionsSlot={
+                    <Button variant="outline" size="sm" className="rounded-xl" asChild>
+                      <Link to={`${routePrefix}/workload-risk`}>
+                        Matriks Risiko
+                        <ArrowRight data-icon="inline-end" />
+                      </Link>
+                    </Button>
+                  }
+                  filterSlot={
+                    <Select value={riskFilter} onValueChange={setRiskFilter}>
+                      <SelectTrigger
+                        id="mgr-risk-filter"
+                        size="sm"
+                        className="h-9 w-40 rounded-xl bg-background text-xs"
+                      >
+                        <SelectValue placeholder="Semua Risiko" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value={ALL_VALUE}>Semua Risiko</SelectItem>
+                          <SelectItem value="high">Risiko Tinggi</SelectItem>
+                          <SelectItem value="medium">Risiko Sedang</SelectItem>
+                          <SelectItem value="low">Risiko Rendah</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  }
+                />
               </div>
 
-              {/* Right Column: Decent Work Donut + 6 Dimensions + Survey Aggregate */}
               <div className="flex flex-col gap-6 xl:col-span-4">
-                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+                {/* Decent Work Donut + 6 Dimensions Card */}
+                <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6">
                   <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                    <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
                       Decent Work Score
-                    </h2>
-                    <span className="text-xs text-muted-foreground tabular-nums">
+                    </h3>
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">
                       {formatMonth(activeFiltersMeta.period_month)}
                     </span>
                   </div>
@@ -670,17 +635,17 @@ export default function ManagerDashboardPage() {
                   </div>
                 </div>
 
-                {/* Aggregated Survey Card (Strict NFR-02 Privacy: open spacing, no inner box) */}
-                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+                {/* Aggregated Survey Card (Strict NFR-02 Privacy: AVG & COUNT only) */}
+                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6">
                   <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                    <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
                       Survei Agregat
-                    </h2>
+                    </h3>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                         >
                           <Info className="size-3.5" />
                           <span>NFR-02</span>
@@ -695,7 +660,7 @@ export default function ManagerDashboardPage() {
                   <div className="grid grid-cols-3 divide-x divide-border text-center">
                     <div className="px-2">
                       <p className="text-xs text-muted-foreground">Skor WLB</p>
-                      <p className="mt-1 text-base font-semibold text-foreground tabular-nums">
+                      <p className="mt-1 text-lg font-bold text-foreground tabular-nums">
                         {surveySummary.avg_wlb_score != null
                           ? `${surveySummary.avg_wlb_score}/5`
                           : '-'}
@@ -703,7 +668,7 @@ export default function ManagerDashboardPage() {
                     </div>
                     <div className="px-2">
                       <p className="text-xs text-muted-foreground">Beban</p>
-                      <p className="mt-1 text-base font-semibold text-foreground tabular-nums">
+                      <p className="mt-1 text-lg font-bold text-foreground tabular-nums">
                         {surveySummary.avg_workload_perception_score != null
                           ? `${surveySummary.avg_workload_perception_score}/5`
                           : '-'}
@@ -711,7 +676,7 @@ export default function ManagerDashboardPage() {
                     </div>
                     <div className="px-2">
                       <p className="text-xs text-muted-foreground">Partisipasi</p>
-                      <p className="mt-1 text-base font-semibold text-success tabular-nums">
+                      <p className="mt-1 text-lg font-bold text-success tabular-nums">
                         {formatScore(surveySummary.participation_rate, 0)}%
                       </p>
                     </div>
@@ -720,37 +685,111 @@ export default function ManagerDashboardPage() {
               </div>
             </section>
 
-            {/* Band 3: Full-Width Employee Priority Table */}
-            <section>
-              <DataTable
-                title="Prioritas Redistribusi"
-                countLabel="pegawai"
-                columns={employeeColumns}
-                data={filteredEmployeePriorities}
-                loading={loading}
-                searchValue={search}
-                onSearchChange={setSearch}
-                searchPlaceholder="Cari nama atau jabatan..."
-                pageSize={8}
-                onRowClick={(emp) => setSelectedEmployee(emp)}
-                emptyTitle="Tidak ada pegawai sesuai filter"
-                emptyDescription="Ubah pilihan risiko atau kata kunci pencarian."
-                filterSlot={
-                  <Select value={riskFilter} onValueChange={setRiskFilter}>
-                    <SelectTrigger id="mgr-risk-filter" size="sm" className="w-40 rounded-lg bg-background text-xs">
-                      <SelectValue placeholder="Semua Risiko" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value={ALL_VALUE}>Semua Risiko</SelectItem>
-                        <SelectItem value="high">Risiko Tinggi</SelectItem>
-                        <SelectItem value="medium">Risiko Sedang</SelectItem>
-                        <SelectItem value="low">Risiko Rendah</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                }
-              />
+            {/* Band 3: Compact Actionable Row (Prioritas Tim & Masalah Kerja) */}
+            <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card lg:col-span-7">
+                <div className="border-b border-border px-6 py-4">
+                  <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
+                    Prioritas Tim
+                  </h3>
+                </div>
+
+                <div className="flex-1 divide-y divide-border">
+                  {priorityHighlights.map((item) => {
+                    const sev = SEVERITY_TONES[item.severity] || SEVERITY_TONES.info;
+                    return (
+                      <Link
+                        key={item.id}
+                        to={resolveContextualRoute(item.action_route)}
+                        className="group flex flex-col gap-1.5 px-6 py-4 transition-colors hover:bg-muted/40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
+                            {item.title}
+                          </span>
+                          <StatusBadge tone={sev.tone} label={sev.label} />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <p
+                            className="truncate text-xs text-muted-foreground"
+                            title={item.description}
+                          >
+                            {item.description}
+                          </p>
+                          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card lg:col-span-5">
+                <div className="flex items-center justify-between gap-2 border-b border-border px-6 py-4">
+                  <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
+                    Masalah Kerja
+                  </h3>
+                  <span className="text-xs font-semibold text-success tabular-nums">
+                    {formatScore(issuesSummary.counts.resolution_rate, 0)}% selesai
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 divide-x divide-border border-b border-border py-3.5 text-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Menunggu</p>
+                    <p className="mt-0.5 text-base font-bold text-foreground tabular-nums">
+                      {issuesSummary.counts.open}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ditangani</p>
+                    <p className="mt-0.5 text-base font-bold text-foreground tabular-nums">
+                      {issuesSummary.counts.in_progress}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Selesai</p>
+                    <p className="mt-0.5 text-base font-bold text-foreground tabular-nums">
+                      {issuesSummary.counts.resolved}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="max-h-72 flex-1 divide-y divide-border overflow-y-auto">
+                  {issuesSummary.active_issues.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                      <CheckCircle2 className="size-5 text-success" />
+                      <p className="text-xs font-medium text-foreground">
+                        Tidak ada masalah aktif
+                      </p>
+                    </div>
+                  ) : (
+                    issuesSummary.active_issues.map((issue) => (
+                      <div key={issue.id} className="flex flex-col gap-1 px-6 py-3.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-semibold text-foreground">
+                            {issue.category}
+                          </span>
+                          <StatusBadge status={issue.status} />
+                        </div>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {issue.reporter?.full_name || '-'} ·{' '}
+                          <span className="font-mono">{issue.department?.code || '-'}</span>
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="border-t border-border p-4">
+                  <Button variant="outline" size="sm" className="w-full rounded-xl" asChild>
+                    <Link to={`${routePrefix}/workplace-issues`}>
+                      Kelola Masalah
+                      <ArrowRight data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </section>
           </>
         )}
@@ -771,10 +810,14 @@ export default function ManagerDashboardPage() {
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setSelectedEmployee(null)}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setSelectedEmployee(null)}
+            >
               Tutup
             </Button>
-            <Button asChild>
+            <Button variant="cta" className="rounded-xl" asChild>
               <Link to={`${routePrefix}/task-assignments`}>
                 Kelola Penugasan
                 <ArrowRight data-icon="inline-end" />
@@ -792,7 +835,7 @@ export default function ManagerDashboardPage() {
                   <AnimatedNumber
                     value={Number(selectedEmployee.final_score || 0)}
                     decimals={1}
-                    className="text-3xl leading-none font-semibold tracking-[-0.03em] text-foreground"
+                    className="text-3xl leading-none font-bold tracking-[-0.03em] text-foreground"
                   />
                   <span className="text-xs text-muted-foreground">/ 100</span>
                 </div>

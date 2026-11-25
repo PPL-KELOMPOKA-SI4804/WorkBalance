@@ -8,9 +8,6 @@ import {
   EyeOff,
   Lock,
   Mail,
-  Scale,
-  ShieldCheck,
-  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -45,24 +42,6 @@ const DEMO_ACCOUNTS = [
     email: 'pegawai1@workbalance.id',
     password: 'password123',
     scope: 'Portal Pribadi',
-  },
-];
-
-const SYSTEM_PILLARS = [
-  {
-    icon: Scale,
-    label: 'Kepatuhan PP No. 35/2021',
-    metric: '40j normal · maks 18j lembur',
-  },
-  {
-    icon: TrendingUp,
-    label: 'Decent Work Score',
-    metric: '6 dimensi · skala 0–100',
-  },
-  {
-    icon: ShieldCheck,
-    label: 'Privasi Survei NFR-02',
-    metric: 'Agregasi per departemen',
   },
 ];
 
@@ -118,67 +97,62 @@ export default function LoginPage() {
         <ThemeSwitch />
       </div>
 
-      {/* Left Architectural Context Panel */}
-      <aside className="hidden flex-col justify-between border-r border-border bg-sidebar p-10 lg:col-span-6 lg:flex xl:col-span-7 xl:p-14">
-        <div>
-          <BrandLogo variant="lockup" />
+      {/* Left Editorial Photography Panel (HRDashboard 2. Sign In - Filled) */}
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[oklch(0.15_0.020_262)] lg:col-span-6 lg:flex">
+        <img
+          src="/assets/login-hero.jpg"
+          alt="Kolaborasi tim WorkBalance dalam ruang kerja modern"
+          className="absolute inset-0 h-full w-full object-cover object-[center_35%]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-[oklch(0.135_0.022_262/96%)] via-[oklch(0.145_0.022_262/56%)] to-[oklch(0.145_0.022_262/22%)]"
+        />
+
+        <div className="relative z-10 p-10 xl:p-14">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/25 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm">
+            <span className="size-1.5 rounded-full bg-[var(--chart-2)]" />
+            SDG 8 · Decent Work Decision Support
+          </span>
         </div>
 
-        <div className="my-auto flex max-w-xl flex-col gap-8 py-8">
-          <div className="flex flex-col gap-3">
-            <h2 className="text-3xl leading-[1.18] font-semibold tracking-[-0.03em] text-foreground text-balance xl:text-[34px]">
+        <div className="relative z-10 mt-auto flex max-w-xl flex-col gap-5 p-10 xl:p-14">
+          <BrandLogo variant="lockup" inverted />
+
+          <div className="flex flex-col gap-2.5">
+            <h2 className="text-3xl leading-[1.18] font-bold tracking-[-0.03em] text-white text-balance xl:text-[36px]">
               Keseimbangan beban kerja, terukur setiap minggu.
             </h2>
-            <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              Pemantauan kapasitas tugas, jam kerja, dan indikator SDG 8 secara objektif dan non-punitif.
+            <p className="max-w-md text-sm leading-relaxed text-white/80">
+              Pemantauan kapasitas tugas, batas jam kerja PP No. 35/2021, dan indikator SDG 8 secara objektif dan non-punitif.
             </p>
           </div>
 
-          {/* Concise Specification Surface */}
-          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-            {SYSTEM_PILLARS.map((pillar) => {
-              const Icon = pillar.icon;
-              return (
-                <div
-                  key={pillar.label}
-                  className="flex items-center justify-between gap-4 px-5 py-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon
-                      aria-hidden="true"
-                      className="size-4 shrink-0 text-primary"
-                    />
-                    <span className="text-sm font-medium text-foreground">
-                      {pillar.label}
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                    {pillar.metric}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between gap-4 pt-3">
+            <div className="flex items-center gap-1.5" aria-hidden="true">
+              <span className="h-1.5 w-8 rounded-full bg-white" />
+              <span className="h-1.5 w-2 rounded-full bg-white/35" />
+              <span className="h-1.5 w-2 rounded-full bg-white/35" />
+            </div>
+            <span className="text-xs font-medium text-white/75 tabular-nums">
+              PP No. 35/2021 · Privasi NFR-02
+            </span>
           </div>
-        </div>
-
-        <div className="flex w-full max-w-xl items-center justify-between text-xs text-muted-foreground">
-          <span>WorkBalance · SDG 8 Decision Support</span>
-          <span>PPL SI4804 · Kelompok A</span>
         </div>
       </aside>
 
       {/* Right Authentication Column */}
-      <main className="flex flex-col items-center justify-center px-6 py-12 sm:px-10 lg:col-span-6 xl:col-span-5">
-        <div className="flex w-full max-w-[380px] flex-col gap-7">
+      <main className="flex flex-col items-center justify-center px-6 py-12 sm:px-10 lg:col-span-6">
+        <div className="flex w-full max-w-[400px] flex-col gap-7">
           <div className="flex flex-col gap-1.5">
             <div className="mb-3 self-start lg:hidden">
               <BrandLogo variant="horizontal" />
             </div>
-            <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground text-balance">
-              Masuk ke ruang kerja
+            <h1 className="text-2xl font-bold tracking-[-0.025em] text-foreground text-balance sm:text-[28px]">
+              Masuk ke akun Anda
             </h1>
             <p className="text-sm text-muted-foreground">
-              Gunakan akun organisasi untuk mengakses dasbor Anda.
+              Gunakan akun organisasi untuk mengakses ruang kerja WorkBalance.
             </p>
           </div>
 
@@ -190,7 +164,7 @@ export default function LoginPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs text-destructive"
+                className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-3 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span className="leading-relaxed">{errorMessage}</span>
@@ -200,13 +174,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="text-xs font-medium text-foreground">
-                Email
+              <Label htmlFor="email" className="text-xs font-semibold text-foreground">
+                Email <span className="text-danger">*</span>
               </Label>
               <div className="relative">
                 <Mail
                   aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
                   id="email"
@@ -217,19 +191,19 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@workbalance.id"
-                  className="h-10 rounded-lg bg-card pl-9 text-sm"
+                  className="h-11 rounded-xl bg-card pl-10 text-sm"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password" className="text-xs font-medium text-foreground">
-                Kata Sandi
+              <Label htmlFor="password" className="text-xs font-semibold text-foreground">
+                Kata Sandi <span className="text-danger">*</span>
               </Label>
               <div className="relative">
                 <Lock
                   aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
                   id="password"
@@ -240,13 +214,13 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Masukkan kata sandi"
-                  className="h-10 rounded-lg bg-card pr-10 pl-9 text-sm"
+                  className="h-11 rounded-xl bg-card pr-10 pl-10 text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
@@ -255,9 +229,10 @@ export default function LoginPage() {
 
             <Button
               type="submit"
+              variant="cta"
               size="lg"
               disabled={submitting}
-              className="mt-1 h-10 w-full rounded-lg font-medium transition-transform active:scale-[0.99]"
+              className="mt-1 h-11 w-full rounded-xl font-semibold transition-transform active:scale-[0.99]"
             >
               {submitting ? (
                 <>
@@ -304,6 +279,10 @@ export default function LoginPage() {
               })}
             </div>
           </div>
+
+          <p className="text-center text-xs text-muted-foreground">
+            WorkBalance · PPL SI4804 · Kelompok A
+          </p>
         </div>
       </main>
     </div>

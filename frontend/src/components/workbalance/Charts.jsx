@@ -59,9 +59,9 @@ export function DecentWorkDonutChart({
   return (
     <div
       data-slot="decent-work-donut"
-      className={cn('relative mx-auto flex size-48 items-center justify-center', className)}
+      className={cn('relative mx-auto flex size-52 items-center justify-center', className)}
     >
-      <ChartContainer config={chartConfig} className="size-48 aspect-square">
+      <ChartContainer config={chartConfig} className="size-52 aspect-square">
         <PieChart>
           <ChartTooltip
             cursor={false}
@@ -73,10 +73,11 @@ export function DecentWorkDonutChart({
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius="72%"
+            innerRadius="68%"
             outerRadius="92%"
             startAngle={90}
             endAngle={-270}
+            paddingAngle={2}
             cornerRadius={8}
             stroke="none"
             isAnimationActive={!prefersReducedMotion}
@@ -94,9 +95,9 @@ export function DecentWorkDonutChart({
         <AnimatedNumber
           value={clamped}
           decimals={1}
-          className="text-3xl leading-none font-semibold tracking-[-0.03em] text-foreground"
+          className="text-[32px] leading-none font-bold tracking-[-0.03em] text-foreground"
         />
-        <span className={cn('mt-1.5 text-xs font-medium', meta.textClass)}>
+        <span className={cn('mt-1.5 text-xs font-semibold', meta.textClass)}>
           {meta.label}
         </span>
       </div>
@@ -130,7 +131,7 @@ export function WorkHoursBarChart({
           dataKey={xKey}
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
+          tickMargin={10}
         />
         <YAxis
           tickLine={false}
@@ -152,7 +153,7 @@ export function WorkHoursBarChart({
           stackId="hours"
           fill={`var(--color-${normalKey})`}
           radius={[0, 0, 0, 0]}
-          maxBarSize={36}
+          maxBarSize={32}
           isAnimationActive={!prefersReducedMotion}
           animationDuration={220}
           animationEasing="ease-out"
@@ -161,8 +162,8 @@ export function WorkHoursBarChart({
           dataKey={overtimeKey}
           stackId="hours"
           fill={`var(--color-${overtimeKey})`}
-          radius={[6, 6, 0, 0]}
-          maxBarSize={36}
+          radius={[8, 8, 0, 0]}
+          maxBarSize={32}
           isAnimationActive={!prefersReducedMotion}
           animationDuration={220}
           animationEasing="ease-out"
@@ -214,7 +215,7 @@ export function WorkloadTrendAreaChart({
           dataKey={xKey}
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
+          tickMargin={10}
         />
         <YAxis
           domain={[0, 100]}
@@ -237,10 +238,85 @@ export function WorkloadTrendAreaChart({
             type="monotone"
             dataKey={item.key}
             stroke={item.color}
-            strokeWidth={2}
+            strokeWidth={2.5}
             fill={`url(#wb-grad-${item.key})`}
-            dot={{ r: 3, strokeWidth: 1.5, fill: 'var(--card)' }}
-            activeDot={{ r: 5 }}
+            dot={false}
+            activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)', fill: item.color }}
+            isAnimationActive={!prefersReducedMotion}
+            animationDuration={220}
+            animationEasing="ease-out"
+          />
+        ))}
+      </AreaChart>
+    </ChartContainer>
+  );
+}
+
+/**
+ * HRDashboard Team Performance smooth multi-series curve chart.
+ */
+export function PerformanceLineChart({
+  data = [],
+  xKey = 'code',
+  series = [
+    { key: 'decent_work_score', label: 'Decent Work', color: 'var(--chart-2)' },
+    { key: 'avg_workload_risk_score', label: 'Workload Risk', color: 'var(--chart-3)' },
+  ],
+  yDomain = [0, 100],
+  heightClass = 'h-60',
+  className,
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const chartConfig = series.reduce((acc, item) => {
+    acc[item.key] = { label: item.label, color: item.color };
+    return acc;
+  }, {});
+
+  return (
+    <ChartContainer
+      config={chartConfig}
+      className={cn('w-full aspect-auto', heightClass, className)}
+    >
+      <AreaChart data={data} margin={{ top: 10, right: 12, left: -14, bottom: 0 }}>
+        <defs>
+          {series.map((item) => (
+            <linearGradient
+              key={item.key}
+              id={`wb-perf-${item.key}`}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop offset="0%" stopColor={item.color} stopOpacity={0.14} />
+              <stop offset="100%" stopColor={item.color} stopOpacity={0} />
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid vertical={true} horizontal={false} strokeDasharray="0" />
+        <XAxis
+          dataKey={xKey}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+        />
+        <YAxis
+          domain={yDomain}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+        />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        {series.map((item) => (
+          <Area
+            key={item.key}
+            type="monotone"
+            dataKey={item.key}
+            stroke={item.color}
+            strokeWidth={2.5}
+            fill={`url(#wb-perf-${item.key})`}
+            dot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--card)', fill: item.color }}
+            activeDot={{ r: 5.5, strokeWidth: 2.5, stroke: 'var(--card)', fill: item.color }}
             isAnimationActive={!prefersReducedMotion}
             animationDuration={220}
             animationEasing="ease-out"

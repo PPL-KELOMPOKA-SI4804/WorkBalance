@@ -47,11 +47,11 @@ function Calendar({
         selected:
           '[&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:hover:bg-primary [&>button]:hover:text-primary-foreground [&>button]:font-medium',
         range_start:
-          'rounded-l-lg bg-primary/15 [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:font-medium',
+          'rounded-l-lg bg-primary/15 [&>button]:!bg-primary [&>button]:!text-primary-foreground [&>button]:!font-medium',
         range_middle:
-          'bg-primary/15 [&>button]:rounded-none [&>button]:bg-transparent [&>button]:text-foreground [&>button]:hover:bg-primary/20',
+          'bg-primary/15 [&>button]:rounded-none [&>button]:!bg-transparent [&>button]:!text-foreground [&>button]:!font-normal [&>button]:hover:!bg-primary/25 [&>button]:hover:!text-foreground',
         range_end:
-          'rounded-r-lg bg-primary/15 [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:font-medium',
+          'rounded-r-lg bg-primary/15 [&>button]:!bg-primary [&>button]:!text-primary-foreground [&>button]:!font-medium',
         today:
           '[&>button]:ring-1 [&>button]:ring-primary/50 [&>button]:font-semibold',
         outside: 'text-muted-foreground opacity-45',

@@ -12,12 +12,13 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import { getNavGroupsForRole } from '@/lib/navigation';
+import { getDashboardItemForRole, getNavGroupsForRole } from '@/lib/navigation';
 
 export function CommandMenu({ open, onOpenChange, role }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
+  const dashboardItem = getDashboardItemForRole(role);
   const groups = getNavGroupsForRole(role);
 
   useEffect(() => {
@@ -58,8 +59,27 @@ export function CommandMenu({ open, onOpenChange, role }) {
         />
         <CommandList>
           <CommandEmpty>Modul tidak ditemukan.</CommandEmpty>
+          {dashboardItem && (
+            <CommandGroup heading="Utama">
+              <CommandItem
+                value={`${dashboardItem.label} ${dashboardItem.commandLabel} ${dashboardItem.keywords || ''}`}
+                onSelect={() => handleSelect(dashboardItem.to)}
+                className="flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2.5">
+                  <dashboardItem.icon className="size-4 text-muted-foreground" />
+                  <span>{dashboardItem.commandLabel || dashboardItem.label}</span>
+                </div>
+                {location.pathname === dashboardItem.to ? (
+                  <span className="text-xs font-medium text-primary">Aktif</span>
+                ) : (
+                  <CornerDownLeft className="size-3.5 text-muted-foreground" />
+                )}
+              </CommandItem>
+            </CommandGroup>
+          )}
           {groups.map((group) => (
-            <CommandGroup key={group.label} heading={group.label}>
+            <CommandGroup key={group.id || group.label} heading={group.label}>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.to;

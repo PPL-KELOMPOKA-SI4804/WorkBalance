@@ -6,7 +6,7 @@ import { BrandLogo } from '@/components/workbalance';
 
 export default function RoleRouteGuard({ allowedRoles = [], children }) {
   const { user, loading } = useAuth();
-  useDocumentTitle(loading ? 'Memuat' : '');
+  useDocumentTitle(loading ? 'Memuat' : null);
 
   if (loading) {
     return (

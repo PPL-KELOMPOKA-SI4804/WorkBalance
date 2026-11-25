@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-function BrandSymbol({ className }) {
+function BrandSymbol({ className, inverted = false }) {
   return (
     <svg
       viewBox="16 18 224 220"
@@ -14,7 +14,7 @@ function BrandSymbol({ className }) {
         width="48"
         height="140"
         rx="24"
-        fill="var(--brand-blue)"
+        fill={inverted ? 'oklch(0.745 0.132 237)' : 'var(--brand-blue)'}
       />
       <rect
         x="104"
@@ -35,13 +35,13 @@ function BrandSymbol({ className }) {
       <path
         d="M 18,154 C 66,78 190,78 238,154 C 183,105 73,105 18,154 Z"
         fill="currentColor"
-        className="text-foreground"
+        className={inverted ? 'text-white' : 'text-foreground'}
       />
     </svg>
   );
 }
 
-export function BrandLogo({ variant = 'horizontal', className }) {
+export function BrandLogo({ variant = 'horizontal', inverted = false, className }) {
   if (variant === 'mark') {
     return (
       <span
@@ -49,7 +49,7 @@ export function BrandLogo({ variant = 'horizontal', className }) {
         className={cn('inline-flex items-center justify-center', className)}
         aria-label="WorkBalance"
       >
-        <BrandSymbol className="size-7" />
+        <BrandSymbol className="size-7" inverted={inverted} />
       </span>
     );
   }
@@ -60,13 +60,20 @@ export function BrandLogo({ variant = 'horizontal', className }) {
         data-slot="brand-logo"
         className={cn('inline-flex items-center gap-3 select-none', className)}
       >
-        <BrandSymbol className="size-11" />
+        <BrandSymbol className="size-11" inverted={inverted} />
         <span className="flex flex-col">
           <span className="font-heading text-[28px] leading-[1.08] font-bold tracking-[-0.03em]">
-            <span className="text-foreground">Work</span>
-            <span className="text-brand-blue">Balance</span>
+            <span className={inverted ? 'text-white' : 'text-foreground'}>Work</span>
+            <span className={inverted ? 'text-[oklch(0.78_0.12_237)]' : 'text-brand-blue'}>
+              Balance
+            </span>
           </span>
-          <span className="mt-0.5 text-xs font-medium tracking-[0.04em] text-muted-foreground">
+          <span
+            className={cn(
+              'mt-0.5 text-xs font-medium tracking-[0.04em]',
+              inverted ? 'text-white/80' : 'text-muted-foreground'
+            )}
+          >
             Decent Work, Better Life
           </span>
         </span>
@@ -79,10 +86,12 @@ export function BrandLogo({ variant = 'horizontal', className }) {
       data-slot="brand-logo"
       className={cn('inline-flex items-center gap-2.5 select-none', className)}
     >
-      <BrandSymbol className="size-8" />
-      <span className="font-heading text-[21px] leading-none font-bold tracking-[-0.03em]">
-        <span className="text-foreground">Work</span>
-        <span className="text-brand-blue">Balance</span>
+      <BrandSymbol className="size-8" inverted={inverted} />
+      <span className="font-heading text-[20px] leading-none font-bold tracking-[-0.03em]">
+        <span className={inverted ? 'text-white' : 'text-foreground'}>Work</span>
+        <span className={inverted ? 'text-[oklch(0.78_0.12_237)]' : 'text-brand-blue'}>
+          Balance
+        </span>
       </span>
     </span>
   );

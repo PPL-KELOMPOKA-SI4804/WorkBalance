@@ -19,7 +19,7 @@ export function KpiStatCard({
     <div
       data-slot="kpi-stat-card"
       className={cn(
-        'flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20',
+        'flex flex-col justify-between gap-3.5 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20',
         className
       )}
     >
@@ -28,17 +28,16 @@ export function KpiStatCard({
           {label}
         </span>
         {Icon && (
-          <Icon
-            aria-hidden="true"
-            className="size-4 shrink-0 text-muted-foreground"
-          />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+            <Icon aria-hidden="true" className="size-4" />
+          </span>
         )}
       </div>
 
-      <div className="flex items-baseline gap-1.5">
+      <div className="flex flex-wrap items-baseline gap-1.5">
         <AnimatedNumber
           value={value}
-          className="text-[28px] leading-none font-semibold tracking-[-0.025em] text-foreground"
+          className="text-[28px] leading-none font-bold tracking-[-0.03em] text-foreground"
         />
         {unit && (
           <span className="text-xs font-medium text-muted-foreground tabular-nums">

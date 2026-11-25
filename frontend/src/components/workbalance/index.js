@@ -1,6 +1,7 @@
 export { AnimatedNumber } from './AnimatedNumber';
 export { BrandLogo } from './BrandLogo';
 export { ThemeSwitch } from './ThemeSwitch';
+export { HeroBentoCard } from './HeroBentoCard';
 export { PageHeader } from './PageHeader';
 export { KpiStatCard } from './KpiStatCard';
 export { StatusBadge } from './StatusBadge';
@@ -16,4 +17,5 @@ export {
   DecentWorkDonutChart,
   WorkHoursBarChart,
   WorkloadTrendAreaChart,
+  PerformanceLineChart,
 } from './Charts';

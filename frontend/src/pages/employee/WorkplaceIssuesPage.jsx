@@ -497,7 +497,7 @@ export default function WorkplaceIssuesPage() {
       title="Laporan Masalah & K3"
       breadcrumb={isEmployee ? 'Ruang Kerja' : 'Kesejahteraan'}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {/* Row 1: 4 KPI Cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -570,12 +570,12 @@ export default function WorkplaceIssuesPage() {
           emptyAction={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetFilters}>
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={resetFilters}>
                   <RotateCcw className="size-4" data-icon="inline-start" />
                   Reset Filter
                 </Button>
               )}
-              <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+              <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSheet}>
                 <Plus className="size-4" data-icon="inline-start" />
                 Laporkan Masalah
               </Button>
@@ -592,7 +592,7 @@ export default function WorkplaceIssuesPage() {
                   id="wi-filter-status"
                   size="sm"
                   aria-label="Filter status penanganan"
-                  className="w-36 rounded-lg bg-background text-xs"
+                  className="h-9 w-36 rounded-xl bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -617,7 +617,7 @@ export default function WorkplaceIssuesPage() {
                   id="wi-filter-category"
                   size="sm"
                   aria-label="Filter kategori permasalahan"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Kategori" />
                 </SelectTrigger>
@@ -644,7 +644,7 @@ export default function WorkplaceIssuesPage() {
                   id="wi-filter-department"
                   size="sm"
                   aria-label="Filter departemen"
-                  className="w-44 rounded-lg bg-background text-xs"
+                  className="h-9 w-44 rounded-xl bg-background text-xs"
                 >
                   <SelectValue placeholder="Semua Departemen" />
                 </SelectTrigger>
@@ -677,7 +677,7 @@ export default function WorkplaceIssuesPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-lg"
+                      className="rounded-xl"
                       onClick={resetFilters}
                     >
                       <RotateCcw className="size-4" data-icon="inline-start" />
@@ -689,7 +689,7 @@ export default function WorkplaceIssuesPage() {
             </div>
           }
           actionsSlot={
-            <Button size="sm" className="rounded-lg" onClick={openCreateSheet}>
+            <Button variant="cta" size="sm" className="rounded-xl" onClick={openCreateSheet}>
               <Plus className="size-4" data-icon="inline-start" />
               Laporkan Masalah
             </Button>
@@ -713,14 +713,15 @@ export default function WorkplaceIssuesPage() {
           <>
             <Button
               variant="outline"
-              className="rounded-lg"
+              className="rounded-xl"
               onClick={() => setDetailSheetOpen(false)}
             >
               Tutup
             </Button>
             {canHandle && detailIssue && (
               <Button
-                className="rounded-lg"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = detailIssue;
                   setDetailSheetOpen(false);
@@ -733,7 +734,8 @@ export default function WorkplaceIssuesPage() {
             )}
             {isEmployee && detailIssue?.status === 'open' && (
               <Button
-                className="rounded-lg"
+                variant="cta"
+                className="rounded-xl"
                 onClick={() => {
                   const target = detailIssue;
                   setDetailSheetOpen(false);
@@ -849,7 +851,7 @@ export default function WorkplaceIssuesPage() {
             <Button
               type="button"
               variant="outline"
-              className="rounded-lg"
+              className="rounded-xl"
               onClick={() => setFormSheetOpen(false)}
               disabled={formSubmitting}
             >
@@ -857,8 +859,9 @@ export default function WorkplaceIssuesPage() {
             </Button>
             <Button
               type="submit"
+              variant="cta"
               form="workplace-issue-form"
-              className="rounded-lg"
+              className="rounded-xl"
               disabled={formSubmitting}
             >
               {formSubmitting && <Spinner data-icon="inline-start" />}
@@ -885,7 +888,7 @@ export default function WorkplaceIssuesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-                className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <span>{formError}</span>
@@ -894,8 +897,8 @@ export default function WorkplaceIssuesPage() {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wi-category">
-              Kategori Permasalahan <span className="text-destructive">*</span>
+            <Label htmlFor="wi-category" className="text-xs font-semibold">
+              Kategori Permasalahan <span className="text-danger">*</span>
             </Label>
             <Select
               name="category"
@@ -904,7 +907,7 @@ export default function WorkplaceIssuesPage() {
                 setIssueForm((prev) => ({ ...prev, category: val }))
               }
             >
-              <SelectTrigger id="wi-category" className="w-full rounded-lg bg-background">
+              <SelectTrigger id="wi-category" className="h-10 w-full rounded-xl bg-background">
                 <SelectValue placeholder="Pilih Kategori" />
               </SelectTrigger>
               <SelectContent>
@@ -920,7 +923,9 @@ export default function WorkplaceIssuesPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wi-department">Departemen Terkait</Label>
+            <Label htmlFor="wi-department" className="text-xs font-semibold">
+              Departemen Terkait
+            </Label>
             <Select
               name="department_id"
               value={issueForm.department_id || AUTO_DEPARTMENT_VALUE}
@@ -931,7 +936,7 @@ export default function WorkplaceIssuesPage() {
                 }))
               }
             >
-              <SelectTrigger id="wi-department" className="w-full rounded-lg bg-background">
+              <SelectTrigger id="wi-department" className="h-10 w-full rounded-xl bg-background">
                 <SelectValue placeholder="Otomatis sesuai departemen saya" />
               </SelectTrigger>
               <SelectContent>
@@ -955,8 +960,8 @@ export default function WorkplaceIssuesPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wi-description">
-              Deskripsi Permasalahan <span className="text-destructive">*</span>
+            <Label htmlFor="wi-description" className="text-xs font-semibold">
+              Deskripsi Permasalahan <span className="text-danger">*</span>
             </Label>
             <Textarea
               id="wi-description"
@@ -968,7 +973,7 @@ export default function WorkplaceIssuesPage() {
                 setIssueForm((prev) => ({ ...prev, description: e.target.value }))
               }
               placeholder="Jelaskan situasi, dampak terhadap kenyamanan atau beban kerja, serta konteks lokasi/waktu bila relevan..."
-              className="rounded-lg bg-background"
+              className="rounded-xl bg-background"
             />
             <p className="text-xs text-muted-foreground tabular-nums">
               Minimal 10 karakter ({issueForm.description.trim().length} karakter tertulis).
@@ -994,7 +999,7 @@ export default function WorkplaceIssuesPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-lg"
+                className="rounded-xl"
                 onClick={() => setFollowUpSheetOpen(false)}
                 disabled={followUpSubmitting}
               >
@@ -1002,8 +1007,9 @@ export default function WorkplaceIssuesPage() {
               </Button>
               <Button
                 type="submit"
+                variant="cta"
                 form="workplace-followup-form"
-                className="rounded-lg"
+                className="rounded-xl"
                 disabled={followUpSubmitting}
               >
                 {followUpSubmitting && <Spinner data-icon="inline-start" />}
@@ -1027,7 +1033,7 @@ export default function WorkplaceIssuesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                     transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-                    className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+                    className="flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
                   >
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <span>{followUpError}</span>
@@ -1047,8 +1053,8 @@ export default function WorkplaceIssuesPage() {
               <Separator />
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wi-followup-status">
-                  Status Penanganan <span className="text-destructive">*</span>
+                <Label htmlFor="wi-followup-status" className="text-xs font-semibold">
+                  Status Penanganan <span className="text-danger">*</span>
                 </Label>
                 <Select
                   name="status"
@@ -1057,7 +1063,7 @@ export default function WorkplaceIssuesPage() {
                     setFollowUpForm((prev) => ({ ...prev, status: val }))
                   }
                 >
-                  <SelectTrigger id="wi-followup-status" className="w-full rounded-lg bg-background">
+                  <SelectTrigger id="wi-followup-status" className="h-10 w-full rounded-xl bg-background">
                     <SelectValue placeholder="Pilih Status Penanganan" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1075,10 +1081,10 @@ export default function WorkplaceIssuesPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wi-followup-notes">
+                <Label htmlFor="wi-followup-notes" className="text-xs font-semibold">
                   Catatan Tindak Lanjut / Resolusi{' '}
                   {followUpForm.status === 'resolved' && (
-                    <span className="text-destructive">*</span>
+                    <span className="text-danger">*</span>
                   )}
                 </Label>
                 <Textarea
@@ -1093,7 +1099,7 @@ export default function WorkplaceIssuesPage() {
                     }))
                   }
                   placeholder="Tuliskan langkah penanganan, penjadwalan ulang, atau solusi yang telah diterapkan..."
-                  className="rounded-lg bg-background"
+                  className="rounded-xl bg-background"
                 />
                 {followUpForm.status === 'resolved' && (
                   <p className="text-xs text-muted-foreground">
