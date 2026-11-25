@@ -376,7 +376,7 @@ export default function SurveysPage() {
               {row.original.department_code}
             </Badge>
             <span
-              className="max-w-[180px] truncate text-xs font-medium text-foreground"
+              className="max-w-[135px] truncate text-xs font-medium text-foreground"
               title={row.original.department_name}
             >
               {row.original.department_name}
@@ -393,9 +393,9 @@ export default function SurveysPage() {
           return (
             <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
               <span className="font-medium">
-                {row.original.respondents_count} / {row.original.active_employees_count}
+                {row.original.respondents_count}/{row.original.active_employees_count}
               </span>{' '}
-              <span className="text-muted-foreground">({rate.toFixed(1)}%)</span>
+              <span className="text-muted-foreground">({rate.toFixed(0)}%)</span>
             </span>
           );
         },
@@ -409,14 +409,22 @@ export default function SurveysPage() {
         header: 'Skor WLB',
         cell: ({ row }) => {
           const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
+          const shortLabel =
+            meta.status === 'good'
+              ? 'Baik'
+              : meta.status === 'needs_attention'
+                ? 'Perhatian'
+                : meta.status === 'action_priority'
+                  ? 'Prioritas'
+                  : 'Kosong';
           return (
-            <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="text-xs font-medium text-foreground tabular-nums">
                 {row.original.avg_wlb_score !== null && row.original.avg_wlb_score !== undefined
-                  ? `${Number(row.original.avg_wlb_score).toFixed(2)} / 5`
+                  ? `${Number(row.original.avg_wlb_score).toFixed(2)}/5`
                   : '-'}
               </span>
-              <StatusBadge status={meta.status} tone={meta.tone} label={meta.label} />
+              <StatusBadge status={meta.status} tone={meta.tone} label={shortLabel} />
             </div>
           );
         },
@@ -931,6 +939,7 @@ export default function SurveysPage() {
                 data={selectedSurvey.department_aggregates || []}
                 searchable={false}
                 pageSize={20}
+                className="[&_td]:px-3 [&_th]:px-3"
                 emptyTitle="Belum ada data agregat departemen"
                 emptyDescription="Statistik agregat akan muncul setelah pegawai mengirimkan respons pada periode survei ini."
               />
