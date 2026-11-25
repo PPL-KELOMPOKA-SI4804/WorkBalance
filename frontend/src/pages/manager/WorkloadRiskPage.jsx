@@ -386,7 +386,7 @@ export default function WorkloadRiskPage() {
             <div className="flex flex-col gap-4 lg:col-span-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5">
-                  <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                  <h2 className="text-base font-bold tracking-[-0.02em] text-foreground">
                     {isEmployee ? 'Sub-Indikator Saya' : 'Rata-rata Sub-Indikator'}
                   </h2>
                   <p className="text-xs text-muted-foreground tabular-nums">
@@ -501,7 +501,13 @@ export default function WorkloadRiskPage() {
                 </Button>
               )}
               {canRecalculate && (
-                <Button size="sm" onClick={handleRecalculate} disabled={recalculating}>
+                <Button
+                  variant="cta"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={handleRecalculate}
+                  disabled={recalculating}
+                >
                   <Calculator data-icon="inline-start" />
                   Hitung Ulang
                 </Button>
@@ -529,7 +535,7 @@ export default function WorkloadRiskPage() {
                       setDepartmentFilter(val === ALL_VALUE ? '' : val)
                     }
                   >
-                    <SelectTrigger id="wr-dept-filter" size="sm" className="w-44 rounded-lg bg-background text-xs">
+                    <SelectTrigger id="wr-dept-filter" size="sm" className="h-9 w-44 rounded-xl bg-background text-xs">
                       <SelectValue placeholder="Semua Departemen" />
                     </SelectTrigger>
                     <SelectContent>
@@ -550,7 +556,7 @@ export default function WorkloadRiskPage() {
                   </Select>
 
                   <Select value={riskCategory} onValueChange={setRiskCategory}>
-                    <SelectTrigger id="wr-risk-filter" size="sm" className="w-36 rounded-lg bg-background text-xs">
+                    <SelectTrigger id="wr-risk-filter" size="sm" className="h-9 w-36 rounded-xl bg-background text-xs">
                       <SelectValue placeholder="Semua Risiko" />
                     </SelectTrigger>
                     <SelectContent>
@@ -564,7 +570,7 @@ export default function WorkloadRiskPage() {
                   </Select>
 
                   <Select value={overrideFilter} onValueChange={setOverrideFilter}>
-                    <SelectTrigger id="wr-override-filter" size="sm" className="w-40 rounded-lg bg-background text-xs">
+                    <SelectTrigger id="wr-override-filter" size="sm" className="h-9 w-40 rounded-xl bg-background text-xs">
                       <SelectValue placeholder="Semua Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -597,8 +603,9 @@ export default function WorkloadRiskPage() {
           actionsSlot={
             canRecalculate ? (
               <Button
+                variant="cta"
                 size="sm"
-                className="rounded-lg"
+                className="rounded-xl"
                 onClick={handleRecalculate}
                 disabled={recalculating}
               >
@@ -633,10 +640,14 @@ export default function WorkloadRiskPage() {
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => setDetailSheetOpen(false)}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDetailSheetOpen(false)}
+            >
               Tutup
             </Button>
-            <Button asChild>
+            <Button variant="cta" className="rounded-xl" asChild>
               <Link
                 to={isEmployee ? `${routePrefix}/work-logs` : `${routePrefix}/task-assignments`}
               >

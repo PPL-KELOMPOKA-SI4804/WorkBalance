@@ -24,14 +24,12 @@ import {
   toApiDate,
   toISODateLocal,
 } from '@/lib/format';
-import { getInitials } from '@/lib/navigation';
 import { extractApiError } from '@/services/api';
 import { surveyService } from '@/services/surveyService';
 import { taskAssignmentService } from '@/services/taskAssignmentService';
 import { trainingParticipationService } from '@/services/trainingParticipationService';
 import { workloadRiskService } from '@/services/workloadRiskService';
 import { workLogService } from '@/services/workLogService';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,7 +49,7 @@ import {
   DataTable,
   DatePicker,
   FormSheet,
-  KpiStatCard,
+  HeroBentoCard,
   StatusBadge,
   WorkHoursBarChart,
 } from '@/components/workbalance';
@@ -120,6 +118,7 @@ export default function EmployeeDashboardPage() {
   const { user } = useAuth();
   const employee = user?.employee;
   const fullName = employee?.full_name || user?.email || 'Pegawai';
+  const firstName = fullName.trim().split(/\s+/)[0];
   const normalWeeklyHours = Number(employee?.employment_type?.normal_weekly_hours || 40);
   const workDaysPerWeek = Number(employee?.employment_type?.work_days_per_week || 5);
   const dailyLimit = workDaysPerWeek >= 6 ? 7 : 8;
@@ -228,6 +227,72 @@ export default function EmployeeDashboardPage() {
   );
   const weeklyHoursPct = Math.min(100, Math.round((currentWeekHours / normalWeeklyHours) * 100));
 
+  const heroMetrics = useMemo(
+    () => [
+      {
+        key: 'week-hours',
+        label: 'Jam Minggu Ini',
+        value: formatScore(currentWeekHours, 1),
+        unit: `/ ${normalWeeklyHours}j`,
+        icon: Clock,
+        status:
+          currentWeekHours >= 55
+            ? 'high'
+            : currentWeekHours > normalWeeklyHours
+              ? 'medium'
+              : 'low',
+        statusLabel:
+          currentWeekHours >= 55
+            ? 'Melebihi PP 35'
+            : currentWeekHours > normalWeeklyHours
+              ? 'Ada lembur'
+              : 'Batas sehat',
+        hint: `${weeklyHoursPct}%`,
+      },
+      {
+        key: 'my-risk',
+        label: 'Workload Risk Saya',
+        value: riskRow ? formatScore(riskRow.final_score, 1) : '-',
+        unit: riskRow ? '/ 100' : undefined,
+        icon: Activity,
+        status: riskRow?.risk_category || 'neutral',
+        statusLabel: riskRow ? undefined : 'Belum dihitung',
+      },
+      {
+        key: 'active-tasks',
+        label: 'Penugasan Aktif',
+        value: activeAssignments.length,
+        unit: 'tugas',
+        icon: ClipboardCheck,
+        hint:
+          urgentAssignmentsCount > 0
+            ? `${urgentAssignmentsCount} tenggat dekat`
+            : 'Tenggat terkendali',
+      },
+      {
+        key: 'trainings',
+        label: 'Pelatihan',
+        value: trainingsCount,
+        unit: 'diikuti',
+        icon: Award,
+        hint:
+          pendingSurveysCount > 0
+            ? `${pendingSurveysCount} survei belum diisi`
+            : 'Semua survei terisi',
+      },
+    ],
+    [
+      currentWeekHours,
+      normalWeeklyHours,
+      weeklyHoursPct,
+      riskRow,
+      activeAssignments.length,
+      urgentAssignmentsCount,
+      trainingsCount,
+      pendingSurveysCount,
+    ]
+  );
+
   const openQuickLogSheet = useCallback((assignment = null) => {
     setLogFormError('');
     setLogForm({
@@ -335,40 +400,33 @@ export default function EmployeeDashboardPage() {
 
   return (
     <AppShell title="Beranda" breadcrumb="Ruang Kerja">
-      <div className="flex flex-col gap-8">
-        {/* Compact Identity Header Strip */}
-        <section className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 lg:flex-row lg:items-center">
-          <div className="flex items-center gap-3.5">
-            <Avatar className="size-10 border border-border">
-              <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-                {getInitials(employee?.full_name, user?.email)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-base font-semibold tracking-[-0.015em] text-foreground">
-                  {fullName}
-                </h2>
-                <StatusBadge status="active" />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {employee?.position?.title || 'Pegawai'} · {employee?.department?.name || '-'}
-              </p>
+      <div className="flex flex-col gap-6">
+        {/* Top Greeting & Compact Employee Identity Meta (HRDashboard Home - V1) */}
+        <section className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-2xl font-bold tracking-[-0.025em] text-foreground">
+                Halo, {firstName}
+              </h2>
+              <StatusBadge status="active" />
             </div>
+            <p className="text-xs text-muted-foreground">
+              {employee?.position?.title || 'Pegawai'} · {employee?.department?.name || '-'}
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground lg:border-t-0 lg:pt-0">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+            <div className="inline-flex items-center gap-1.5">
               <Building2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
               <span className="font-mono text-foreground">
                 {employee?.employee_code || '-'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="inline-flex items-center gap-1.5">
               <Briefcase aria-hidden="true" className="size-3.5 text-muted-foreground" />
               <span>{employee?.employment_type?.name || 'Tetap'}</span>
             </div>
-            <div className="flex items-center gap-1.5 tabular-nums">
+            <div className="inline-flex items-center gap-1.5 tabular-nums">
               <Clock aria-hidden="true" className="size-3.5 text-muted-foreground" />
               <span>
                 {workDaysPerWeek} hari · {normalWeeklyHours}j/minggu
@@ -379,11 +437,11 @@ export default function EmployeeDashboardPage() {
 
         {/* Error State */}
         {errorMsg && (
-          <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-destructive/30 bg-card p-5 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-danger-border bg-card p-5 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-danger" />
               <div className="flex flex-col gap-0.5">
-                <p className="text-sm font-medium text-foreground">Gagal memuat beranda</p>
+                <p className="text-sm font-semibold text-foreground">Gagal memuat beranda</p>
                 <p className="text-xs text-muted-foreground">{errorMsg}</p>
               </div>
             </div>
@@ -393,119 +451,53 @@ export default function EmployeeDashboardPage() {
           </div>
         )}
 
-        {/* Row 1: 4 Personal KPI Stat Cards */}
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[1, 2, 3, 4].map((n) => (
-              <Skeleton key={n} className="h-32 rounded-2xl" />
-            ))}
-          </div>
+        {/* Band 1: Hero Bento Card (2x2 Personal KPIs + 7-Day Work Hours Chart) */}
+        {loading && !riskRow && workLogs.length === 0 ? (
+          <Skeleton className="h-[340px] w-full rounded-2xl" />
         ) : (
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiStatCard
-              label="Jam Minggu Ini"
-              value={formatScore(currentWeekHours, 1)}
-              unit={`/ ${normalWeeklyHours}j`}
-              icon={Clock}
-              progress={weeklyHoursPct}
-              status={
-                currentWeekHours >= 55
-                  ? 'high'
-                  : currentWeekHours > normalWeeklyHours
-                    ? 'medium'
-                    : 'low'
-              }
-              statusLabel={
-                currentWeekHours >= 55
-                  ? 'Melebihi PP 35'
-                  : currentWeekHours > normalWeeklyHours
-                    ? 'Ada lembur'
-                    : 'Batas sehat'
-              }
-            />
-
-            <KpiStatCard
-              label="Workload Risk Saya"
-              value={riskRow ? formatScore(riskRow.final_score, 1) : '-'}
-              unit={riskRow ? '/ 100' : undefined}
-              icon={Activity}
-              status={riskRow?.risk_category || 'neutral'}
-              statusLabel={riskRow ? undefined : 'Belum dihitung'}
-            />
-
-            <KpiStatCard
-              label="Penugasan Aktif"
-              value={activeAssignments.length}
-              unit="tugas"
-              icon={ClipboardCheck}
-              hint={
-                urgentAssignmentsCount > 0
-                  ? `${urgentAssignmentsCount} tenggat dekat`
-                  : 'Tenggat terkendali'
-              }
-            />
-
-            <KpiStatCard
-              label="Pelatihan"
-              value={trainingsCount}
-              unit="diikuti"
-              icon={Award}
-              hint={
-                pendingSurveysCount > 0
-                  ? `${pendingSurveysCount} survei belum diisi`
-                  : 'Semua survei terisi'
-              }
-            />
-          </section>
+          <HeroBentoCard
+            metrics={heroMetrics}
+            chartTitle="Jam Kerja 7 Hari Terakhir"
+            chartSubtitle={`Garis batas ${dailyLimit} jam/hari (PP 35/2021)`}
+            chartLegend={
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--chart-1)]" />
+                  Normal
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--chart-3)]" />
+                  Lembur
+                </span>
+              </>
+            }
+            chartActions={
+              <Button
+                variant="cta"
+                size="sm"
+                className="rounded-xl"
+                onClick={() => openQuickLogSheet(null)}
+              >
+                <Plus data-icon="inline-start" />
+                Catat Log
+              </Button>
+            }
+          >
+            {loading ? (
+              <Skeleton className="h-60 w-full rounded-xl" />
+            ) : (
+              <WorkHoursBarChart
+                data={dailyChartData}
+                dailyLimit={dailyLimit}
+                heightClass="h-60"
+              />
+            )}
+          </HeroBentoCard>
         )}
 
-        {/* Row 2: Daily Hours Chart + Active Tasks (8 cols) | Risk Profile + Quick Links (4 cols) */}
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <div className="flex flex-col gap-6 xl:col-span-8">
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-col gap-0.5">
-                  <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-                    Jam Kerja 7 Hari Terakhir
-                  </h3>
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    Garis batas {dailyLimit} jam/hari (PP 35/2021)
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-xs bg-[var(--chart-1)]" />
-                      Normal
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-xs bg-[var(--chart-3)]" />
-                      Lembur
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="rounded-lg"
-                    onClick={() => openQuickLogSheet(null)}
-                  >
-                    <Plus data-icon="inline-start" />
-                    Catat Log
-                  </Button>
-                </div>
-              </div>
-
-              {loading ? (
-                <Skeleton className="h-60 w-full rounded-xl" />
-              ) : (
-                <WorkHoursBarChart
-                  data={dailyChartData}
-                  dailyLimit={dailyLimit}
-                  heightClass="h-60"
-                />
-              )}
-            </div>
-
+        {/* Band 2: Bottom 8/4 Split (Active Tasks Table | Personal Risk Profile & Quick Links) */}
+        <section className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
+          <div className="xl:col-span-8">
             <DataTable
               title="Penugasan Aktif"
               countLabel="tugas"
@@ -519,7 +511,7 @@ export default function EmployeeDashboardPage() {
               emptyTitle="Tidak ada penugasan aktif"
               emptyDescription="Semua penugasan selesai atau belum ada tugas baru."
               actionsSlot={
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" className="rounded-xl" asChild>
                   <Link to="/employee/task-assignments">
                     Semua
                     <ArrowUpRight data-icon="inline-end" />
@@ -529,15 +521,14 @@ export default function EmployeeDashboardPage() {
             />
           </div>
 
-          {/* Right Rail: Personal 4 Sub-Indicators + Quick Links */}
           <div className="flex flex-col gap-6 xl:col-span-4">
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
                   Profil Beban Kerja
                 </h3>
                 {riskRow?.period_week && (
-                  <span className="text-xs text-muted-foreground tabular-nums">
+                  <span className="text-xs font-medium text-muted-foreground tabular-nums">
                     {formatWeek(riskRow.period_week)}
                   </span>
                 )}
@@ -558,7 +549,7 @@ export default function EmployeeDashboardPage() {
                   {subIndicators.map((sub) => (
                     <div key={sub.label} className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{sub.label}</span>
+                        <span className="font-medium text-muted-foreground">{sub.label}</span>
                         <span className="font-semibold text-foreground tabular-nums">
                           {formatScore(sub.score, 1)}
                         </span>
@@ -570,7 +561,7 @@ export default function EmployeeDashboardPage() {
                     </div>
                   ))}
                   {riskRow?.recommendation_note && (
-                    <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+                    <p className="border-t border-border pt-3.5 text-xs leading-relaxed text-muted-foreground">
                       {riskRow.recommendation_note}
                     </p>
                   )}
@@ -579,8 +570,8 @@ export default function EmployeeDashboardPage() {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              <div className="border-b border-border px-5 py-3.5">
-                <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+              <div className="border-b border-border px-6 py-4">
+                <h3 className="text-base font-bold tracking-[-0.02em] text-foreground">
                   Aksi Cepat
                 </h3>
               </div>
@@ -591,10 +582,12 @@ export default function EmployeeDashboardPage() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="group flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/40"
+                      className="group flex items-center justify-between gap-3 px-6 py-3.5 transition-colors hover:bg-muted/40"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-primary">
+                          <Icon className="size-4" />
+                        </span>
                         <span className="truncate text-sm font-medium text-foreground">
                           {item.title}
                         </span>
@@ -621,12 +614,19 @@ export default function EmployeeDashboardPage() {
             <Button
               type="button"
               variant="outline"
+              className="rounded-xl"
               onClick={() => setLogSheetOpen(false)}
               disabled={logSubmitting}
             >
               Batal
             </Button>
-            <Button type="submit" form="quick-work-log-form" disabled={logSubmitting}>
+            <Button
+              type="submit"
+              variant="cta"
+              form="quick-work-log-form"
+              className="rounded-xl"
+              disabled={logSubmitting}
+            >
               {logSubmitting && <Spinner data-icon="inline-start" />}
               Simpan
             </Button>
@@ -641,14 +641,14 @@ export default function EmployeeDashboardPage() {
           {logFormError && (
             <div
               role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive"
+              className="rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-xs text-danger"
             >
               {logFormError}
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="quick-log-assignment" className="text-xs">
+            <Label htmlFor="quick-log-assignment" className="text-xs font-semibold">
               Penugasan (Opsional)
             </Label>
             <Select
@@ -660,7 +660,7 @@ export default function EmployeeDashboardPage() {
                 }))
               }
             >
-              <SelectTrigger id="quick-log-assignment" className="w-full rounded-lg bg-background">
+              <SelectTrigger id="quick-log-assignment" className="h-10 w-full rounded-xl bg-background">
                 <SelectValue placeholder="Aktivitas umum" />
               </SelectTrigger>
               <SelectContent>
@@ -678,8 +678,8 @@ export default function EmployeeDashboardPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="quick-log-date" className="text-xs">
-                Tanggal
+              <Label htmlFor="quick-log-date" className="text-xs font-semibold">
+                Tanggal <span className="text-danger">*</span>
               </Label>
               <DatePicker
                 id="quick-log-date"
@@ -692,8 +692,8 @@ export default function EmployeeDashboardPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="quick-log-hours" className="text-xs">
-                Durasi (Jam)
+              <Label htmlFor="quick-log-hours" className="text-xs font-semibold">
+                Durasi (Jam) <span className="text-danger">*</span>
               </Label>
               <Input
                 id="quick-log-hours"
@@ -703,6 +703,7 @@ export default function EmployeeDashboardPage() {
                 min="0.25"
                 max="24"
                 required
+                className="h-10 rounded-xl bg-background"
                 value={logForm.hours_spent}
                 onChange={(e) =>
                   setLogForm((prev) => ({ ...prev, hours_spent: e.target.value }))
@@ -712,14 +713,15 @@ export default function EmployeeDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="quick-log-desc" className="text-xs">
-              Deskripsi Aktivitas
+            <Label htmlFor="quick-log-desc" className="text-xs font-semibold">
+              Deskripsi Aktivitas <span className="text-danger">*</span>
             </Label>
             <Textarea
               id="quick-log-desc"
               name="activity_description"
               rows={4}
               required
+              className="rounded-xl bg-background"
               placeholder="Ringkas pekerjaan yang diselesaikan hari ini..."
               value={logForm.activity_description}
               onChange={(e) =>
