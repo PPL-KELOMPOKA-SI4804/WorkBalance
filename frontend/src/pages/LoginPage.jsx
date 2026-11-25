@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
@@ -20,6 +20,44 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { BrandLogo, StatusBadge, ThemeSwitch } from '@/components/workbalance';
+
+const SLIDE_DURATION_MS = 3000;
+
+const HERO_SLIDES = [
+  {
+    id: 'workload-balance',
+    src: '/assets/login-hero.jpg',
+    objectPosition: 'object-[center_35%]',
+    alt: 'Kolaborasi tim WorkBalance dalam ruang kerja modern',
+    badge: 'SDG 8 · Decent Work Decision Support',
+    headline: 'Keseimbangan beban kerja, terukur setiap minggu.',
+    subtitle:
+      'Pemantauan kapasitas tugas, batas jam kerja PP No. 35/2021, dan indikator SDG 8 secara objektif dan non-punitif.',
+    footerMeta: 'PP No. 35/2021 · 40j + maks 18j lembur',
+  },
+  {
+    id: 'ergonomic-safety',
+    src: '/assets/login-hero-2.jpg',
+    objectPosition: 'object-center',
+    alt: 'Ruang kerja modern yang ergonomis, terang, dan mendukung kesehatan kerja',
+    badge: 'SDG 8.8 · Keselamatan & Kesehatan Kerja',
+    headline: 'Lingkungan kerja aman, ergonomis, dan berkelanjutan.',
+    subtitle:
+      'Deteksi dini kelelahan kerja, tindak lanjut isu K3, dan ritme istirahat sehat demi produktivitas jangka panjang.',
+    footerMeta: 'Pemantauan K3 · Pencegahan Kelelahan',
+  },
+  {
+    id: 'non-punitive-decisions',
+    src: '/assets/login-hero-3.jpg',
+    objectPosition: 'object-[32%_center]',
+    alt: 'Diskusi perencanaan kapasitas yang suportif antara manajer dan anggota tim',
+    badge: 'Decent Work Score · 6 Dimensi Terintegrasi',
+    headline: 'Keputusan tim berbasis data, objektif dan non-punitif.',
+    subtitle:
+      'Redistribusi tugas yang adil, pengembangan kompetensi terarah, serta survei kesejahteraan agregat berprivasi NFR-02.',
+    footerMeta: 'Privasi NFR-02 · Agregasi Departemen',
+  },
+];
 
 const DEMO_ACCOUNTS = [
   {
@@ -58,9 +96,23 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Hero 3-slide carousel state (3s per photo, pauses cleanly on hover/focus)
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+
+  useEffect(() => {
+    if (isCarouselPaused) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, SLIDE_DURATION_MS);
+    return () => window.clearInterval(timer);
+  }, [isCarouselPaused, activeSlide]);
+
   if (user) {
     return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
   }
+
+  const currentSlide = HERO_SLIDES[activeSlide] || HERO_SLIDES[0];
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -97,45 +149,136 @@ export default function LoginPage() {
         <ThemeSwitch />
       </div>
 
-      {/* Left Editorial Photography Panel (HRDashboard 2. Sign In - Filled) */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[oklch(0.15_0.020_262)] lg:col-span-6 lg:flex">
-        <img
-          src="/assets/login-hero.jpg"
-          alt="Kolaborasi tim WorkBalance dalam ruang kerja modern"
-          className="absolute inset-0 h-full w-full object-cover object-[center_35%]"
-        />
+      {/* Left Editorial Photography Carousel (3 slides x 3s, pauses on hover/focus) */}
+      <aside
+        aria-label="Sorotan nilai WorkBalance"
+        onMouseEnter={() => setIsCarouselPaused(true)}
+        onMouseLeave={() => setIsCarouselPaused(false)}
+        onFocusCapture={() => setIsCarouselPaused(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setIsCarouselPaused(false);
+          }
+        }}
+        className="relative hidden flex-col justify-between overflow-hidden bg-[oklch(0.15_0.020_262)] lg:col-span-6 lg:flex"
+      >
+        {/* Layered Preloaded Slides for Flicker-Free Crossfade */}
+        {HERO_SLIDES.map((slide, index) => {
+          const isCurrent = index === activeSlide;
+          return (
+            <motion.img
+              key={slide.id}
+              src={slide.src}
+              alt={slide.alt}
+              aria-hidden={!isCurrent}
+              initial={false}
+              animate={{
+                opacity: isCurrent ? 1 : 0,
+                scale: prefersReducedMotion ? 1 : isCurrent ? 1 : 1.035,
+              }}
+              transition={{
+                opacity: { duration: prefersReducedMotion ? 0.12 : 0.55, ease: [0.22, 1, 0.36, 1] },
+                scale: { duration: prefersReducedMotion ? 0.12 : 0.75, ease: [0.22, 1, 0.36, 1] },
+              }}
+              className={cn(
+                'pointer-events-none absolute inset-0 h-full w-full object-cover',
+                slide.objectPosition
+              )}
+            />
+          );
+        })}
+
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-[oklch(0.135_0.022_262/96%)] via-[oklch(0.145_0.022_262/56%)] to-[oklch(0.145_0.022_262/22%)]"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[oklch(0.135_0.022_262/96%)] via-[oklch(0.145_0.022_262/56%)] to-[oklch(0.145_0.022_262/22%)]"
         />
 
         <div className="relative z-10 p-10 xl:p-14">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/25 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm">
-            <span className="size-1.5 rounded-full bg-[var(--chart-2)]" />
-            SDG 8 · Decent Work Decision Support
-          </span>
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={currentSlide.id}
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm"
+            >
+              <span className="size-1.5 rounded-full bg-[var(--chart-2)]" />
+              {currentSlide.badge}
+            </motion.span>
+          </AnimatePresence>
         </div>
 
         <div className="relative z-10 mt-auto flex max-w-xl flex-col gap-5 p-10 xl:p-14">
           <BrandLogo variant="lockup" inverted />
 
-          <div className="flex flex-col gap-2.5">
-            <h2 className="text-3xl leading-[1.18] font-bold tracking-[-0.03em] text-white text-balance xl:text-[36px]">
-              Keseimbangan beban kerja, terukur setiap minggu.
-            </h2>
-            <p className="max-w-md text-sm leading-relaxed text-white/80">
-              Pemantauan kapasitas tugas, batas jam kerja PP No. 35/2021, dan indikator SDG 8 secara objektif dan non-punitif.
-            </p>
+          <div className="min-h-[122px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide.id}
+                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col gap-2.5"
+              >
+                <h2 className="text-3xl leading-[1.18] font-bold tracking-[-0.03em] text-white text-balance xl:text-[36px]">
+                  {currentSlide.headline}
+                </h2>
+                <p className="max-w-md text-sm leading-relaxed text-white/80">
+                  {currentSlide.subtitle}
+                </p>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           <div className="flex items-center justify-between gap-4 pt-3">
-            <div className="flex items-center gap-1.5" aria-hidden="true">
-              <span className="h-1.5 w-8 rounded-full bg-white" />
-              <span className="h-1.5 w-2 rounded-full bg-white/35" />
-              <span className="h-1.5 w-2 rounded-full bg-white/35" />
+            <div
+              role="tablist"
+              aria-label="Pilih sorotan halaman masuk"
+              className="flex items-center gap-2"
+            >
+              {HERO_SLIDES.map((slide, index) => {
+                const isCurrent = index === activeSlide;
+                return (
+                  <button
+                    key={slide.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isCurrent}
+                    aria-label={`Slide ${index + 1} dari ${HERO_SLIDES.length}: ${slide.headline}`}
+                    onClick={() => setActiveSlide(index)}
+                    className="group py-2 focus-visible:outline-none"
+                  >
+                    <span
+                      className={cn(
+                        'relative block h-1.5 overflow-hidden rounded-full transition-all duration-300',
+                        isCurrent
+                          ? 'w-10 bg-white/30'
+                          : 'w-2.5 bg-white/35 group-hover:w-4 group-hover:bg-white/75'
+                      )}
+                    >
+                      {isCurrent && (
+                        <motion.span
+                          key={`${slide.id}-${isCarouselPaused ? 'paused' : 'play'}`}
+                          initial={{ scaleX: isCarouselPaused || prefersReducedMotion ? 1 : 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={
+                            isCarouselPaused || prefersReducedMotion
+                              ? { duration: 0 }
+                              : { duration: SLIDE_DURATION_MS / 1000, ease: 'linear' }
+                          }
+                          style={{ transformOrigin: 'left center' }}
+                          className="absolute inset-0 rounded-full bg-white"
+                        />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <span className="text-xs font-medium text-white/75 tabular-nums">
-              PP No. 35/2021 · Privasi NFR-02
+              {currentSlide.footerMeta}
             </span>
           </div>
         </div>
@@ -220,7 +363,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-hover-surface-strong hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
