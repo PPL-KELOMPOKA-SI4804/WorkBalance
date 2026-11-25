@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   createFilteredRowModel,
@@ -17,6 +17,7 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   Inbox,
   Search,
   X,
@@ -41,6 +42,97 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { detectCellOverflowText } from './TruncatedText';
+
+const INITIAL_COLUMN_RESIZING = {
+  startOffset: null,
+  startSize: null,
+  deltaOffset: null,
+  deltaPercentage: null,
+  isResizingColumn: false,
+  columnSizingStart: [],
+};
+
+const CELL_TOOLTIP_DELAY_MS = 150;
+
+function OverflowTooltipCell({
+  as: CellComponent = TableCell,
+  disabled = false,
+  children,
+  ...props
+}) {
+  const cellRef = useRef(null);
+  const timerRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [overflowText, setOverflowText] = useState('');
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  useEffect(() => {
+    if (disabled) {
+      clearTimer();
+      setOpen(false);
+    }
+  }, [disabled, clearTimer]);
+
+  const handleMouseEnter = useCallback(() => {
+    clearTimer();
+    if (disabled) return;
+    const text = detectCellOverflowText(cellRef.current);
+    if (!text) {
+      setOpen(false);
+      setOverflowText('');
+      return;
+    }
+    setOverflowText(text);
+    timerRef.current = window.setTimeout(() => {
+      setOpen(true);
+    }, CELL_TOOLTIP_DELAY_MS);
+  }, [clearTimer, disabled]);
+
+  const handleClose = useCallback(() => {
+    clearTimer();
+    setOpen(false);
+  }, [clearTimer]);
+
+  return (
+    <Tooltip open={open}>
+      <TooltipTrigger asChild>
+        <CellComponent
+          ref={cellRef}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleClose}
+          onMouseDown={handleClose}
+          {...props}
+        >
+          {children}
+        </CellComponent>
+      </TooltipTrigger>
+      {open && overflowText && (
+        <TooltipContent
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="max-w-sm whitespace-normal break-words px-3 py-2 text-xs leading-relaxed"
+        >
+          {overflowText}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
+}
 
 function buildPaginationRange(currentPage, totalPages) {
   if (totalPages <= 5) {
@@ -82,6 +174,7 @@ export function DataTable({
   filterSlot,
   actionsSlot,
   pageSize = 10,
+  resizable = true,
   emptyTitle = 'Belum ada data',
   emptyDescription = 'Data akan muncul di sini setelah tersedia atau sesuai filter yang dipilih.',
   emptyAction,
@@ -93,6 +186,8 @@ export function DataTable({
   const [sorting, setSorting] = useState([]);
   const [internalSearch, setInternalSearch] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
+  const [columnSizing, setColumnSizing] = useState({});
+  const [columnResizing, setColumnResizing] = useState(INITIAL_COLUMN_RESIZING);
 
   const isControlledSearch = typeof onSearchChange === 'function';
   const activeSearch = isControlledSearch ? searchValue ?? '' : internalSearch;
@@ -122,13 +217,24 @@ export function DataTable({
       features,
       data: safeData,
       columns,
+      enableColumnResizing: resizable,
+      columnResizeMode: 'onChange',
+      defaultColumn: {
+        size: 160,
+        minSize: 72,
+        maxSize: 560,
+      },
       state: {
         sorting,
         globalFilter: isControlledSearch ? '' : activeSearch,
         pagination,
+        columnSizing,
+        columnResizing,
       },
       onSortingChange: setSorting,
       onPaginationChange: setPagination,
+      onColumnSizingChange: setColumnSizing,
+      onColumnResizingChange: setColumnResizing,
       onGlobalFilterChange: (val) => {
         if (!isControlledSearch) setInternalSearch(String(val ?? ''));
       },
@@ -145,12 +251,16 @@ export function DataTable({
 
   const isInitialLoading = loading && safeData.length === 0;
   const isRefetching = loading && safeData.length > 0;
+  const isAnyResizing = Boolean(columnResizing?.isResizingColumn);
+  const hasCustomWidths = Object.keys(columnSizing).length > 0;
+  const totalColumnWidth = resizable ? table.getCenterTotalSize() : null;
+
   const pageNumbers = useMemo(
     () => buildPaginationRange(pageIndex, pageCount),
     [pageIndex, pageCount]
   );
 
-  const hasToolbarRow = searchable || Boolean(filterSlot);
+  const hasToolbarRow = searchable || Boolean(filterSlot) || (resizable && hasCustomWidths);
 
   return (
     <div
@@ -186,7 +296,7 @@ export function DataTable({
         </div>
       )}
 
-      {/* Single-Row Search & Inline Filter Bar (HRDashboard 19. Employee rhythm) */}
+      {/* Single-Row Search & Inline Filter Bar */}
       {hasToolbarRow && (
         <div
           className={cn(
@@ -207,14 +317,14 @@ export function DataTable({
                 value={activeSearch}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="h-9 rounded-xl bg-background pl-9 pr-8 text-xs sm:text-sm"
+                className="h-9 rounded-xl bg-background pl-9 pr-8 text-xs transition-colors hover:border-hover-border sm:text-sm"
               />
               {activeSearch && (
                 <button
                   type="button"
                   onClick={() => handleSearch('')}
                   aria-label="Hapus pencarian"
-                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-hover-surface-strong hover:text-foreground"
                 >
                   <X className="size-3.5" />
                 </button>
@@ -222,8 +332,22 @@ export function DataTable({
             </div>
           )}
 
-          {filterSlot && (
-            <div className="flex flex-wrap items-center gap-2">{filterSlot}</div>
+          {(filterSlot || (resizable && hasCustomWidths)) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {filterSlot}
+              {resizable && hasCustomWidths && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => table.resetColumnSizing()}
+                  className="h-9 rounded-xl text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Columns3 data-icon="inline-start" />
+                  Reset Lebar
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -263,7 +387,7 @@ export function DataTable({
             <p className="max-w-md text-xs text-muted-foreground">{error}</p>
           </div>
           {onRetry && (
-            <Button variant="outline" size="sm" onClick={onRetry}>
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={onRetry}>
               Coba Lagi
             </Button>
           )}
@@ -295,15 +419,23 @@ export function DataTable({
         <div
           className={cn(
             'overflow-x-auto px-5 pb-2 transition-opacity duration-150 sm:px-6',
-            isRefetching && 'pointer-events-none opacity-60'
+            isRefetching && 'pointer-events-none opacity-60',
+            isAnyResizing && 'select-none'
           )}
         >
-          <Table>
+          <Table
+            className={cn(resizable && 'table-fixed')}
+            style={
+              resizable && totalColumnWidth
+                ? { width: `${totalColumnWidth}px`, minWidth: '100%' }
+                : undefined
+            }
+          >
             <TableHeader className="[&_tr]:border-b-0">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow
                   key={headerGroup.id}
-                  className="bg-muted/75 hover:bg-muted/75"
+                  className="bg-muted/85 hover:bg-muted/85"
                 >
                   {headerGroup.headers.map((header, idx) => {
                     const canSort = header.column.getCanSort();
@@ -311,41 +443,91 @@ export function DataTable({
                     const colMetaClass = header.column.columnDef.meta?.className;
                     const isFirst = idx === 0;
                     const isLast = idx === headerGroup.headers.length - 1;
+                    const canResize =
+                      resizable && !isLast && header.column.getCanResize();
+                    const isResizing = header.column.getIsResizing();
+                    const headerTitle =
+                      typeof header.column.columnDef.header === 'string'
+                        ? header.column.columnDef.header
+                        : header.column.id;
+
                     return (
-                      <TableHead
+                      <OverflowTooltipCell
                         key={header.id}
+                        as={TableHead}
+                        disabled={isAnyResizing || header.column.id === 'actions'}
+                        style={
+                          resizable
+                            ? {
+                                width: `${header.getSize()}px`,
+                                minWidth: `${header.column.columnDef.minSize ?? 72}px`,
+                              }
+                            : undefined
+                        }
                         className={cn(
-                          'h-11 px-4 text-xs font-semibold text-muted-foreground',
+                          'relative h-11 px-4 text-xs font-semibold text-muted-foreground',
                           isFirst && 'rounded-l-xl',
                           isLast && 'rounded-r-xl',
                           colMetaClass
                         )}
                       >
-                        {header.isPlaceholder ? null : canSort ? (
-                          <button
-                            type="button"
-                            onClick={header.column.getToggleSortingHandler()}
-                            className="inline-flex items-center gap-1.5 text-left font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                        <div className="flex min-w-0 items-center overflow-hidden pr-1">
+                          {header.isPlaceholder ? null : canSort ? (
+                            <button
+                              type="button"
+                              onClick={header.column.getToggleSortingHandler()}
+                              className="group/sort inline-flex min-w-0 items-center gap-1.5 rounded-md px-1 -mx-1 py-0.5 text-left font-semibold text-muted-foreground transition-colors duration-150 hover:bg-hover-surface-strong hover:text-foreground"
+                            >
+                              <span className="truncate">
+                                {flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                              </span>
+                              {sortDir === 'asc' ? (
+                                <ArrowUp className="size-3.5 shrink-0 text-primary" />
+                              ) : sortDir === 'desc' ? (
+                                <ArrowDown className="size-3.5 shrink-0 text-primary" />
+                              ) : (
+                                <ArrowUpDown className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/sort:text-primary" />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="truncate">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
+                          )}
+                        </div>
+
+                        {canResize && (
+                          <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label={`Ubah lebar kolom ${headerTitle}`}
+                            title="Tahan & geser untuk ubah lebar kolom · Klik 2x untuk reset"
+                            onMouseDown={header.getResizeHandler()}
+                            onTouchStart={header.getResizeHandler()}
+                            onClick={(event) => event.stopPropagation()}
+                            onDoubleClick={(event) => {
+                              event.stopPropagation();
+                              header.column.resetSize();
+                            }}
+                            className="group/resizer absolute top-1.5 -right-1.5 bottom-1.5 z-20 flex w-3 cursor-col-resize items-center justify-center touch-none select-none"
                           >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                            {sortDir === 'asc' ? (
-                              <ArrowUp className="size-3.5 text-primary" />
-                            ) : sortDir === 'desc' ? (
-                              <ArrowDown className="size-3.5 text-primary" />
-                            ) : (
-                              <ArrowUpDown className="size-3.5 text-muted-foreground" />
-                            )}
-                          </button>
-                        ) : (
-                          flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )
+                            <span
+                              className={cn(
+                                'h-full rounded-full transition-all duration-150',
+                                isResizing
+                                  ? 'w-[2.5px] bg-primary shadow-[0_0_0_2px_color-mix(in_oklch,var(--primary)_24%,transparent)]'
+                                  : 'w-px bg-border group-hover/resizer:w-[2.5px] group-hover/resizer:bg-primary'
+                              )}
+                            />
+                          </div>
                         )}
-                      </TableHead>
+                      </OverflowTooltipCell>
                     );
                   })}
                 </TableRow>
@@ -371,16 +553,27 @@ export function DataTable({
                       : undefined
                   }
                   className={cn(
-                    'border-b border-border/75 transition-colors last:border-b-0 hover:bg-muted/40',
+                    'group/row border-b border-border/75 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] last:border-b-0 hover:bg-hover-surface',
                     onRowClick &&
-                      'cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring'
+                      'cursor-pointer hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:bg-hover-surface focus-visible:shadow-[inset_3px_0_0_var(--primary)] focus-visible:outline-none'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
+                    <OverflowTooltipCell
                       key={cell.id}
+                      as={TableCell}
+                      disabled={isAnyResizing || cell.column.id === 'actions'}
+                      style={
+                        resizable
+                          ? {
+                              width: `${cell.column.getSize()}px`,
+                              minWidth: `${cell.column.columnDef.minSize ?? 72}px`,
+                            }
+                          : undefined
+                      }
                       className={cn(
-                        'px-4 py-3.5 text-sm whitespace-normal',
+                        'px-4 py-3.5 text-sm',
+                        resizable ? 'overflow-hidden' : 'whitespace-normal',
                         cell.column.columnDef.meta?.className
                       )}
                     >
@@ -388,7 +581,7 @@ export function DataTable({
                         cell.column.columnDef.cell,
                         cell.getContext()
                       )}
-                    </TableCell>
+                    </OverflowTooltipCell>
                   ))}
                 </TableRow>
               ))}
@@ -432,10 +625,10 @@ export function DataTable({
                   onClick={() => table.setPageIndex(item)}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
-                    'flex size-8 items-center justify-center rounded-lg text-xs tabular-nums transition-colors',
+                    'flex size-8 items-center justify-center rounded-lg text-xs tabular-nums transition-all duration-150',
                     isCurrent
-                      ? 'border border-border bg-muted font-semibold text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      ? 'border border-hover-border bg-hover-surface font-semibold text-foreground'
+                      : 'text-muted-foreground hover:-translate-y-px hover:bg-hover-surface-strong hover:text-foreground'
                   )}
                 >
                   {item + 1}

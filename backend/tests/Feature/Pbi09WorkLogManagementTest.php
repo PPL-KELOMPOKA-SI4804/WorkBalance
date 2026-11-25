@@ -55,7 +55,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_employee_lists_only_own_work_logs_and_assignments_with_estimation_comparison(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
 
         $response = $this->withToken($token)
             ->getJson('/api/v1/work-logs');
@@ -85,7 +85,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_employee_can_create_view_update_and_delete_own_work_log_and_auto_start_assignment(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
 
         // Task 2 assignment starts as 'assigned' with task status 'open'
@@ -152,7 +152,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_employee_cannot_view_update_or_delete_other_employees_work_log(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $otherLog = WorkLog::where('employee_id', $emp4->id)->firstOrFail();
 
@@ -177,7 +177,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_employee_cannot_log_work_against_another_employees_task_assignment(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $otherAssignment = TaskAssignment::where('employee_id', $emp4->id)->firstOrFail();
 
@@ -194,7 +194,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_daily_work_hours_exceeding_24_hours_is_rejected_with_conflict(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $targetDate = now()->toDateString(); // EMP-003 already has 4.0h seeded on today
 
         $this->withToken($token)
@@ -209,7 +209,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_manager_can_view_and_filter_all_work_logs_and_realization_metrics(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $engDept = Department::where('code', 'ENG')->firstOrFail();
         $emp4Assignment = TaskAssignment::where('employee_id', $emp4->id)->firstOrFail();
@@ -255,7 +255,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_manager_cannot_create_update_or_delete_work_logs(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $sampleLog = WorkLog::firstOrFail();
 
         $this->withToken($token)
@@ -282,7 +282,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_admin_can_create_update_and_delete_work_log_and_rejects_mismatched_assignment(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $emp4Assignment = TaskAssignment::where('employee_id', $emp4->id)->firstOrFail();
@@ -332,7 +332,7 @@ class Pbi09WorkLogManagementTest extends TestCase
 
     public function test_validation_rejects_invalid_work_log_payloads(): void
     {
-        $token = $this->employee2->createToken('emp2')->plainTextToken;
+        $token = $this->issueJwt($this->employee2);
 
         $this->withToken($token)
             ->postJson('/api/v1/work-logs', [

@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import api, { TOKEN_STORAGE_KEY } from '../services/api';
+import { toast } from 'sonner';
+import api, {
+  clearStoredAuthTokens,
+  REFRESH_TOKEN_STORAGE_KEY,
+  SESSION_EXPIRED_EVENT,
+  setStoredAuthTokens,
+  TOKEN_STORAGE_KEY,
+} from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -18,11 +25,19 @@ export function getDefaultRouteForRole(role) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(() => Boolean(localStorage.getItem(TOKEN_STORAGE_KEY)));
+  const [loading, setLoading] = useState(() =>
+    Boolean(
+      localStorage.getItem(TOKEN_STORAGE_KEY) ||
+        localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
+    )
+  );
 
   const fetchProfile = useCallback(async () => {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!token) {
+    const hasStoredSession = Boolean(
+      localStorage.getItem(TOKEN_STORAGE_KEY) ||
+        localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
+    );
+    if (!hasStoredSession) {
       setUser(null);
       setLoading(false);
       return null;
@@ -34,7 +49,7 @@ export function AuthProvider({ children }) {
       setUser(activeUser);
       return activeUser;
     } catch {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      clearStoredAuthTokens();
       setUser(null);
       return null;
     } finally {
@@ -46,21 +61,44 @@ export function AuthProvider({ children }) {
     fetchProfile();
   }, [fetchProfile]);
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      clearStoredAuthTokens();
+      setUser(null);
+      setLoading(false);
+      toast.info('Sesi Anda telah berakhir. Silakan masuk kembali.', {
+        id: 'wb-session-expired',
+      });
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, []);
+
   const login = async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
-    const { token, user: loggedInUser } = response.data.data;
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    const data = response.data?.data || {};
+    const accessToken = data.access_token || data.token;
+    const refreshToken = data.refresh_token;
+    const loggedInUser = data.user;
+
+    setStoredAuthTokens(accessToken, refreshToken);
     setUser(loggedInUser);
     return loggedInUser;
   };
 
   const logout = async () => {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
     try {
-      await api.delete('/auth/logout');
+      await api.delete('/auth/logout', {
+        data: refreshToken ? { refresh_token: refreshToken } : undefined,
+      });
     } catch {
       // Clear local session regardless of server token expiry
     } finally {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      clearStoredAuthTokens();
       setUser(null);
     }
   };

@@ -33,7 +33,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_admin_can_list_and_filter_trainings_with_summary_metrics(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         $response = $this->withToken($token)
             ->getJson('/api/v1/trainings');
@@ -82,7 +82,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_admin_can_create_view_update_and_delete_training(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         $createResponse = $this->withToken($token)
             ->postJson('/api/v1/trainings', [
@@ -132,7 +132,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_manager_can_list_create_update_and_delete_training(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
 
         $this->withToken($token)
             ->getJson('/api/v1/trainings')
@@ -168,7 +168,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_training_validation_rejects_invalid_dates_duration_and_missing_fields(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $existingTraining = Training::firstOrFail();
 
         // Store with missing fields, duration <= 0, and end_date < start_date
@@ -205,7 +205,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_cannot_delete_training_referenced_by_employee_participations(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $training = Training::firstOrFail();
         $employee = Employee::where('employee_code', 'EMP-003')->firstOrFail();
 
@@ -225,7 +225,7 @@ class Pbi05TrainingCatalogManagementTest extends TestCase
 
     public function test_rbac_employee_is_forbidden_from_training_catalog(): void
     {
-        $token = $this->employeeUser->createToken('emp')->plainTextToken;
+        $token = $this->issueJwt($this->employeeUser);
         $training = Training::firstOrFail();
 
         $this->withToken($token)->getJson('/api/v1/trainings')->assertForbidden();

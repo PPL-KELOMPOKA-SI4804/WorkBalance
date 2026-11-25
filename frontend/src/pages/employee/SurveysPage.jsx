@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
-import { formatMonth, toApiMonth } from '@/lib/format';
+import { formatDate, formatMonth, toApiMonth } from '@/lib/format';
 import { extractApiError } from '@/services/api';
 import { surveyService } from '@/services/surveyService';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +89,20 @@ function getDimensionBadgeMeta(score) {
   };
 }
 
+function getWorkloadPerceptionMeta(score) {
+  if (score === null || score === undefined) {
+    return { status: 'inactive', tone: 'neutral', hint: 'Belum ada data' };
+  }
+  const num = Number(score);
+  if (num <= 2.5) {
+    return { status: 'low', tone: 'success', hint: 'Terkendali' };
+  }
+  if (num <= 3.5) {
+    return { status: 'medium', tone: 'warning', hint: 'Sedang' };
+  }
+  return { status: 'high', tone: 'danger', hint: 'Perlu Perhatian' };
+}
+
 function emptySurveyForm() {
   return {
     title: '',
@@ -104,25 +118,6 @@ function emptyResponseForm() {
     workload_perception_score: 3,
     comments: '',
   };
-}
-
-function getSurveyActiveCount(survey) {
-  if (survey?.active_employees_count !== null && survey?.active_employees_count !== undefined) {
-    return Number(survey.active_employees_count);
-  }
-  if (
-    survey?.total_active_employees !== null &&
-    survey?.total_active_employees !== undefined
-  ) {
-    return Number(survey.total_active_employees);
-  }
-  if (Array.isArray(survey?.department_aggregates) && survey.department_aggregates.length > 0) {
-    return survey.department_aggregates.reduce(
-      (sum, dept) => sum + Number(dept.active_employees_count || 0),
-      0
-    );
-  }
-  return null;
 }
 
 function Nfr02PrivacyCue({ isEmployee, compact = false }) {
@@ -368,35 +363,90 @@ export default function SurveysPage() {
   const departmentAggregateColumns = useMemo(
     () => [
       {
+        accessorKey: 'department_code',
+        header: 'Kode Dept',
+        size: 105,
+        minSize: 84,
+        maxSize: 150,
+        cell: ({ row }) => {
+          const code = row.original.department_code || '-';
+          return (
+            <Badge variant="outline" className="font-mono text-xs font-normal" title={code}>
+              {code}
+            </Badge>
+          );
+        },
+      },
+      {
         accessorKey: 'department_name',
         header: 'Departemen',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <Badge variant="outline" className="font-mono text-xs font-normal">
-              {row.original.department_code}
-            </Badge>
-            <span
-              className="max-w-[135px] truncate text-xs font-medium text-foreground"
-              title={row.original.department_name}
-            >
-              {row.original.department_name}
+        size: 235,
+        minSize: 145,
+        maxSize: 380,
+        cell: ({ row }) => {
+          const name = row.original.department_name || '-';
+          return (
+            <span className="block truncate text-xs font-medium text-foreground" title={name}>
+              {name}
             </span>
-          </div>
-        ),
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.active_employees_count ?? 0),
+        id: 'active_employees_count',
+        header: 'Pegawai Aktif',
+        size: 125,
+        minSize: 96,
+        maxSize: 180,
+        cell: ({ row }) => {
+          const count = Number(row.original.active_employees_count ?? 0);
+          const label = `${count} pegawai`;
+          return (
+            <span className="block truncate text-xs text-foreground tabular-nums" title={label}>
+              {label}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.respondents_count ?? 0),
+        id: 'respondents_count',
+        header: 'Responden',
+        size: 115,
+        minSize: 92,
+        maxSize: 170,
+        cell: ({ row }) => {
+          const count = Number(row.original.respondents_count ?? 0);
+          const label = `${count} respons`;
+          return (
+            <span
+              className="block truncate text-xs font-medium text-foreground tabular-nums"
+              title={label}
+            >
+              {label}
+            </span>
+          );
+        },
       },
       {
         accessorFn: (row) => Number(row.participation_rate || 0),
         id: 'participation',
         header: 'Partisipasi',
+        size: 130,
+        minSize: 100,
+        maxSize: 200,
         cell: ({ row }) => {
           const rate = Number(row.original.participation_rate || 0);
+          const clamped = Math.min(100, Math.max(0, rate));
+          const label = `${rate.toFixed(1)}%`;
           return (
-            <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
-              <span className="font-medium">
-                {row.original.respondents_count}/{row.original.active_employees_count}
-              </span>{' '}
-              <span className="text-muted-foreground">({rate.toFixed(0)}%)</span>
-            </span>
+            <div className="flex min-w-0 items-center gap-2" title={`Partisipasi ${label}`}>
+              <span className="shrink-0 text-xs font-medium text-foreground tabular-nums">
+                {label}
+              </span>
+              <Progress value={clamped} className="h-1.5 min-w-6 flex-1" />
+            </div>
           );
         },
       },
@@ -406,25 +456,20 @@ export default function SurveysPage() {
             ? Number(row.avg_wlb_score)
             : -1,
         id: 'avg_wlb',
-        header: 'Skor WLB',
+        header: 'Rata-rata WLB',
+        size: 145,
+        minSize: 115,
+        maxSize: 220,
         cell: ({ row }) => {
+          const raw = row.original.avg_wlb_score;
+          if (raw === null || raw === undefined) {
+            return <span className="text-xs text-muted-foreground">-</span>;
+          }
           const meta = getDimensionBadgeMeta(row.original.converted_wlb_dimension_score);
-          const shortLabel =
-            meta.status === 'good'
-              ? 'Baik'
-              : meta.status === 'needs_attention'
-                ? 'Perhatian'
-                : meta.status === 'action_priority'
-                  ? 'Prioritas'
-                  : 'Kosong';
+          const scoreText = `${Number(raw).toFixed(2)} / 5`;
           return (
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="text-xs font-medium text-foreground tabular-nums">
-                {row.original.avg_wlb_score !== null && row.original.avg_wlb_score !== undefined
-                  ? `${Number(row.original.avg_wlb_score).toFixed(2)}/5`
-                  : '-'}
-              </span>
-              <StatusBadge status={meta.status} tone={meta.tone} label={shortLabel} />
+            <div className="whitespace-nowrap" title={`${scoreText} · ${meta.label}`}>
+              <StatusBadge status={meta.status} tone={meta.tone} label={scoreText} />
             </div>
           );
         },
@@ -437,57 +482,119 @@ export default function SurveysPage() {
             : -1,
         id: 'workload_perception',
         header: 'Persepsi Beban',
-        cell: ({ row }) => (
-          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {row.original.avg_workload_perception_score !== null &&
-            row.original.avg_workload_perception_score !== undefined
-              ? `${Number(row.original.avg_workload_perception_score).toFixed(2)} / 5`
-              : '-'}
-          </span>
-        ),
+        size: 155,
+        minSize: 120,
+        maxSize: 230,
+        cell: ({ row }) => {
+          const raw = row.original.avg_workload_perception_score;
+          if (raw === null || raw === undefined) {
+            return <span className="text-xs text-muted-foreground">-</span>;
+          }
+          const meta = getWorkloadPerceptionMeta(raw);
+          const scoreText = `${Number(raw).toFixed(2)} / 5`;
+          return (
+            <div className="whitespace-nowrap" title={`${scoreText} · ${meta.hint}`}>
+              <StatusBadge status={meta.status} tone={meta.tone} label={scoreText} />
+            </div>
+          );
+        },
       },
     ],
     []
   );
 
-  // Main Survey Table Columns (max 4 data columns + RowActionsMenu, strictly 1 line per cell)
+  // Main Survey Table Columns (work_surveys; Manager/Admin view stays strictly aggregated per NFR-02)
   const columns = useMemo(() => {
     const baseCols = [
       {
         accessorKey: 'title',
-        header: 'Judul',
-        cell: ({ row }) => (
-          <span
-            className="block max-w-[260px] truncate text-xs font-medium text-foreground"
-            title={row.original.title}
-          >
-            {row.original.title}
-          </span>
-        ),
+        header: 'Judul Survei',
+        size: 265,
+        minSize: 155,
+        maxSize: 440,
+        cell: ({ row }) => {
+          const title = row.original.title || '-';
+          return (
+            <span className="block truncate text-xs font-medium text-foreground" title={title}>
+              {title}
+            </span>
+          );
+        },
       },
       {
         accessorKey: 'period_month',
         header: 'Periode',
-        cell: ({ row }) => (
-          <span className="text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
-            {formatMonth(row.original.period_month)}
-          </span>
-        ),
+        size: 155,
+        minSize: 120,
+        maxSize: 220,
+        cell: ({ row }) => {
+          const period = formatMonth(row.original.period_month);
+          return (
+            <span
+              className="block truncate text-xs font-medium text-foreground tabular-nums"
+              title={period}
+            >
+              {period}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.description || '',
+        id: 'description',
+        header: 'Deskripsi',
+        size: 260,
+        minSize: 140,
+        maxSize: 440,
+        cell: ({ row }) => {
+          const description = row.original.description;
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={description || undefined}
+            >
+              {description || '-'}
+            </span>
+          );
+        },
       },
       {
         accessorFn: (row) => (row.is_active ? 1 : 0),
         id: 'status',
         header: 'Status',
+        size: 120,
+        minSize: 96,
+        maxSize: 180,
         cell: ({ row }) => (
           <div className="whitespace-nowrap">
             <StatusBadge
               status={row.original.is_active ? 'active' : 'inactive'}
-              label={row.original.is_active ? 'Dibuka' : 'Ditutup'}
+              label={row.original.is_active ? 'Aktif' : 'Ditutup'}
             />
           </div>
         ),
       },
     ];
+
+    const createdAtCol = {
+      accessorFn: (row) => row.created_at || '',
+      id: 'created_at',
+      header: 'Dibuat',
+      size: 165,
+      minSize: 130,
+      maxSize: 240,
+      cell: ({ row }) => {
+        const formatted = formatDate(row.original.created_at);
+        return (
+          <span
+            className="block truncate text-xs text-muted-foreground tabular-nums"
+            title={formatted}
+          >
+            {formatted}
+          </span>
+        );
+      },
+    };
 
     if (isEmployee) {
       return [
@@ -495,23 +602,55 @@ export default function SurveysPage() {
         {
           accessorFn: (row) => (row.my_response ? 1 : 0),
           id: 'my_participation',
-          header: 'Partisipasi',
+          header: 'Status Saya',
+          size: 140,
+          minSize: 110,
+          maxSize: 200,
           cell: ({ row }) => {
             const hasResponded = Boolean(row.original.my_response);
             return (
               <div className="whitespace-nowrap">
                 <StatusBadge
                   status={hasResponded ? 'completed' : 'pending'}
-                  label={hasResponded ? 'Sudah Diisi' : 'Belum Diisi'}
+                  label={hasResponded ? 'Sudah diisi' : 'Belum diisi'}
                 />
               </div>
             );
           },
         },
         {
+          accessorFn: (row) =>
+            row.my_response ? Number(row.my_response.work_life_balance_score || 0) : -1,
+          id: 'my_scores',
+          header: 'Skor Saya',
+          size: 150,
+          minSize: 115,
+          maxSize: 240,
+          cell: ({ row }) => {
+            const resp = row.original.my_response;
+            if (!resp) {
+              return <span className="text-xs text-muted-foreground">-</span>;
+            }
+            const scoreLabel = `WLB ${resp.work_life_balance_score}/5 · Beban ${resp.workload_perception_score}/5`;
+            return (
+              <span
+                className="block truncate text-xs font-medium text-foreground tabular-nums"
+                title={scoreLabel}
+              >
+                {scoreLabel}
+              </span>
+            );
+          },
+        },
+        createdAtCol,
+        {
           id: 'actions',
           header: () => <span className="sr-only">Aksi</span>,
           enableSorting: false,
+          enableResizing: false,
+          size: 64,
+          minSize: 56,
+          maxSize: 72,
           cell: ({ row }) => {
             const survey = row.original;
             if (!survey.is_active) {
@@ -542,28 +681,35 @@ export default function SurveysPage() {
         accessorFn: (row) => Number(row.responses_count || 0),
         id: 'participation',
         header: 'Partisipasi',
+        size: 165,
+        minSize: 125,
+        maxSize: 260,
         cell: ({ row }) => {
           const survey = row.original;
           const respondents = Number(survey.responses_count ?? 0);
-          const activeCount = getSurveyActiveCount(survey);
           const rate = Number(survey.participation_rate || 0);
+          const summaryText = `${respondents} responden (${rate.toFixed(1)}%)`;
 
           return (
-            <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
-              <span className="font-medium">
-                {activeCount !== null && activeCount > 0
-                  ? `${respondents} / ${activeCount}`
-                  : respondents}
-              </span>{' '}
+            <span
+              className="block truncate text-xs text-foreground tabular-nums"
+              title={summaryText}
+            >
+              <span className="font-medium">{respondents} responden</span>{' '}
               <span className="text-muted-foreground">({rate.toFixed(1)}%)</span>
             </span>
           );
         },
       },
+      createdAtCol,
       {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const survey = row.original;
           const hasResponses = Number(survey.responses_count || 0) > 0;

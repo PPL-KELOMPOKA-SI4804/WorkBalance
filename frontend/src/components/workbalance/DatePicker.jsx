@@ -10,7 +10,7 @@ export function DatePicker({
   id,
   value = '',
   onChange,
-  placeholder = 'DD-MM-YYYY',
+  placeholder = 'Pilih tanggal',
   disabled = false,
   clearable = false,
   size = 'default',
@@ -33,7 +33,7 @@ export function DatePicker({
     setOpen(false);
   };
 
-  const heightClass = size === 'sm' ? 'h-8 text-xs' : 'h-9 text-sm';
+  const heightClass = size === 'sm' ? 'h-9 text-xs' : 'h-10 text-sm';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -45,7 +45,7 @@ export function DatePicker({
           disabled={disabled}
           aria-label={ariaLabel}
           className={cn(
-            'w-full justify-between rounded-lg bg-background px-3 font-normal tabular-nums hover:bg-muted/50',
+            'w-full justify-between rounded-xl bg-background px-3 font-normal tabular-nums hover:border-hover-border hover:bg-hover-surface hover:translate-y-0',
             heightClass,
             !selectedDate && 'text-muted-foreground',
             className
@@ -63,7 +63,7 @@ export function DatePicker({
               tabIndex={-1}
               aria-label="Hapus tanggal"
               onClick={handleClear}
-              className="ml-1 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+              className="ml-1 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-hover-surface-strong hover:text-foreground"
             >
               <X className="size-3.5" />
             </span>

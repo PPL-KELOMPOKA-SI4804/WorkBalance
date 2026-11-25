@@ -52,7 +52,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_employee_lists_only_own_issues_and_can_create_edit_and_delete_open_issue(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
 
         $listResponse = $this->withToken($token)
@@ -115,7 +115,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_employee_cannot_view_edit_or_delete_other_employees_issue(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $otherIssue = WorkplaceIssue::where('reported_by', $emp4->id)->firstOrFail();
 
@@ -140,7 +140,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_employee_cannot_modify_status_or_resolution_notes_on_own_issue(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $openIssue = WorkplaceIssue::where('reported_by', $emp3->id)
             ->where('status', 'open')
@@ -157,7 +157,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_employee_cannot_edit_or_delete_resolved_issue(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $resolvedIssue = WorkplaceIssue::where('reported_by', $emp3->id)
             ->where('status', 'resolved')
@@ -178,7 +178,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_employee_cannot_edit_or_delete_in_progress_issue(): void
     {
-        $token = $this->employee2->createToken('emp2')->plainTextToken;
+        $token = $this->issueJwt($this->employee2);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $inProgressIssue = WorkplaceIssue::where('reported_by', $emp4->id)
             ->where('status', 'in_progress')
@@ -199,7 +199,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_manager_can_list_filter_and_follow_up_issues_with_resolved_at_lifecycle(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
 
         $listResponse = $this->withToken($token)
@@ -266,7 +266,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_admin_can_delete_open_issue_but_cannot_delete_non_open_issues_for_audit_protection(): void
     {
-        $token = $this->admin->createToken('admin')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         $openIssue = WorkplaceIssue::where('status', 'open')->firstOrFail();
         $inProgressIssue = WorkplaceIssue::where('status', 'in_progress')->firstOrFail();
@@ -294,7 +294,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_validation_rejects_invalid_store_workplace_issue_payloads(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
 
         $this->withToken($token)
             ->postJson('/api/v1/workplace-issues', [
@@ -309,7 +309,7 @@ class Pbi08WorkplaceIssueManagementTest extends TestCase
 
     public function test_validation_rejects_invalid_update_status_payload(): void
     {
-        $token = $this->admin->createToken('admin')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $openIssue = WorkplaceIssue::where('status', 'open')->firstOrFail();
 
         $this->withToken($token)

@@ -2,8 +2,31 @@ const ISO_DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:$|[\sT]00:00:00(?:\.0+)?$)/
 const ISO_MONTH_RE = /^(\d{4})-(\d{2})$/;
 const ISO_WEEK_RE = /^(\d{4})-W(\d{2})$/;
 
+export const MONTH_NAMES_ID = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
 function pad2(num) {
   return String(num).padStart(2, '0');
+}
+
+function formatLongIndonesianDate(year, monthIndex, day) {
+  const monthName = MONTH_NAMES_ID[monthIndex];
+  if (!monthName || Number.isNaN(day) || Number.isNaN(year)) {
+    return '';
+  }
+  return `${day} ${monthName} ${year}`;
 }
 
 /**
@@ -43,45 +66,68 @@ export function parseISODateLocal(value) {
 }
 
 /**
- * Formats date values to DD-MM-YYYY without UTC timezone drift on date-only strings.
+ * Formats date values to Indonesian long text (e.g. "20 November 2026")
+ * without UTC timezone drift on date-only strings.
  */
 export function formatDate(value, fallback = '-') {
   if (!value) return fallback;
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return fallback;
-    return `${pad2(value.getDate())}-${pad2(value.getMonth() + 1)}-${value.getFullYear()}`;
+    return (
+      formatLongIndonesianDate(value.getFullYear(), value.getMonth(), value.getDate()) ||
+      fallback
+    );
   }
 
   const raw = String(value).trim();
   const dateOnly = raw.match(ISO_DATE_ONLY_RE);
   if (dateOnly) {
-    return `${dateOnly[3]}-${dateOnly[2]}-${dateOnly[1]}`;
+    return (
+      formatLongIndonesianDate(
+        Number(dateOnly[1]),
+        Number(dateOnly[2]) - 1,
+        Number(dateOnly[3])
+      ) || fallback
+    );
   }
 
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return fallback;
-  return `${pad2(parsed.getDate())}-${pad2(parsed.getMonth() + 1)}-${parsed.getFullYear()}`;
+  return (
+    formatLongIndonesianDate(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) ||
+    fallback
+  );
 }
 
 /**
- * Formats timestamp values to DD-MM-YYYY HH:mm in local time.
+ * Formats timestamp values to Indonesian long text with local time
+ * (e.g. "20 November 2026, 14:30").
  */
 export function formatDateTime(value, fallback = '-') {
   if (!value) return fallback;
   const parsed = value instanceof Date ? value : new Date(String(value).trim());
   if (Number.isNaN(parsed.getTime())) return fallback;
-  return `${pad2(parsed.getDate())}-${pad2(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+  const dateText = formatLongIndonesianDate(
+    parsed.getFullYear(),
+    parsed.getMonth(),
+    parsed.getDate()
+  );
+  if (!dateText) return fallback;
+  return `${dateText}, ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
 }
 
 /**
- * Formats YYYY-MM to MM-YYYY for display.
+ * Formats YYYY-MM to Indonesian month and year (e.g. "November 2026").
  */
 export function formatMonth(value, fallback = '-') {
   if (!value) return fallback;
   const raw = String(value).trim();
   const match = raw.match(ISO_MONTH_RE);
   if (match) {
-    return `${match[2]}-${match[1]}`;
+    const monthName = MONTH_NAMES_ID[Number(match[2]) - 1];
+    if (monthName) {
+      return `${monthName} ${match[1]}`;
+    }
   }
   return raw || fallback;
 }
@@ -153,16 +199,32 @@ export function toApiWeek(value) {
 }
 
 /**
- * Formats ISO week string (YYYY-Www) as "DD-MM-YYYY s.d. DD-MM-YYYY".
+ * Formats ISO week string (YYYY-Www) as compact Indonesian range:
+ * - Same month: "16–22 November 2026"
+ * - Cross month: "30 November – 6 Desember 2026"
+ * - Cross year: "28 Desember 2026 – 3 Januari 2027"
  */
 export function formatWeek(weekValue, fallback = '-') {
   const range = getIsoWeekRange(weekValue);
   if (!range) return weekValue ? String(weekValue) : fallback;
-  return `${formatDate(range.start)} s.d. ${formatDate(range.end)}`;
+  const { start, end } = range;
+
+  if (
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth()
+  ) {
+    return `${start.getDate()}–${end.getDate()} ${MONTH_NAMES_ID[start.getMonth()]} ${start.getFullYear()}`;
+  }
+
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${start.getDate()} ${MONTH_NAMES_ID[start.getMonth()]} – ${end.getDate()} ${MONTH_NAMES_ID[end.getMonth()]} ${end.getFullYear()}`;
+  }
+
+  return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
 /**
- * Formats ISO week string (YYYY-Www) as Monday start date "DD-MM-YYYY" for compact table cells.
+ * Formats ISO week string (YYYY-Www) as Monday start date (e.g. "16 November 2026").
  */
 export function formatWeekStart(weekValue, fallback = '-') {
   const range = getIsoWeekRange(weekValue);

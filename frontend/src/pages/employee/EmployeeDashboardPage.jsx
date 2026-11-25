@@ -57,6 +57,13 @@ import {
 const DAY_NAMES_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const NO_ASSIGNMENT_VALUE = '__none__';
 
+const PRIORITY_META = {
+  critical: { tone: 'danger', label: 'Kritis' },
+  high: { tone: 'danger', label: 'Tinggi' },
+  medium: { tone: 'warning', label: 'Sedang' },
+  low: { tone: 'success', label: 'Rendah' },
+};
+
 function formatScore(val, digits = 1) {
   return Number(val || 0).toFixed(digits);
 }
@@ -337,18 +344,49 @@ export default function EmployeeDashboardPage() {
     }
   };
 
-  // Calm Rows: 3 single-line columns; clicking any row opens Catat Log prefilled with that task
+  // Detailed resizable columns for Penugasan Aktif; clicking any row opens Catat Log prefilled with that task
   const assignmentColumns = useMemo(
     () => [
       {
         accessorFn: (row) => row.task?.title || `Penugasan #${row.id}`,
         id: 'title',
         header: 'Tugas',
+        size: 270,
+        minSize: 150,
+        maxSize: 460,
         cell: ({ row }) => {
           const title = row.original.task?.title || `Penugasan #${row.original.id}`;
           return (
-            <span className="block max-w-[300px] truncate font-medium text-foreground" title={title}>
+            <span className="block truncate font-medium text-foreground" title={title}>
               {title}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.task?.priority || 'medium',
+        id: 'priority',
+        header: 'Prioritas',
+        size: 120,
+        minSize: 95,
+        maxSize: 170,
+        cell: ({ row }) => {
+          const meta = PRIORITY_META[row.original.task?.priority] || PRIORITY_META.medium;
+          return <StatusBadge tone={meta.tone} label={meta.label} />;
+        },
+      },
+      {
+        accessorFn: (row) => Number(row.task?.estimated_hours || 0),
+        id: 'estimated_hours',
+        header: 'Estimasi',
+        size: 110,
+        minSize: 86,
+        maxSize: 165,
+        cell: ({ row }) => {
+          const hours = row.original.task?.estimated_hours;
+          return (
+            <span className="block truncate text-xs font-medium text-foreground whitespace-nowrap tabular-nums">
+              {hours != null ? `${formatScore(hours, 1)} jam` : '-'}
             </span>
           );
         },
@@ -356,15 +394,27 @@ export default function EmployeeDashboardPage() {
       {
         accessorKey: 'deadline',
         header: 'Tenggat',
-        cell: ({ row }) => (
-          <span className="text-xs text-foreground whitespace-nowrap tabular-nums">
-            {formatDate(row.original.deadline)}
-          </span>
-        ),
+        size: 165,
+        minSize: 130,
+        maxSize: 230,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.deadline);
+          return (
+            <span
+              className="block truncate text-xs text-foreground whitespace-nowrap tabular-nums"
+              title={formatted}
+            >
+              {formatted}
+            </span>
+          );
+        },
       },
       {
         accessorKey: 'status',
         header: 'Status',
+        size: 135,
+        minSize: 105,
+        maxSize: 200,
         cell: ({ row }) => {
           const item = row.original;
           const urgency = getDeadlineBadge(item.deadline, item.status);
@@ -582,17 +632,17 @@ export default function EmployeeDashboardPage() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="group flex items-center justify-between gap-3 px-6 py-3.5 transition-colors hover:bg-muted/40"
+                      className="group flex items-center justify-between gap-3 px-6 py-3.5 transition-all duration-150 hover:bg-hover-surface hover:shadow-[inset_3px_0_0_var(--primary)]"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-primary">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all duration-150 group-hover:scale-105 group-hover:bg-primary/15 group-hover:text-primary">
                           <Icon className="size-4" />
                         </span>
-                        <span className="truncate text-sm font-medium text-foreground">
+                        <span className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
                           {item.title}
                         </span>
                       </div>
-                      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground" />
+                      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
                     </Link>
                   );
                 })}

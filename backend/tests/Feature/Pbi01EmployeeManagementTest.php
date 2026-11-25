@@ -46,10 +46,18 @@ class Pbi01EmployeeManagementTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'message',
-                'data' => ['token', 'token_type', 'user' => ['id', 'email', 'role', 'employee']],
+                'data' => [
+                    'token',
+                    'access_token',
+                    'refresh_token',
+                    'token_type',
+                    'expires_in',
+                    'user' => ['id', 'email', 'role', 'employee'],
+                ],
             ]);
 
         $token = $loginResponse->json('data.token');
+        $refreshToken = $loginResponse->json('data.refresh_token');
 
         $this->withToken($token)
             ->getJson('/api/v1/auth/me')
@@ -57,12 +65,18 @@ class Pbi01EmployeeManagementTest extends TestCase
             ->assertJsonPath('data.user.email', 'admin@workbalance.id');
 
         $this->withToken($token)
-            ->deleteJson('/api/v1/auth/logout')
+            ->deleteJson('/api/v1/auth/logout', [
+                'refresh_token' => $refreshToken,
+            ])
             ->assertOk()
             ->assertJsonPath('status', 'success');
 
-        // Verify token was deleted from personal_access_tokens
-        $this->assertDatabaseCount('personal_access_tokens', 0);
+        // Verify JWT access & refresh tokens were revoked in blacklist and immediately rejected
+        $this->assertDatabaseCount('jwt_revoked_tokens', 2);
+
+        $this->withToken($token)
+            ->getJson('/api/v1/auth/me')
+            ->assertUnauthorized();
     }
 
     public function test_public_register_and_inactive_login_rejection(): void
@@ -96,7 +110,7 @@ class Pbi01EmployeeManagementTest extends TestCase
         $position = Position::where('title', 'Senior Software Engineer')->firstOrFail();
         $employmentType = EmploymentType::where('name', 'Tetap (PKWTT)')->firstOrFail();
 
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         // List with summary
         $this->withToken($token)
@@ -177,7 +191,7 @@ class Pbi01EmployeeManagementTest extends TestCase
 
     public function test_admin_cannot_delete_employee_managing_a_department(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $managerEmployee = Employee::where('employee_code', 'EMP-002')->firstOrFail();
 
         $this->withToken($token)
@@ -188,7 +202,7 @@ class Pbi01EmployeeManagementTest extends TestCase
 
     public function test_admin_crud_employment_types_and_restrict_delete_guard(): void
     {
-        $token = $this->admin->createToken('test')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
 
         // List seeded employment types
         $this->withToken($token)
@@ -254,7 +268,7 @@ class Pbi01EmployeeManagementTest extends TestCase
         $position = Position::firstOrFail();
         $employmentType = EmploymentType::firstOrFail();
 
-        $managerToken = $this->manager->createToken('mgr')->plainTextToken;
+        $managerToken = $this->issueJwt($this->manager);
 
         $this->withToken($managerToken)->getJson('/api/v1/employees')->assertOk();
         $this->withToken($managerToken)->getJson('/api/v1/employment-types')->assertOk();
@@ -285,7 +299,7 @@ class Pbi01EmployeeManagementTest extends TestCase
 
     public function test_rbac_employee_is_forbidden_from_master_management(): void
     {
-        $employeeToken = $this->employeeUser->createToken('emp')->plainTextToken;
+        $employeeToken = $this->issueJwt($this->employeeUser);
 
         $this->withToken($employeeToken)->getJson('/api/v1/employees')->assertForbidden();
         $this->withToken($employeeToken)->getJson('/api/v1/employment-types')->assertForbidden();

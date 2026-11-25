@@ -1,8 +1,8 @@
 # System Architecture Blueprint (ARCHITECTURE.md): WorkBalance
 
-**Versi Dokumen:** 1.0
-**Tanggal:** 17 November 2026
-**Referensi Produk:** `PRD.md` (WorkBalance — SDG 8 Decision Support System)
+**Versi Dokumen:** 1.1
+**Tanggal:** 25 November 2026
+**Referensi Produk:** `PRD.md` (WorkBalance: SDG 8 Decision Support System)
 
 ---
 
@@ -17,7 +17,7 @@ WorkBalance dibangun menggunakan arsitektur **decoupled Client-Server (SPA + RES
 - **Data Visualization:** Recharts (untuk grafik tren garis, _stacked/grouped bar chart_, dan _donut/radial gauge_ indikator risiko).
 - **Backend API:** Laravel (RESTful JSON API, _business logic engine_ untuk kalkulasi _Workload Risk_ & _Decent Work Score_, serta pemrosesan laporan periodik).
 - **Database:** MySQL (relasional, 24 entitas dengan penegakan integritas _Foreign Key_).
-- **Authentication & Authorization:** Laravel Sanctum (_token-based authentication_) + _Role-Based Access Control_ (`employee`, `manager`, `admin`).
+- **Authentication & Authorization:** Custom RFC 7519 **JWT HS256 Guard (`auth:jwt`)** dengan Access Token (60 menit), Refresh Token rotasi sekali pakai (`/api/v1/auth/refresh`), Blacklist `jti` (`jwt_revoked_tokens`), dan _Role-Based Access Control_ (`employee`, `manager`, `admin`).
 - **Version Control:** Git.
 
 ### 1.2 Arsitektur 3 Lapisan (ArchiMate Alignment)
@@ -72,7 +72,7 @@ Basis data MySQL dikelompokkan ke dalam 5 domain fungsional dengan integritas re
 1. `user_accounts`: `id`, `email`, `password_hash`, `role` (`admin`, `manager`, `employee`), `is_active`, `remember_token`, `timestamps`.
 2. `departments`: `id`, `name`, `code`, `description`, `manager_id` (FK -> `employees.id`, nullable), `timestamps`.
 3. `positions`: `id`, `title`, `level`, `description`, `timestamps`.
-4. `employment_types`: `id`, `name` (Tetap, Kontrak, Magang), `work_days_per_week` (`5` atau `6` — menentukan ambang lembur harian 8 jam vs 7 jam), `normal_weekly_hours` (default `40`), `timestamps`.
+4. `employment_types`: `id`, `name` (Tetap, Kontrak, Magang, Operasional Shift 6 Hari), `work_days_per_week` (`5` atau `6`, menentukan ambang lembur harian 8 jam vs 7 jam), `normal_weekly_hours` (default `40`), `timestamps`.
 5. `employees`: `id`, `user_account_id` (FK), `department_id` (FK), `position_id` (FK), `employment_type_id` (FK), `employee_code`, `full_name`, `join_date`, `status` (`active`, `inactive`), `timestamps`.
 
 ### Domain B: Tugas & Aktivitas Kerja (6 Entitas)
@@ -124,10 +124,11 @@ Seluruh respons menggunakan format JSON standar:
 
 | Modul          | PBI      | HTTP & Endpoint                                          | Akses Peran                 | Deskripsi                                        |
 | :------------- | :------- | :------------------------------------------------------- | :-------------------------- | :----------------------------------------------- |
-| **Auth**       | AUTH-01  | `POST /api/v1/auth/register`                             | Admin / Public              | Mendaftarkan akun pengguna baru                  |
-| **Auth**       | AUTH-02  | `POST /api/v1/auth/login`                                | Public                      | Verifikasi kredensial & terbitkan token Sanctum  |
-| **Auth**       | AUTH-03  | `GET /api/v1/auth/me`                                    | All Authenticated           | Ambil profil sesi aktif & hak akses RBAC         |
-| **Auth**       | AUTH-04  | `DELETE /api/v1/auth/logout`                             | All Authenticated           | Akhiri sesi & cabut token akses                  |
+| **Auth**       | AUTH-01  | `POST /api/v1/auth/register`                             | Admin / Public              | Mendaftarkan akun pengguna baru & terbitkan pasangan JWT |
+| **Auth**       | AUTH-02  | `POST /api/v1/auth/login`                                | Public                      | Verifikasi kredensial & terbitkan Access + Refresh JWT   |
+| **Auth**       | AUTH-02B | `POST /api/v1/auth/refresh`                              | Public (Refresh JWT)        | Rotasi Refresh Token sekali pakai & terbitkan pasangan baru |
+| **Auth**       | AUTH-03  | `GET /api/v1/auth/me`                                    | All Authenticated           | Ambil profil sesi aktif & hak akses RBAC                 |
+| **Auth**       | AUTH-04  | `DELETE /api/v1/auth/logout`                             | All Authenticated           | Akhiri sesi & catat `jti` Access + Refresh ke blacklist  |
 | **Master**     | PBI-01   | `GET, POST, PUT, DELETE /api/v1/employees`               | Admin (Read: Manager)       | CRUD data master pegawai & jenis kepegawaian     |
 | **Master**     | PBI-02   | `GET, POST, PUT, DELETE /api/v1/departments`             | Admin (Read: Manager)       | CRUD struktur departemen organisasi              |
 | **Master**     | PBI-12   | `GET, POST, PUT, DELETE /api/v1/positions`               | Admin (Read: Manager)       | CRUD jabatan/posisi pegawai                      |
@@ -153,8 +154,9 @@ Seluruh respons menggunakan format JSON standar:
 
 ## 4. Keamanan, Privasi & Konfigurasi Model
 
-1. **Middleware Otorisasi & Privasi:**
-   - Setiap _endpoint_ dilindungi middleware `auth:sanctum` dan pemeriksaan peran (`role:admin`, `role:manager`, `role:employee`).
+1. **Middleware Otorisasi, JWT & Privasi:**
+   - Setiap _endpoint_ terautentikasi dilindungi guard **`auth:jwt`** (`App\Auth\JwtGuard` + `App\Services\JwtService` HS256 dengan validasi `exp`/`nbf`/`typ` dan tabel pencabutan `jwt_revoked_tokens`) serta pemeriksaan peran (`role:admin`, `role:manager`, `role:employee`).
+   - Frontend SPA (`services/api.js` + `AuthContext.jsx`) menangani pembaruan Access Token otomatis via *single-flight mutex* `POST /api/v1/auth/refresh` saat menerima `401` dan mengarahkan ke `/login` bila Refresh Token telah kedaluwarsa atau dicabut.
    - **Isolasi Data Survei (NFR-02):** Query pada `SurveyController` untuk peran `manager` wajib melakukan agregasi tingkat departemen (`AVG(work_life_balance_score)`, `COUNT(*)`) dan dilarang mengembalikan identitas responden maupun komentar mentah per individu.
 2. **Konfigurasi Parameter Dinamis (NFR-07 & NFR-08):**
    - Ambang batas indikator _Workload Risk_ (batas jam normal `40`, batas kritis `55`, rasio beban `1.0–1.5`) serta bobot 6 dimensi _Decent Work Score_ disimpan pada tabel/konfigurasi sistem yang dapat diubah oleh `Admin` tanpa mengubah kode sumber (_hardcode_).

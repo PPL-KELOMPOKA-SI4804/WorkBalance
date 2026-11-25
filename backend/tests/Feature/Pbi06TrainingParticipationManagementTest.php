@@ -36,7 +36,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_admin_can_list_and_filter_participations_with_summary_metrics(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $opsDept = Department::where('code', 'OPS')->firstOrFail();
         $k3Training = Training::where('title', 'Keselamatan & Kesehatan Kerja (K3) Lingkungan Operasional')->firstOrFail();
@@ -83,7 +83,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_admin_can_enroll_view_update_completion_and_delete_participation(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $emp5 = Employee::where('employee_code', 'EMP-005')->firstOrFail();
         $t1 = Training::where('title', 'Arsitektur Sistem Terdistribusi & Optimasi Database')->firstOrFail();
 
@@ -139,7 +139,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_manager_can_enroll_update_and_delete_participation(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $t4 = Training::where('title', 'Manajemen Stres & Keseimbangan Kerja-Hidup (Work-Life Balance)')->firstOrFail();
 
@@ -172,7 +172,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_duplicate_enrollment_inactive_employee_and_invalid_inputs_are_rejected(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $existing = TrainingParticipation::where('employee_id', $emp3->id)->firstOrFail();
 
@@ -223,7 +223,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_cannot_delete_completed_training_participation(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $completed = TrainingParticipation::where('status', 'completed')->firstOrFail();
 
         $this->withToken($token)
@@ -236,7 +236,7 @@ class Pbi06TrainingParticipationManagementTest extends TestCase
 
     public function test_rbac_employee_can_only_view_own_participations_and_cannot_mutate(): void
     {
-        $token = $this->employeeUser->createToken('emp')->plainTextToken;
+        $token = $this->issueJwt($this->employeeUser);
         $ownEmployee = $this->employeeUser->employee;
         $ownParticipation = TrainingParticipation::where('employee_id', $ownEmployee->id)->firstOrFail();
         $otherParticipation = TrainingParticipation::where('employee_id', '!=', $ownEmployee->id)->firstOrFail();

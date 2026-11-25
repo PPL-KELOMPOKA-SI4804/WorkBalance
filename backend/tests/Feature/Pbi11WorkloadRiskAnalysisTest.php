@@ -51,7 +51,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_employee_can_only_view_own_workload_risk_and_cannot_recalculate_or_view_others(): void
     {
-        $token = $this->employee1->createToken('emp1')->plainTextToken;
+        $token = $this->issueJwt($this->employee1);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
 
@@ -98,7 +98,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_manager_can_recalculate_and_persist_workload_risks_for_all_active_employees(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
 
         $res = $this->withToken($token)
@@ -128,7 +128,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_linear_interpolation_accuracy_for_weekly_hours_and_task_load_scores(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $managerEmp = Employee::where('employee_code', 'EMP-002')->firstOrFail();
         $opsDept = Department::where('code', 'OPS')->firstOrFail();
@@ -188,7 +188,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_pp35_mandatory_override_triggers_on_55_weekly_hours_daily_overtime_above_4_or_weekly_overtime_above_18(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail();
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
         $emp5 = Employee::where('employee_code', 'EMP-005')->firstOrFail();
@@ -246,7 +246,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_overtime_calculation_respects_6_day_workweek_and_prioritizes_approved_overtime_records(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail(); // 5-day week (8h/day normal)
         $emp5 = Employee::where('employee_code', 'EMP-005')->firstOrFail(); // 6-day week (7h/day normal)
 
@@ -297,7 +297,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_full_week_approved_leave_handles_zero_available_capacity_without_division_by_zero(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $emp3 = Employee::where('employee_code', 'EMP-003')->firstOrFail(); // Has active assignments (28h)
         $emp5 = Employee::where('employee_code', 'EMP-005')->firstOrFail(); // Only completed assignment -> 0 active tasks
 
@@ -336,7 +336,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_manager_can_filter_workload_risks_by_department_category_override_and_search(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
         $emp4 = Employee::where('employee_code', 'EMP-004')->firstOrFail();
 
@@ -378,7 +378,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_admin_can_trigger_targeted_recalculation_and_view_details(): void
     {
-        $token = $this->admin->createToken('adm')->plainTextToken;
+        $token = $this->issueJwt($this->admin);
         $engDept = Department::where('code', 'ENG')->firstOrFail();
 
         $res = $this->withToken($token)
@@ -394,7 +394,7 @@ class Pbi11WorkloadRiskAnalysisTest extends TestCase
 
     public function test_validation_rejects_invalid_period_week_or_nonexistent_department_on_recalculate(): void
     {
-        $token = $this->manager->createToken('mgr')->plainTextToken;
+        $token = $this->issueJwt($this->manager);
 
         $this->withToken($token)
             ->postJson('/api/v1/analytics/workload-risk', [

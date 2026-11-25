@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\UserAccount;
+use App\Services\JwtService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly JwtService $jwtService
+    ) {}
+
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -18,7 +23,7 @@ class AuthController extends Controller
             'role' => ['sometimes', 'in:admin,manager,employee'],
         ]);
 
-        $actingUser = auth('sanctum')->user();
+        $actingUser = auth('jwt')->user();
         $role = ($actingUser && $actingUser->role === 'admin' && isset($validated['role']))
             ? $validated['role']
             : 'employee';
@@ -30,11 +35,10 @@ class AuthController extends Controller
             'is_active' => true,
         ]);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        $tokens = $this->jwtService->issueTokenPair($user);
 
         return $this->successResponse([
-            'token' => $token,
-            'token_type' => 'Bearer',
+            ...$tokens,
             'user' => $user->load(['employee.department', 'employee.position', 'employee.employmentType']),
         ], 'Registrasi akun berhasil.', 201);
     }
@@ -58,13 +62,29 @@ class AuthController extends Controller
             return $this->errorResponse('Akun pengguna sedang dinonaktifkan.', 403);
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        $tokens = $this->jwtService->issueTokenPair($user);
 
         return $this->successResponse([
-            'token' => $token,
-            'token_type' => 'Bearer',
+            ...$tokens,
             'user' => $user,
         ], 'Login berhasil.');
+    }
+
+    public function refresh(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'refresh_token' => ['required', 'string'],
+        ]);
+
+        $rotated = $this->jwtService->rotateRefreshToken($validated['refresh_token']);
+        if ($rotated === null) {
+            return $this->errorResponse('Refresh token tidak valid atau telah kedaluwarsa.', 401);
+        }
+
+        return $this->successResponse([
+            ...$rotated['tokens'],
+            'user' => $rotated['user'],
+        ], 'Token sesi berhasil diperbarui.');
     }
 
     public function me(Request $request): JsonResponse
@@ -78,7 +98,13 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()?->delete();
+        $accessToken = $request->bearerToken();
+        $this->jwtService->revokeToken($accessToken, JwtService::TYPE_ACCESS);
+
+        $refreshToken = $request->input('refresh_token');
+        if (is_string($refreshToken) && trim($refreshToken) !== '') {
+            $this->jwtService->revokeToken($refreshToken, JwtService::TYPE_REFRESH);
+        }
 
         return $this->successResponse(null, 'Logout berhasil.');
     }

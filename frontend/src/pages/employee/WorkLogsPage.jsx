@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { useRefetchOnFocus } from '@/hooks/useRefetchOnFocus';
-import { formatDate, toApiDate, toISODateLocal } from '@/lib/format';
+import { formatDate, formatDateTime, toApiDate, toISODateLocal } from '@/lib/format';
 import { getInitials } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/services/api';
@@ -383,50 +383,101 @@ export default function WorkLogsPage({ readOnly = false }) {
     const cols = [
       {
         accessorKey: 'work_date',
-        header: 'Tanggal',
-        cell: ({ row }) => (
-          <span className="text-xs font-medium whitespace-nowrap text-foreground tabular-nums">
-            {formatDate(row.original.work_date)}
-          </span>
-        ),
+        header: 'Tanggal Kerja',
+        size: 165,
+        minSize: 130,
+        maxSize: 230,
+        cell: ({ row }) => {
+          const formatted = formatDate(row.original.work_date);
+          return (
+            <span
+              className="block truncate text-xs font-medium whitespace-nowrap text-foreground tabular-nums"
+              title={formatted !== '-' ? formatted : undefined}
+            >
+              {formatted}
+            </span>
+          );
+        },
       },
     ];
 
     if (!isEmployee) {
-      cols.push({
-        accessorFn: (row) => row.employee?.full_name || '-',
-        id: 'employee',
-        header: 'Pegawai',
-        cell: ({ row }) => {
-          const emp = row.original.employee || {};
-          const fullName = emp.full_name || '-';
-          return (
-            <div className="flex min-w-0 max-w-[180px] items-center gap-2.5">
-              <Avatar className="size-7 shrink-0 border border-border">
-                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                  {getInitials(emp.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate text-xs font-medium text-foreground" title={fullName}>
-                {fullName}
-              </span>
-            </div>
-          );
+      cols.push(
+        {
+          accessorFn: (row) => row.employee?.full_name || '-',
+          id: 'employee',
+          header: 'Pegawai',
+          size: 210,
+          minSize: 145,
+          maxSize: 340,
+          cell: ({ row }) => {
+            const emp = row.original.employee || {};
+            const fullName = emp.full_name || '-';
+            const code = emp.employee_code || '';
+            const tooltip = code ? `${fullName} (${code})` : fullName;
+            return (
+              <div className="flex min-w-0 items-center gap-2.5" title={tooltip}>
+                <Avatar className="size-7 shrink-0 border border-border">
+                  <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                    {getInitials(emp.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-xs font-medium text-foreground">
+                    {fullName}
+                  </span>
+                  {code && (
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {code}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          },
         },
-      });
+        {
+          accessorFn: (row) => row.employee?.department?.name || '-',
+          id: 'department',
+          header: 'Departemen',
+          size: 165,
+          minSize: 110,
+          maxSize: 300,
+          cell: ({ row }) => {
+            const dept = row.original.employee?.department;
+            if (!dept) {
+              return <span className="text-xs text-muted-foreground">-</span>;
+            }
+            const label = dept.code ? `${dept.code} · ${dept.name}` : dept.name || '-';
+            return (
+              <div className="flex min-w-0 items-center gap-1.5" title={label}>
+                {dept.code && (
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                    {dept.code}
+                  </span>
+                )}
+                <span className="truncate text-xs text-foreground">{dept.name || '-'}</span>
+              </div>
+            );
+          },
+        }
+      );
     }
 
     cols.push(
       {
         accessorFn: (row) => row.task_assignment?.task?.title || 'Aktivitas umum',
         id: 'task',
-        header: 'Tugas',
+        header: 'Tugas Terkait',
+        size: 235,
+        minSize: 140,
+        maxSize: 460,
         cell: ({ row }) => {
           const title = row.original.task_assignment?.task?.title;
           return (
             <span
               className={cn(
-                'block max-w-[260px] truncate text-xs',
+                'block truncate text-xs',
                 title ? 'font-medium text-foreground' : 'text-muted-foreground'
               )}
               title={title || 'Aktivitas umum'}
@@ -440,8 +491,13 @@ export default function WorkLogsPage({ readOnly = false }) {
         accessorFn: (row) => Number(row.hours_spent || 0),
         id: 'hours_spent',
         header: 'Durasi',
+        size: 105,
+        minSize: 84,
+        maxSize: 160,
         cell: ({ row }) => {
           const log = row.original;
+          const hoursValue = Number(log.hours_spent || 0);
+          const hoursLabel = `${hoursValue.toFixed(2).replace(/\.?0+$/, '')} jam`;
           const dailyTotal = Number(log.daily_total_hours ?? log.hours_spent ?? 0);
           const dailyLimit = Number(log.daily_limit_hours ?? 8);
           const exceedsDailyNormal = dailyTotal > dailyLimit;
@@ -451,14 +507,51 @@ export default function WorkLogsPage({ readOnly = false }) {
               title={
                 exceedsDailyNormal
                   ? `Total harian ${formatHours(dailyTotal)} (melebihi batas normal ${formatHours(dailyLimit)})`
-                  : undefined
+                  : hoursLabel
               }
               className={cn(
-                'text-xs font-medium whitespace-nowrap tabular-nums',
+                'block truncate text-xs font-medium whitespace-nowrap tabular-nums',
                 exceedsDailyNormal ? 'text-warning' : 'text-foreground'
               )}
             >
-              {Number(log.hours_spent || 0).toFixed(1)}j
+              {hoursLabel}
+            </span>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.activity_description || '',
+        id: 'activity_description',
+        header: 'Deskripsi Aktivitas',
+        size: 280,
+        minSize: 150,
+        maxSize: 540,
+        cell: ({ row }) => {
+          const desc = row.original.activity_description?.trim();
+          return (
+            <span
+              className="block truncate text-xs text-muted-foreground"
+              title={desc || undefined}
+            >
+              {desc || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'created_at',
+        header: 'Dicatat Pada',
+        size: 185,
+        minSize: 140,
+        maxSize: 260,
+        cell: ({ row }) => {
+          const formatted = formatDateTime(row.original.created_at);
+          return (
+            <span
+              className="block truncate text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+              title={formatted !== '-' ? formatted : undefined}
+            >
+              {formatted}
             </span>
           );
         },
@@ -470,6 +563,10 @@ export default function WorkLogsPage({ readOnly = false }) {
         id: 'actions',
         header: () => <span className="sr-only">Aksi</span>,
         enableSorting: false,
+        enableResizing: false,
+        size: 64,
+        minSize: 56,
+        maxSize: 72,
         cell: ({ row }) => {
           const log = row.original;
           return (
@@ -612,7 +709,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                   return (
                     <div
                       key={assign.id}
-                      className="flex flex-col gap-2 px-5 py-3.5 transition-colors hover:bg-muted/30"
+                      className="flex flex-col gap-2 px-5 py-3.5 transition-colors duration-150 hover:bg-hover-surface"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
@@ -831,7 +928,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                   clearable
                   size="sm"
                   ariaLabel="Tanggal mulai"
-                  className="h-9 w-36 rounded-xl"
+                  className="h-9 w-44 rounded-xl"
                 />
                 <span>s.d.</span>
                 <DatePicker
@@ -842,7 +939,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                   clearable
                   size="sm"
                   ariaLabel="Tanggal akhir"
-                  className="h-9 w-36 rounded-xl"
+                  className="h-9 w-44 rounded-xl"
                 />
               </div>
 
@@ -1153,7 +1250,7 @@ export default function WorkLogsPage({ readOnly = false }) {
                 id="wl-work-date"
                 value={form.work_date}
                 onChange={(val) => setForm((prev) => ({ ...prev, work_date: val }))}
-                placeholder="DD-MM-YYYY"
+                placeholder="Pilih tanggal"
                 ariaLabel="Tanggal Kerja"
                 className="h-10 rounded-xl"
               />
